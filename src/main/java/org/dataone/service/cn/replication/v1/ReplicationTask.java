@@ -44,6 +44,29 @@ public class ReplicationTask {
 	private NodeReference targetNode;
 
 	/**
+	 * Constructor - create an empty replication task instance
+   */
+  public ReplicationTask() {
+	  this.taskid = taskid;
+	  this.pid = pid;
+	  this.targetNode = targetNode;
+  }
+
+	/**
+	 * Constructor - create a replication task instance
+	 * 
+   * @param taskid
+   * @param pid
+   * @param targetNode
+   */
+  public ReplicationTask(String taskid, Identifier pid, NodeReference targetNode) {
+	  
+  	this.taskid = taskid;
+	  this.pid = pid;
+	  this.targetNode = targetNode;
+  }
+
+	/**
 	 * Get the task identifier for this task
    * @return the taskid
    */
