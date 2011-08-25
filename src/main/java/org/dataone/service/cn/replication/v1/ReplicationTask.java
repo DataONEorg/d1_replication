@@ -21,6 +21,7 @@
 package org.dataone.service.cn.replication.v1;
 
 import org.dataone.service.types.v1.Identifier;
+import org.dataone.service.types.v1.Node;
 import org.dataone.service.types.v1.NodeReference;
 
 /**
@@ -40,8 +41,8 @@ public class ReplicationTask {
 	/* The identifier of the object to replicate */
 	private Identifier pid;
 	
-	/* The node to replicate data to */
-	private NodeReference targetNode;
+	/* The node to replicate data to. This contains the Subject used for authorization */
+	private Node targetNode;
 
 	/**
 	 * Constructor - create an empty replication task instance
@@ -59,7 +60,7 @@ public class ReplicationTask {
    * @param pid
    * @param targetNode
    */
-  public ReplicationTask(String taskid, Identifier pid, NodeReference targetNode) {
+  public ReplicationTask(String taskid, Identifier pid, Node targetNode) {
 	  
   	this.taskid = taskid;
 	  this.pid = pid;
@@ -102,7 +103,7 @@ public class ReplicationTask {
 	 * Get the target node reference to replicate the object to
    * @return the targetNode
    */
-  public NodeReference getTargetNode() {
+  public Node getTargetNode() {
   	return targetNode;
   }
 
@@ -110,7 +111,7 @@ public class ReplicationTask {
 	 * Set the target node reference to replicate the object to
    * @param targetNode the targetNode to set
    */
-  public void setTargetNode(NodeReference targetNode) {
+  public void setTargetNode(Node targetNode) {
   	this.targetNode = targetNode;
   }
 	
