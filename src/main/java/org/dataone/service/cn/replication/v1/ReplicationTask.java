@@ -20,6 +20,8 @@
 
 package org.dataone.service.cn.replication.v1;
 
+import java.io.Serializable;
+
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.Node;
 import org.dataone.service.types.v1.NodeReference;
@@ -34,7 +36,7 @@ import org.dataone.service.types.v1.Subject;
  * @author cjones
  *
  */
-public class ReplicationTask {
+public class ReplicationTask implements Serializable {
 
 	/* The identifier of this task */
 	private String taskid;
