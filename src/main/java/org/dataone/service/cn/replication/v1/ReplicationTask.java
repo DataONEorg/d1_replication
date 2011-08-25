@@ -40,10 +40,13 @@ public class ReplicationTask {
 	private String taskid;
 	
 	/* The identifier of the object to replicate */
-	private Identifier pid;
+	private String pid;
 	
 	/* The node to replicate data to. This contains the Subject used for authorization */
 	private Node targetNode;
+
+	/* The subject of the target node, extracted from the Node object */
+	private String subject;
 
 	/**
 	 * Constructor - create an empty replication task instance
@@ -64,8 +67,11 @@ public class ReplicationTask {
   public ReplicationTask(String taskid, Identifier pid, Node targetNode) {
 	  
   	this.taskid = taskid;
-	  this.pid = pid;
+	  this.pid = pid.getValue();
 	  this.targetNode = targetNode;
+	  // TODO: uncomment when Types.Node is modified to have Node.Subject
+	  //this.subject = targetNode.getSubject().getValue();
+	  
   }
 
 	/**
@@ -89,7 +95,9 @@ public class ReplicationTask {
    * @return the pid
    */
   public Identifier getPid() {
-  	return pid;
+  	Identifier identifier = new Identifier();
+  	identifier.setValue(pid);
+  	return identifier;
   }
 
 	/**
@@ -97,7 +105,7 @@ public class ReplicationTask {
    * @param pid the pid to set
    */
   public void setPid(Identifier pid) {
-  	this.pid = pid;
+  	this.pid = pid.getValue();
   }
 
 	/**
@@ -131,4 +139,13 @@ public class ReplicationTask {
 		
 	}
 	
+	/**
+	 * Set the target node subject identifying the node
+   * @param subject the targetNode subject
+   */
+  public void setNodeSubject(String subject) {
+  	this.subject = subject;
+  }
+	
+
 }
