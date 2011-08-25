@@ -23,6 +23,7 @@ package org.dataone.service.cn.replication.v1;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.Node;
 import org.dataone.service.types.v1.NodeReference;
+import org.dataone.service.types.v1.Subject;
 
 /**
  * A single replication task to be queued and executed by the Replication Service.
@@ -115,5 +116,19 @@ public class ReplicationTask {
   	this.targetNode = targetNode;
   }
 	
+  /**
+   * For the given Replication task, return the Subject listed in the target
+   * node.  Usually used in authorizing a replication event.
+   * 
+   * @return subject - the Subject listed in the target Node object
+   */
+	public Subject getNodeSubject() {
+		
+		Subject subject = null;
+		// TODO: uncomment when Types.Node is updated with Node.Subject
+		//subject = targetNode.getSubject();
+		return subject;
+		
+	}
 	
 }
