@@ -134,7 +134,7 @@ public class ReplicationTask implements Serializable {
    * 
    * @return subject - the subject listed in the target Node object
    */
-	public Subject getNodeSubject() {
+	public Subject getTargetNodeSubject() {
 		
 		Subject subject = null;
 		subject = targetNode.getSubject(0);
@@ -146,9 +146,27 @@ public class ReplicationTask implements Serializable {
 	 * Set the target node subject identifying the node
    * @param subject the targetNode subject
    */
-  public void setNodeSubject(String subject) {
+  public void setTargetNodeSubject(String subject) {
   	this.targetNodeSubject = subject;
   }
 	
+  /**
+   * Get the permission being allowed for this task
+   * 
+   * @return subject - the subject listed in the target Node object
+   */
+	public String getPermission() {
+		return this.permission;
+		
+	}
+	
+	/**
+	 * Set the permission being allowed for this task
+   * @param subject the targetNode subject
+   */
+  public void setPermission(Permission permission) {
+  	this.permission = permission.name();
+  	
+  }
 
 }
