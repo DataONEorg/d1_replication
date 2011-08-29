@@ -25,6 +25,7 @@ import java.io.Serializable;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.Node;
 import org.dataone.service.types.v1.NodeReference;
+import org.dataone.service.types.v1.Permission;
 import org.dataone.service.types.v1.Subject;
 
 /**
@@ -48,9 +49,13 @@ public class ReplicationTask implements Serializable {
 	private Node targetNode;
 
 	/* The subject of the target node, extracted from the Node object */
-	private String subject;
+	private String targetNodeSubject;
+	
+	/* The permission to be executed (in this case, always 'replicate') */
+	String permission;
 
 	/**
+
 	 * Constructor - create an empty replication task instance
    */
   public ReplicationTask() {
@@ -66,13 +71,14 @@ public class ReplicationTask implements Serializable {
    * @param pid
    * @param targetNode
    */
-  public ReplicationTask(String taskid, Identifier pid, Node targetNode) {
+  public ReplicationTask(String taskid, Identifier pid, Node targetNode,
+  	Permission replicatePermission) {
 	  
   	this.taskid = taskid;
 	  this.pid = pid.getValue();
 	  this.targetNode = targetNode;
-	  // TODO: uncomment when Types.Node is modified to have Node.Subject
-	  //this.subject = targetNode.getSubject().getValue();
+	  this.targetNodeSubject = targetNode.getSubject(0).getValue();
+	  this.permission = replicatePermission.name();
 	  
   }
 
@@ -130,13 +136,12 @@ public class ReplicationTask implements Serializable {
    * For the given Replication task, return the Subject listed in the target
    * node.  Usually used in authorizing a replication event.
    * 
-   * @return subject - the Subject listed in the target Node object
+   * @return subject - the subject listed in the target Node object
    */
 	public Subject getNodeSubject() {
 		
 		Subject subject = null;
-		// TODO: uncomment when Types.Node is updated with Node.Subject
-		//subject = targetNode.getSubject();
+		subject = targetNode.getSubject(0);
 		return subject;
 		
 	}
@@ -146,7 +151,7 @@ public class ReplicationTask implements Serializable {
    * @param subject the targetNode subject
    */
   public void setNodeSubject(String subject) {
-  	this.subject = subject;
+  	this.targetNodeSubject = subject;
   }
 	
 
