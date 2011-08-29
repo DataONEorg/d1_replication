@@ -21,12 +21,15 @@
 package org.dataone.service.cn.replication.v1;
 
 import com.hazelcast.core.Hazelcast; 
+import com.hazelcast.core.IMap;
 import com.hazelcast.core.Instance; 
 import com.hazelcast.core.InstanceEvent; 
 import com.hazelcast.core.InstanceListener;
+import com.hazelcast.query.SqlPredicate;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -38,9 +41,11 @@ import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.types.v1.Identifier;
+import org.dataone.service.types.v1.Permission;
 import org.dataone.service.types.v1.ReplicationPolicy;
 import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.Session;
+import org.dataone.service.types.v1.Subject;
 
 /**
  * A DataONE Coordinating Node implementation of the CNReplication API which
@@ -199,6 +204,63 @@ public class ReplicationService implements CNReplication, InstanceListener {
 		log.info("Destroyed Hazelcast instance: " + instance.getInstanceType() +
 		  ", " + instance.getId());
 	  
+  }
+
+	/**
+	 * Verify that a replication task is authorized by comparing the target node's
+	 * Subject (from the X.509 certificate-derived Session) with the list of 
+	 * subjects in the known, pending replication tasks map.
+	 * 
+	 * @param originatingNodeSession - Session information that contains the 
+	 *                                 identity of the calling user
+	 * @param targetNodeSubject - Subject identifying the target node
+	 * @param pid - the identifier of the object to be replicated
+	 * @param executePermission - the execute permission to be granted
+	 * 
+	 * @throws ServiceFailure
+	 * @throws NotImplemented
+	 * @throws InvalidToken
+	 * @throws NotAuthorized
+	 * @throws InvalidRequest
+	 * @throws NotFound
+	 */
+	public boolean isReplicationAuthorized(Session originatingNodeSession,
+    Subject targetNodeSubject, Identifier pid, Permission replicatePermission)
+    throws NotImplemented, NotAuthorized, InvalidToken, ServiceFailure,
+    NotFound, InvalidRequest {
+
+		// build a predicate like: 
+		// "pid                    = '{pid}                   ' AND 
+		//  pemission              = '{permission}            ' AND
+		//  originatingNodeSubject = '{originatingNodeSubject}' AND
+		//  targetNodeSubject      = '{targetNodeSubject}     '"
+		boolean isAllowed = false;
+		String query = "";
+		query += "pid = '";
+		query += pid;
+		query += "' AND permission = '";
+		query += replicatePermission.name();
+		query += "' AND originatingNodeSubject = '";
+		query += originatingNodeSession.getSubject().getValue();
+		query += "' AND targetNodeSubject = '";
+		query += targetNodeSubject.getValue();
+		query += "'";
+		
+		log.debug("Pending replication task query is: " + query);
+		// search the hzPendingReplicationTasks map for the  originating node subject, 
+		// target node subject, pid, and replicate permission
+		
+		IMap pendingReplicationTasks = Hazelcast.getMap("hzPendingReplicationTasks");
+		Set<ReplicationTask> tasks = 
+			(Set<ReplicationTask>) pendingReplicationTasks.values(new SqlPredicate(query));
+		
+		// do we have a matching task?
+		if ( tasks.size() >= 1 ) {
+			isAllowed = true;
+			
+		}
+		
+		return isAllowed;
   }
 	
 	
