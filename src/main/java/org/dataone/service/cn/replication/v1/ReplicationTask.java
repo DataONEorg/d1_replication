@@ -55,13 +55,9 @@ public class ReplicationTask implements Serializable {
 	String permission;
 
 	/**
-
 	 * Constructor - create an empty replication task instance
    */
   public ReplicationTask() {
-	  this.taskid = taskid;
-	  this.pid = pid;
-	  this.targetNode = targetNode;
   }
 
 	/**
