@@ -45,11 +45,11 @@ public class ReplicationTask implements Serializable {
 	/* The identifier of the object to replicate */
 	private String pid;
 	
-	/* The node to replicate data to. This contains the Subject used for authorization */
-	private Node targetNode;
-
 	/* The subject of the target node, extracted from the Node object */
 	private String targetNodeSubject;
+	
+	/* The subject of the originating node, extracted from the Node object */
+	private String originatingNodeSubject;
 	
 	/* The permission to be executed (in this case, always 'replicate') */
 	String permission;
@@ -67,13 +67,14 @@ public class ReplicationTask implements Serializable {
    * @param pid
    * @param targetNode
    */
-  public ReplicationTask(String taskid, Identifier pid, Node targetNode,
+  public ReplicationTask(String taskid, Identifier pid, 
+  	String  originatingNodeSubject, String targetNodeSubject,
   	Permission replicatePermission) {
 	  
   	this.taskid = taskid;
 	  this.pid = pid.getValue();
-	  this.targetNode = targetNode;
-	  this.targetNodeSubject = targetNode.getSubject(0).getValue();
+	  this.originatingNodeSubject = originatingNodeSubject;
+	  this.targetNodeSubject = targetNodeSubject;
 	  this.permission = replicatePermission.name();
 	  
   }
@@ -112,33 +113,15 @@ public class ReplicationTask implements Serializable {
   	this.pid = pid.getValue();
   }
 
-	/**
-	 * Get the target node reference to replicate the object to
-   * @return the targetNode
-   */
-  public Node getTargetNode() {
-  	return targetNode;
-  }
-
-	/**
-	 * Set the target node reference to replicate the object to
-   * @param targetNode the targetNode to set
-   */
-  public void setTargetNode(Node targetNode) {
-  	this.targetNode = targetNode;
-  }
-	
   /**
    * For the given Replication task, return the Subject listed in the target
    * node.  Usually used in authorizing a replication event.
    * 
-   * @return subject - the subject listed in the target Node object
+   * @return subject - the subject listed in the target Node object as a string
    */
-	public Subject getTargetNodeSubject() {
+	public String getTargetNodeSubject() {
 		
-		Subject subject = null;
-		subject = targetNode.getSubject(0);
-		return subject;
+		return this.targetNodeSubject;
 		
 	}
 	
@@ -148,6 +131,26 @@ public class ReplicationTask implements Serializable {
    */
   public void setTargetNodeSubject(String subject) {
   	this.targetNodeSubject = subject;
+  }
+	
+  /**
+   * For the given Replication task, return the Subject listed in the target
+   * node.  Usually used in authorizing a replication event.
+   * 
+   * @return subject - the subject listed in the target Node object as a string
+   */
+	public String getOriginatingNodeSubject() {
+		
+		return this.originatingNodeSubject;
+		
+	}
+	
+	/**
+	 * Set the target node subject identifying the node
+   * @param subject the targetNode subject
+   */
+  public void setOriginatingNodeSubject(String subject) {
+  	this.originatingNodeSubject = subject;
   }
 	
   /**
