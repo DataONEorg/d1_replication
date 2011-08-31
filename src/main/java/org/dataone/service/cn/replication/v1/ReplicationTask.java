@@ -21,6 +21,7 @@
 package org.dataone.service.cn.replication.v1;
 
 import java.io.Serializable;
+import java.util.concurrent.Callable;
 
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.Node;
@@ -37,7 +38,7 @@ import org.dataone.service.types.v1.Subject;
  * @author cjones
  *
  */
-public class ReplicationTask implements Serializable {
+public class ReplicationTask implements Serializable, Callable<String> {
 
 	/* The identifier of this task */
 	private String taskid;
@@ -170,6 +171,17 @@ public class ReplicationTask implements Serializable {
   public void setPermission(Permission permission) {
   	this.permission = permission.name();
   	
+  }
+
+	
+  /**
+   * Implement the Callable interface, providing code that initiates replication.
+   * 
+   * @return pid - the identifier of the replicated object upon success
+   */
+  public String call() throws Exception {
+
+	  return null;
   }
 
 }
