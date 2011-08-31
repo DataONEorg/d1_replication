@@ -20,10 +20,17 @@
 
 package org.dataone.service.cn.replication.v1;
 
+import java.net.InetSocketAddress;
+
 import junit.framework.TestCase;
 
-public class ReplicationServiceTest extends TestCase {
+import org.dataone.configuration.Settings;
 
+import com.hazelcast.core.Hazelcast;
+import com.hazelcast.core.Member;
+
+public class ReplicationServiceTest extends TestCase {
+	
 	protected void setUp() throws Exception {
 		super.setUp();
 	}
@@ -32,8 +39,16 @@ public class ReplicationServiceTest extends TestCase {
 		super.tearDown();
 	}
 
-	public void testReplicationServiceImpl() {
-		fail("Not yet implemented");
+	/**
+	 * Test that the replication service successfully becomes a Hazelcast cluster member
+	 */
+	public void testReplicationService() {
+
+		
+		ReplicationService replicationService = ReplicationService.getInstance();
+    Member member = Hazelcast.getCluster().getLocalMember();
+        
+    assertTrue(member.localMember());
 	}
 
 	public void testSetReplicationPolicy() {
@@ -45,10 +60,6 @@ public class ReplicationServiceTest extends TestCase {
 	}
 
 	public void testCreateReplicationTaskList() {
-		fail("Not yet implemented");
-	}
-
-	public void testHandleReplicationTask() {
 		fail("Not yet implemented");
 	}
 
