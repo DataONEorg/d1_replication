@@ -207,37 +207,6 @@ public class ReplicationService implements CNReplication, InstanceListener,
 	}
 	
 	/**
-	 * Process a replication task by initiating replication on the target node
-	 * 
-	 * @param replicationTask - the replication task to be executed
-	 * @return boolean - true if the task is intiated without exception
-	 * 
-	 * @throws ServiceFailure
-	 * @throws NotImplemented
-	 * @throws InvalidToken
-	 * @throws NotAuthorized
-	 * @throws InvalidRequest
-	 * @throws NotFound
-	 */
-	public boolean handleReplicationTask(ReplicationTask replicationTask) 
-	  throws ServiceFailure, NotImplemented, InvalidToken, NotAuthorized, 
-    InvalidRequest, NotFound {
-		
-		throw new NotImplemented("", "");
-		
-		// get a Subject token to identify this CN
-		
-		// call replicate() on the target MN using ReplicationTask data, and
-		// libclient's REST call methods
-		
-		// handle exceptions from the REST call
-		
-		
-		//return false;
-		
-	}
-
-	/**
 	 * Called when this Hazelcast instance listener is created
 	 * 
 	 * @param event - the instance event that occurred
