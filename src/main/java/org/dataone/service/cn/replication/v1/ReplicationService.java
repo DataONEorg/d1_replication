@@ -76,7 +76,7 @@ public class ReplicationService implements CNReplication, InstanceListener,
 	public static Log log = LogFactory.getLog(ReplicationService.class);
 	
 	/* The instance of the replication service */
-	private ReplicationService instance;
+	private static ReplicationService instance;
 	
 	/* The name of the replication tasks queue */
 	private String tasksQueue = 
@@ -111,7 +111,7 @@ public class ReplicationService implements CNReplication, InstanceListener,
 	 * 
 	 * @return instance - the instance of the ReplicationService
 	 */
-	public synchronized ReplicationService getInstance() {
+	public synchronized static ReplicationService getInstance() {
 		
   	if ( instance == null ) {
   		instance = new ReplicationService();
