@@ -22,17 +22,28 @@ package org.dataone.service.cn.replication.v1;
 
 import com.hazelcast.core.Hazelcast; 
 import com.hazelcast.core.IMap;
+import com.hazelcast.core.IQueue;
 import com.hazelcast.core.Instance; 
 import com.hazelcast.core.InstanceEvent; 
 import com.hazelcast.core.InstanceListener;
+import com.hazelcast.core.ItemListener;
 import com.hazelcast.query.SqlPredicate;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.dataone.client.ObjectFormatCache;
+import org.dataone.configuration.Settings;
 import org.dataone.service.cn.v1.CNReplication;
 import org.dataone.service.exceptions.InvalidRequest;
 import org.dataone.service.exceptions.InvalidToken;
@@ -49,24 +60,69 @@ import org.dataone.service.types.v1.Subject;
 
 /**
  * A DataONE Coordinating Node implementation of the CNReplication API which
- * manages replication queues and executes replication tasks.
+ * manages replication queues and executes replication tasks. The service is
+ * also a Hazelcast cluster member and listens for queued replication tasks. 
+ * Queued tasks are popped from the queue on a first come first serve basis,
+ * and are executed in a distributed manner (not necessarily on the node that
+ * popped the task).
  * 
  * @author cjones
  *
  */
-public class ReplicationService implements CNReplication, InstanceListener {
+public class ReplicationService implements CNReplication, InstanceListener,
+  ItemListener<ReplicationTask> {
 
 	/* Get a Log instance */
 	public static Log log = LogFactory.getLog(ReplicationService.class);
 	
+	/* The instance of the replication service */
+	private ReplicationService instance;
+	
+	/* The name of the replication tasks queue */
+	private String tasksQueue = 
+		Settings.getConfiguration().getString("replication.hazelcast.queuedTasks");
+	
+	/* The name of the pending replication tasks map */
+	private String pendingTasksQueue = 
+		Settings.getConfiguration().getString("replication.hazelcast.pendingTasks");
+	
+	/* The Hazelcast distributed replication tasks queue*/
+	private IQueue<ReplicationTask> replicationTasks;
+	
+	/* The Hazelcast distributed pending replication tasks map*/
+	private Map<String, ReplicationTask> pendingReplicationTasks;
+	
 	/**
-	 * Constructor
+	 * Private Constructor - singleton pattern
 	 */
-	public ReplicationService() {
+	private ReplicationService() {
+		super();
 		
-  }
+		// Become a Hazelcast cluster node using the replication structures
+		replicationTasks = Hazelcast.getQueue("taskQueue");
+		pendingReplicationTasks = Hazelcast.getMap(pendingTasksQueue);
+		
+		// monitor the replication tasks queue
+    replicationTasks.addItemListener(this, true);
+	}
 
 	/**
+	 * Get an instance of the ReplicationService, or create one if it doesn't exist
+	 * 
+	 * @return instance - the instance of the ReplicationService
+	 */
+	public synchronized ReplicationService getInstance() {
+		
+  	if ( instance == null ) {
+  		instance = new ReplicationService();
+  		
+  	}
+  	
+  	return instance;
+  }
+			
+	/**
+
 	 * Update the replication policy entry for an object by updating the system metadata.
 	 *
 	 * @param session - Session information that contains the identity of the calling user
@@ -261,6 +317,63 @@ public class ReplicationService implements CNReplication, InstanceListener {
 		}
 		
 		return isAllowed;
+  }
+
+	
+	/**
+	 * Implement the ItemListener interface, responding to items being added to
+	 * the hzReplicationTasks queue.
+	 * 
+	 * @param task - the ReplicationTask being added to the queue
+	 */
+	public void itemAdded(ReplicationTask task) {
+
+		// When a task is added to the queue, attempt to handle the task. If 
+		// successful, execute the task.		
+    try {
+	    task = this.replicationTasks.poll(3, TimeUnit.SECONDS);
+	    
+	    if ( task != null ) {
+	    	log.info("Scheduling replication task id " + task.getTaskid() +
+	    			     " for object identifier: " + task.getPid().getValue());
+	    	
+		    ExecutorService executorService = Executors.newSingleThreadExecutor();
+		    Future<String> replicationTask = executorService.submit(task);
+		    
+		    // check for completion
+		    while ( !replicationTask.isDone() ) {
+		    	
+		    	if ( replicationTask.isCancelled() ) {
+		    		log.info("Replication task id " + task.getTaskid() + 
+		    				     " was cancelled.");
+		    	}
+		    	
+		    }
+		    
+    		log.info("Replication task id " + task.getTaskid() + " completed.");
+
+	    }
+    
+    } catch (InterruptedException e) {
+
+    	String message = "Polling of the replication task queue was interrupted. " +
+    	                 "The message was: " + e.getMessage();
+    	log.info(message);
+    }
+      
+ }
+
+	
+	/**
+	 * Implement the ItemListener interface, responding to items being removed from
+	 * the hzReplicationTasks queue.
+	 * 
+	 * @param task - the object being removed from the queue (ReplicationTask)
+	 */
+	public void itemRemoved(ReplicationTask task) {
+    // not implemented until needed
+		
+		
   }
 	
 	
