@@ -8,15 +8,15 @@
   </group>
 
   <network>
-    <port auto-increment="false">5701</port>
+    <port auto-increment="true">5701</port>
     <join>
       <multicast enabled="false">
         <multicast-group>224.2.2.3</multicast-group>
         <multicast-port>54327</multicast-port>
       </multicast>
       <tcp-ip enabled="true">
-        <hostname>cn-dev-1.dataone.org</hostname>
-        <hostname>cn-dev-2.dataone.org</hostname>
+        <hostname>cn-dev.test.dataone.org</hostname>
+        <hostname>cn-dev-2.test.dataone.org</hostname>
         <interface>10.0.0.100</interface>
       </tcp-ip>
     </join>
