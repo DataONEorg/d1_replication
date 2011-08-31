@@ -306,7 +306,7 @@ public class ReplicationService implements CNReplication, InstanceListener,
 	    	log.info("Scheduling replication task id " + task.getTaskid() +
 	    			     " for object identifier: " + task.getPid().getValue());
 	    	
-		    ExecutorService executorService = Executors.newSingleThreadExecutor();
+		    ExecutorService executorService = Hazelcast.getExecutorService();
 		    Future<String> replicationTask = executorService.submit(task);
 		    
 		    // check for completion
@@ -320,7 +320,8 @@ public class ReplicationService implements CNReplication, InstanceListener,
 		    }
 		    
     		log.info("Replication task id " + task.getTaskid() + " completed.");
-
+        
+    		//TODO: lock pid, update sysmeta to set ReplicationStatus.COMPLETE
 	    }
     
     } catch (InterruptedException e) {
