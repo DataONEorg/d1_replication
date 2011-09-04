@@ -23,11 +23,11 @@ package org.dataone.service.cn.replication.v1;
 import java.io.Serializable;
 import java.util.concurrent.Callable;
 
+import org.dataone.client.D1Client;
+import org.dataone.client.MNode;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.Node;
-import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.Permission;
-import org.dataone.service.types.v1.Subject;
 
 /**
  * A single replication task to be queued and executed by the Replication Service.
@@ -40,78 +40,137 @@ import org.dataone.service.types.v1.Subject;
  */
 public class ReplicationTask implements Serializable, Callable<String> {
 
-	/* The identifier of this task */
-	private String taskid;
-	
-	/* The identifier of the object to replicate */
-	private String pid;
-	
-	/* The subject of the target node, extracted from the Node object */
-	private String targetNodeSubject;
-	
-	/* The subject of the originating node, extracted from the Node object */
-	private String originatingNodeSubject;
-	
-	/* The permission to be executed (in this case, always 'replicate') */
-	String permission;
+  /* The identifier of this task */
+  private String taskid;
+  
+  /* The identifier of the system metadata map event that precipitated this task */
+  private String eventid;
+  
+  /* The identifier of the object to replicate */
+  private String pid;
+  
+  /* The target Node object */
+  private Node targetNode;
+  
+  /* The originating Node object */
+  private Node originatingNode;
 
-	/**
-	 * Constructor - create an empty replication task instance
+  /* The subject of the target node, extracted from the Node object */
+  private String targetNodeSubject;
+  
+  /* The subject of the originating node, extracted from the Node object */
+  private String originatingNodeSubject;
+  
+  /* The permission to be executed (in this case, always 'replicate') */
+  String permission;
+
+  /**
+   * Constructor - create an empty replication task instance
    */
   public ReplicationTask() {
   }
 
-	/**
-	 * Constructor - create a replication task instance
-	 * 
+  /**
+   * Constructor - create a replication task instance
+   * 
    * @param taskid
    * @param pid
    * @param targetNode
    */
   public ReplicationTask(String taskid, Identifier pid, 
-  	String  originatingNodeSubject, String targetNodeSubject,
-  	Permission replicatePermission) {
-	  
-  	this.taskid = taskid;
-	  this.pid = pid.getValue();
-	  this.originatingNodeSubject = originatingNodeSubject;
-	  this.targetNodeSubject = targetNodeSubject;
-	  this.permission = replicatePermission.name();
-	  
+    Node originatingNode, Node targetNode,
+    Permission replicatePermission) {
+    
+    this.taskid = taskid;
+    this.pid = pid.getValue();
+    this.originatingNode = originatingNode;
+    this.targetNode = targetNode;
+    this.originatingNodeSubject = originatingNode.getSubject(0).getValue();
+    this.targetNodeSubject = targetNode.getSubject(0).getValue();
+    this.permission = replicatePermission.name();
+    
   }
 
-	/**
-	 * Get the task identifier for this task
+  /**
+   * Get the task identifier for this task
    * @return the taskid
    */
   public String getTaskid() {
-  	return taskid;
+    return taskid;
   }
 
-	/**
-	 * Set the task identifier for this task
+  /**
+   * Set the task identifier for this task
    * @param taskid the taskid to set
    */
   public void setTaskid(String taskid) {
-  	this.taskid = taskid;
+    this.taskid = taskid;
   }
 
-	/**
-	 * Get the object identifier to be replicated
+  /**
+   * Get the object identifier to be replicated
    * @return the pid
    */
   public Identifier getPid() {
-  	Identifier identifier = new Identifier();
-  	identifier.setValue(pid);
-  	return identifier;
+    Identifier identifier = new Identifier();
+    identifier.setValue(pid);
+    return identifier;
   }
 
-	/**
-	 * Set the object identifier to be replicated
+  /**
+   * Set the object identifier to be replicated
    * @param pid the pid to set
    */
   public void setPid(Identifier pid) {
-  	this.pid = pid.getValue();
+    this.pid = pid.getValue();
+  }
+
+  /**
+   * Get the event identifier 
+   * @return the eventid
+   */
+  public String getEventid() {
+    return eventid;
+  }
+
+  /**
+   * Set the event identifier 
+   * @param eventid the eventid to set
+   */
+  public void setEventid(String eventid) {
+    this.eventid = eventid;
+  }
+
+  /**
+   * Get the target node
+   * @return the targetNode
+   */
+  public Node getTargetNode() {
+    return targetNode;
+  }
+
+  /**
+   * Set the target node
+   * @param targetNode the targetNode to set
+   */
+  public void setTargetNode(Node targetNode) {
+    this.targetNode = targetNode;
+  }
+
+  /**
+   * Get the originating node
+   * @return the originatingNode
+   */
+  public Node getOriginatingNode() {
+    return originatingNode;
+  }
+
+  /**
+   * Set the originating node
+   * @param originatingNode the originatingNode to set
+   */
+  public void setOriginatingNode(Node originatingNode) {
+    this.originatingNode = originatingNode;
   }
 
   /**
@@ -120,60 +179,59 @@ public class ReplicationTask implements Serializable, Callable<String> {
    * 
    * @return subject - the subject listed in the target Node object as a string
    */
-	public String getTargetNodeSubject() {
-		
-		return this.targetNodeSubject;
-		
-	}
-	
-	/**
-	 * Set the target node subject identifying the node
+  public String getTargetNodeSubject() {
+    
+    return this.targetNodeSubject;
+    
+  }
+  
+  /**
+   * Set the target node subject identifying the node
    * @param subject the targetNode subject
    */
   public void setTargetNodeSubject(String subject) {
-  	this.targetNodeSubject = subject;
+    this.targetNodeSubject = subject;
   }
-	
+  
   /**
    * For the given Replication task, return the Subject listed in the target
    * node.  Usually used in authorizing a replication event.
    * 
    * @return subject - the subject listed in the target Node object as a string
    */
-	public String getOriginatingNodeSubject() {
-		
-		return this.originatingNodeSubject;
-		
-	}
-	
-	/**
-	 * Set the target node subject identifying the node
+  public String getOriginatingNodeSubject() {
+    
+    return this.originatingNodeSubject;
+    
+  }
+  
+  /**
+   * Set the target node subject identifying the node
    * @param subject the targetNode subject
    */
   public void setOriginatingNodeSubject(String subject) {
-  	this.originatingNodeSubject = subject;
+    this.originatingNodeSubject = subject;
   }
-	
+  
   /**
    * Get the permission being allowed for this task
    * 
    * @return subject - the subject listed in the target Node object
    */
-	public String getPermission() {
-		return this.permission;
-		
-	}
-	
-	/**
-	 * Set the permission being allowed for this task
+  public String getPermission() {
+    return this.permission;
+    
+  }
+  
+  /**
+   * Set the permission being allowed for this task
    * @param subject the targetNode subject
    */
   public void setPermission(Permission permission) {
-  	this.permission = permission.name();
-  	
+    this.permission = permission.name();
+    
   }
-
-	
+ 
   /**
    * Implement the Callable interface, providing code that initiates replication.
    * 
@@ -181,7 +239,11 @@ public class ReplicationTask implements Serializable, Callable<String> {
    */
   public String call() throws Exception {
 
-	  return null;
+	MNode targetMN = D1Client.getMN(targetNode.getIdentifier());
+	//targetMN.replicate(arg0, arg1, arg2)
+	    
+	
+    return null;
   }
 
 }
