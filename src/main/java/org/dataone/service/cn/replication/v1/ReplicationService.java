@@ -57,6 +57,7 @@ import org.dataone.service.types.v1.ReplicationPolicy;
 import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.Subject;
+import org.dataone.service.types.v1.SystemMetadata;
 
 /**
  * A DataONE Coordinating Node implementation of the CNReplication API which
@@ -79,18 +80,25 @@ public class ReplicationService implements CNReplication, InstanceListener,
 	private static ReplicationService instance;
 	
 	/* The name of the replication tasks queue */
+	private String systemMetadataMap = 
+		Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
+	
+	/* The name of the replication tasks queue */
 	private String tasksQueue = 
-		Settings.getConfiguration().getString("replication.hazelcast.queuedTasks");
+		Settings.getConfiguration().getString("dataone.hazelcast.replicationQueuedTasks");
 	
 	/* The name of the pending replication tasks map */
 	private String pendingTasksQueue = 
-		Settings.getConfiguration().getString("replication.hazelcast.pendingTasks");
+		Settings.getConfiguration().getString("dataone.hazelcast.replicationPendingTasks");
+	
+	/* The Hazelcast distributed system metadata map */
+	private IMap<Identifier, SystemMetadata> systemMetadata;
 	
 	/* The Hazelcast distributed replication tasks queue*/
 	private IQueue<ReplicationTask> replicationTasks;
 	
 	/* The Hazelcast distributed pending replication tasks map*/
-	private Map<String, ReplicationTask> pendingReplicationTasks;
+	private IMap<String, ReplicationTask> pendingReplicationTasks;
 	
 	/**
 	 * Private Constructor - singleton pattern
@@ -321,7 +329,7 @@ public class ReplicationService implements CNReplication, InstanceListener,
 		    
     		log.info("Replication task id " + task.getTaskid() + " completed.");
         
-    		//TODO: lock pid, update sysmeta to set ReplicationStatus.COMPLETE
+    		//TODO: lock pid, update sysmeta to set ReplicationStatus.REQUESTED
 	    }
     
     } catch (InterruptedException e) {
