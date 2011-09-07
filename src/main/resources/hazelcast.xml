@@ -4,11 +4,11 @@
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <group>
     <name>DataONE</name>
-    <password>D1-Replication</password>
+    <password>password</password>
   </group>
 
   <network>
-    <port auto-increment="true">5801</port>
+    <port auto-increment="true">5701</port>
     <join>
       <multicast enabled="false">
         <multicast-group>224.2.2.3</multicast-group>
@@ -179,7 +179,7 @@
     <merge-policy>hz.ADD_NEW_ENTRY</merge-policy>
   </map>
 
-  <map name="hzObjectLock">
+  <map name="hzSystemMetadata">
     <!--
       Number of backups. If 1 is set as the backup-count for example,
       then all entries of the map will be copied to another JVM for
@@ -226,6 +226,15 @@
       hz.LATEST_UPDATE ; entry with the latest update wins.
     -->
     <merge-policy>hz.ADD_NEW_ENTRY</merge-policy>
+    
+    <!-- 
+      Use Metacat as the backing store for the System Metadata map, using 
+      a write-through policy for fault tolerance.
+     -->
+    <map-store enabled="false">
+      <class-name>edu.ucsb.nceas.metacat.dataone.hazelcast.SystemMetadataMap</class-name>
+      <write-delay-seconds>0</write-delay-seconds>
+    </map-store>
   </map>
 
   <!-- Add your own map merge policy implementations here:   
