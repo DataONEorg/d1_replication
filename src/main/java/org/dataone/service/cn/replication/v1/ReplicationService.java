@@ -70,9 +70,6 @@ public class ReplicationService implements CNReplication,
   /* Get a Log instance */
   public static Log log = LogFactory.getLog(ReplicationService.class);
   
-  /* The instance of the replication service */
-  private static ReplicationService instance;
-  
   /* The instance of the Hazelcast client */
   private HazelcastClient hzClient;
   
@@ -112,8 +109,7 @@ public class ReplicationService implements CNReplication,
   /**
    * Private Constructor - singleton pattern
    */
-  private ReplicationService() {
-    super();
+  public ReplicationService() {
     
     // Become a Hazelcast cluster client using the replication structures
     String[] addresses = this.addressList.split(",");
@@ -128,20 +124,6 @@ public class ReplicationService implements CNReplication,
     this.replicationTasks.addItemListener(this, true);
   }
 
-  /**
-   * Get an instance of the ReplicationService, or create one if it doesn't exist
-   * 
-   * @return instance - the instance of the ReplicationService
-   */
-  public synchronized static ReplicationService getInstance() {
-    
-    if ( instance == null ) {
-      instance = new ReplicationService();
-      
-    }
-    
-    return instance;
-  }
       
   /**
 
