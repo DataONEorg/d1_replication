@@ -181,10 +181,10 @@ public class ReplicationService implements CNReplication, InstanceListener,
 	/**
 	 * Create a list of replication tasks given the identifier of an object
 	 * by evaluating its system metadata and the capabilities of the target
-	 * replication nodes
+	 * replication nodes. Queue the tasks for processing.
 	 * 
 	 * @param pid - the identifier of the object to be replicated
-	 * @return taskList - the list of replication tasks
+	 * @return count - the number of replication tasks queued
 	 * 
 	 * @throws ServiceFailure
 	 * @throws NotImplemented
@@ -193,7 +193,7 @@ public class ReplicationService implements CNReplication, InstanceListener,
 	 * @throws InvalidRequest
 	 * @throws NotFound
 	 */
-	public List<ReplicationTask> createReplicationTaskList(Identifier pid) 
+	public int createAndQueueTasks(Identifier pid) 
 	throws ServiceFailure, NotImplemented, InvalidToken, NotAuthorized, 
   InvalidRequest, NotFound {
 		
