@@ -74,28 +74,22 @@ public class ReplicationService implements CNReplication,
   private HazelcastClient hzClient;
   
   /* The name of the DataONE Hazelcast cluster group */
-  private String groupName = 
-    Settings.getConfiguration().getString("replication.hazelcast.groupName");
+  private String groupName;
 
   /* The name of the DataONE Hazelcast cluster password */
-  private String groupPassword = 
-    Settings.getConfiguration().getString("replication.hazelcast.password");
+  private String groupPassword;
   
   /* The name of the DataONE Hazelcast cluster IP addresses */
-  private String addressList = 
-    Settings.getConfiguration().getString("replication.hazelcast.clusterInstances");
+  private String addressList;
   
   /* The name of the replication tasks queue */
-  private String systemMetadataMap = 
-    Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
+  private String systemMetadataMap;
   
   /* The name of the replication tasks queue */
-  private String tasksQueue = 
-    Settings.getConfiguration().getString("dataone.hazelcast.replicationQueuedTasks");
+  private String tasksQueue;
   
   /* The name of the pending replication tasks map */
-  private String pendingTasksQueue = 
-    Settings.getConfiguration().getString("dataone.hazelcast.replicationPendingTasks");
+  private String pendingTasksQueue;
   
   /* The Hazelcast distributed system metadata map */
   private IMap<Identifier, SystemMetadata> systemMetadata;
@@ -111,10 +105,24 @@ public class ReplicationService implements CNReplication,
    */
   public ReplicationService() {
     
+  	// Get configuration properties on instantiation
+  	groupName = 
+      Settings.getConfiguration().getString("dataone.hazelcast.group");
+    groupPassword = 
+      Settings.getConfiguration().getString("dataone.hazelcast.password");
+    addressList = 
+      Settings.getConfiguration().getString("dataone.hazelcast.clusterInstances");
+    systemMetadataMap = 
+      Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
+    tasksQueue = 
+      Settings.getConfiguration().getString("dataone.hazelcast.replicationQueuedTasks");
+    pendingTasksQueue = 
+      Settings.getConfiguration().getString("dataone.hazelcast.replicationPendingTasks");
+
     // Become a Hazelcast cluster client using the replication structures
     String[] addresses = this.addressList.split(",");
     this.hzClient = 
-      HazelcastClient.newHazelcastClient(groupName, groupPassword, addresses);
+      HazelcastClient.newHazelcastClient(this.groupName, this.groupPassword, addresses);
     this.systemMetadata = this.hzClient.getMap(systemMetadataMap);
     this.replicationTasks = this.hzClient.getQueue(tasksQueue);
     this.pendingReplicationTasks = this.hzClient.getMap(pendingTasksQueue);
@@ -126,7 +134,6 @@ public class ReplicationService implements CNReplication,
 
       
   /**
-
    * Update the replication policy entry for an object by updating the system metadata.
    *
    * @param session - Session information that contains the identity of the calling user
