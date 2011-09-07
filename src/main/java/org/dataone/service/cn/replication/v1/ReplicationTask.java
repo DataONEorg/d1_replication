@@ -25,9 +25,22 @@ import java.util.concurrent.Callable;
 
 import org.dataone.client.D1Client;
 import org.dataone.client.MNode;
+import org.dataone.configuration.Settings;
+import org.dataone.service.exceptions.InsufficientResources;
+import org.dataone.service.exceptions.InvalidRequest;
+import org.dataone.service.exceptions.NotAuthorized;
+import org.dataone.service.exceptions.NotImplemented;
+import org.dataone.service.exceptions.ServiceFailure;
+import org.dataone.service.exceptions.UnsupportedType;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.Node;
 import org.dataone.service.types.v1.Permission;
+import org.dataone.service.types.v1.Session;
+import org.dataone.service.types.v1.Subject;
+import org.dataone.service.types.v1.SystemMetadata;
+
+import com.hazelcast.client.HazelcastClient;
+import com.hazelcast.core.IMap;
 
 /**
  * A single replication task to be queued and executed by the Replication Service.
@@ -237,10 +250,69 @@ public class ReplicationTask implements Serializable, Callable<String> {
    * 
    * @return pid - the identifier of the replicated object upon success
    */
-  public String call() throws Exception {
+  public String call() {
 
-	MNode targetMN = D1Client.getMN(targetNode.getIdentifier());
-	//targetMN.replicate(arg0, arg1, arg2)
+	MNode targetMN = null;
+  
+	// Get an target MNode reference to communicate with
+	try {
+	  targetMN = D1Client.getMN(targetNode.getIdentifier());
+  } catch (ServiceFailure e) {
+  	
+	  // TODO Auto-generated catch block
+	  e.printStackTrace();
+  }
+	
+	// Create a session that will be overridden by D1Client's session from the
+	// SSL cert
+	Subject subject = new Subject();
+	subject.setValue(null);
+	Session session = new Session();
+	session.setSubject(subject);
+	
+	// Get the D1 Hazelcast configuration parameters
+	String hzSystemMetadata = 
+		Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
+
+	String groupName = 
+		Settings.getConfiguration().getString("replication.hazelcast.groupName");
+
+	String groupPassword = 
+		Settings.getConfiguration().getString("replication.hazelcast.password");
+	
+	String addressList = 
+		Settings.getConfiguration().getString("replication.hazelcast.clusterInstances");
+	String[] addresses = addressList.split(",");
+	
+	// get the system metadata for the pid
+	HazelcastClient hzClient = 
+		HazelcastClient.newHazelcastClient(groupName, groupPassword, addresses);
+	
+	IMap<String, SystemMetadata> sysMetaMap = hzClient.getMap(hzSystemMetadata);
+	SystemMetadata sysmeta = sysMetaMap.get(pid);
+	
+	// Initiate the MN to MN replication for this task
+	try {
+	  targetMN.replicate(session, sysmeta, this.originatingNode.getIdentifier());
+  } catch (NotImplemented e) {
+	  // TODO Auto-generated catch block
+	  e.printStackTrace();
+  } catch (ServiceFailure e) {
+	  // TODO Auto-generated catch block
+	  e.printStackTrace();
+  } catch (NotAuthorized e) {
+	  // TODO Auto-generated catch block
+	  e.printStackTrace();
+  } catch (InvalidRequest e) {
+	  // TODO Auto-generated catch block
+	  e.printStackTrace();
+  } catch (InsufficientResources e) {
+	  // TODO Auto-generated catch block
+	  e.printStackTrace();
+  } catch (UnsupportedType e) {
+	  // TODO Auto-generated catch block
+	  e.printStackTrace();
+  }
 	    
 	
     return null;
