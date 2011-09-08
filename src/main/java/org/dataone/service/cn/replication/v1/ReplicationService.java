@@ -25,6 +25,7 @@ import com.hazelcast.core.EntryEvent;
 import com.hazelcast.core.EntryListener;
 import com.hazelcast.core.IMap;
 import com.hazelcast.core.IQueue;
+import com.hazelcast.core.IdGenerator;
 import com.hazelcast.core.ItemListener;
 import com.hazelcast.query.SqlPredicate;
 
@@ -46,12 +47,17 @@ import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.types.v1.Identifier;
+import org.dataone.service.types.v1.Node;
+import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.Permission;
 import org.dataone.service.types.v1.ReplicationPolicy;
 import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.Subject;
 import org.dataone.service.types.v1.SystemMetadata;
+
+import org.dataone.client.D1Client;
+import org.dataone.client.CNode;
 
 /**
  * A DataONE Coordinating Node implementation of the CNReplication API which
@@ -72,6 +78,10 @@ public class ReplicationService implements CNReplication,
   
   /* The instance of the Hazelcast client */
   private HazelcastClient hzClient;
+
+  /* The instance of the IdGenerator created by Hazelcast used 
+     to generate "task-ids" */
+  private IdGenerator taskIdGenerator;
   
   /* The name of the DataONE Hazelcast cluster group */
   private String groupName;
@@ -126,6 +136,7 @@ public class ReplicationService implements CNReplication,
     this.systemMetadata = this.hzClient.getMap(systemMetadataMap);
     this.replicationTasks = this.hzClient.getQueue(tasksQueue);
     this.pendingReplicationTasks = this.hzClient.getMap(pendingTasksQueue);
+    this.taskIdGenerator = this.hzClient.getIdGenerator("task-ids");
     
     // monitor the replication structures
     this.systemMetadata.addEntryListener(this, true);
@@ -173,7 +184,7 @@ public class ReplicationService implements CNReplication,
    * @throws NotFound
    */
   public boolean setReplicationStatus(Session session, Identifier pid,
-    ReplicationStatus replicationStatus) 
+    NodeReference nodeRef, ReplicationStatus replicationStatus) 
     throws ServiceFailure, NotImplemented, InvalidToken, NotAuthorized, 
     InvalidRequest, NotFound {
 
@@ -199,22 +210,87 @@ public class ReplicationService implements CNReplication,
   public int createAndQueueTasks(Identifier pid) 
   throws ServiceFailure, NotImplemented, InvalidToken, NotAuthorized, 
   InvalidRequest, NotFound {
-    
-    List<ReplicationTask> taskList = new ArrayList<ReplicationTask>();
-
-    throw new NotImplemented("", "");
 
     // get the system metadata for the pid
+    SystemMetadata sysmeta = this.systemMetadata.get(pid);
     
+    // the list of replication tasks to create and queue
+    List<ReplicationTask> taskList = new ArrayList<ReplicationTask>();
+
+    // CN for getting nodes for tasks
+    CNode cn = D1Client.getCN();
+
+    // List of Nodes for building ReplicationTasks
+    List<Node> nodes = cn.listNodes().getNodeList();
+
+    // authoritative member node to replicate from
+    Node originatingNode = new Node();
+    for(Node node : nodes) {
+        if(node.getIdentifier().getValue() == 
+                sysmeta.getAuthoritativeMemberNode().getValue()) {
+            originatingNode = node;
+        }
+    }
+
     // parse the sysmeta.ReplicationPolicy
-    
-    // prioritize replication nodes based on the policy and node capabilities
-    
-    // create the ReplicationTask
-    
-    // add the task to the task list
-        
-    //return taskList;
+    ReplicationPolicy replicationPolicy = sysmeta.getReplicationPolicy();
+    List<NodeReference> preferredList = 
+        replicationPolicy.getPreferredMemberNodeList();
+
+    // query the pendingReplicationTasks for tasks pending for this pid
+    String query = "";
+    query += "pid = '";
+    query += pid;
+    query += "'";
+
+    log.debug("Pending replication task query is: " + query);
+
+    // perform query
+    Set<ReplicationTask> pendingTasksForPID = 
+        (Set<ReplicationTask>) 
+        this.pendingReplicationTasks.values(new SqlPredicate(query));
+
+    // flag for whether a node is in the preferred list for this pid
+    boolean alreadyAdded = false;
+
+    // for each node in the preferred list
+    for(NodeReference nodeRef : preferredList) {
+        alreadyAdded = false;
+        // for each task in the pending tasks
+        for(ReplicationTask task : pendingTasksForPID) {
+            // ensure that this node is not in the pending tasks list
+            if(nodeRef.getValue().equals(
+                        task.getTargetNode().getIdentifier().getValue())){
+                alreadyAdded = true;
+                break;
+            }
+        }
+        Node targetNode = new Node();
+        // if the node doesn't already exist in the pendingTasks for this pid
+        if(!alreadyAdded) {
+            for(Node node : nodes) {
+                if(nodeRef.getValue().equals(node.getIdentifier().getValue())) {
+                    targetNode = node;
+                }
+            }
+            Long taskid = taskIdGenerator.newId();
+            // add the task to the task list
+            taskList.add(new ReplicationTask(
+                                taskid.toString(),
+                                pid,
+                                originatingNode,
+                                targetNode,
+                                Permission.REPLICATE));
+        }
+    }
+
+    // add list to the queue
+    for (ReplicationTask task : taskList) {
+        this.replicationTasks.add(task);
+    }
+
+    // return the number of replication tasks queued
+    return taskList.size();
   }
   
   /**
@@ -235,7 +311,7 @@ public class ReplicationService implements CNReplication,
    * @throws InvalidRequest
    * @throws NotFound
    */
-  public boolean isReplicationAuthorized(Session originatingNodeSession,
+  public boolean isNodeAuthorized(Session originatingNodeSession,
     Subject targetNodeSubject, Identifier pid, Permission replicatePermission)
     throws NotImplemented, NotAuthorized, InvalidToken, ServiceFailure,
     NotFound, InvalidRequest {
@@ -290,6 +366,8 @@ public class ReplicationService implements CNReplication,
         log.info("Scheduling replication task id " + task.getTaskid() +
                  " for object identifier: " + task.getPid().getValue());
         
+        // TODO: handle the case when a CN drops and the ReplicationTask.call()
+        // has not been made.
         ExecutorService executorService = this.hzClient.getExecutorService();
         Future<String> replicationTask = executorService.submit(task);
         
@@ -344,7 +422,7 @@ public class ReplicationService implements CNReplication,
       // instance within the cluster should get the lock)
       boolean locked = 
         this.systemMetadata.tryLock(event.getKey(), 3, TimeUnit.SECONDS);
-      if ( locked ) {
+      if ( locked ) { // TODO stiffen this condition
         this.createAndQueueTasks(event.getKey());
         this.systemMetadata.unlock(event.getKey());
         
