@@ -49,7 +49,9 @@ import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.Node;
 import org.dataone.service.types.v1.NodeReference;
+import org.dataone.service.types.v1.NodeType;
 import org.dataone.service.types.v1.Permission;
+import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationPolicy;
 import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.Session;
@@ -92,7 +94,10 @@ public class ReplicationService implements CNReplication,
   /* The name of the DataONE Hazelcast cluster IP addresses */
   private String addressList;
   
-  /* The name of the replication tasks queue */
+  /* The name of the node map */
+  private String nodeMap;
+
+  /* The name of the system metadata map */
   private String systemMetadataMap;
   
   /* The name of the replication tasks queue */
@@ -101,6 +106,12 @@ public class ReplicationService implements CNReplication,
   /* The name of the pending replication tasks map */
   private String pendingTasksQueue;
   
+  /* The Hazelcast distributed task id generator namespace */
+  private String taskIds;
+  
+  /* The Hazelcast distributed system metadata map */
+  private IMap<NodeReference, Node> nodes;
+
   /* The Hazelcast distributed system metadata map */
   private IMap<Identifier, SystemMetadata> systemMetadata;
   
@@ -109,34 +120,39 @@ public class ReplicationService implements CNReplication,
   
   /* The Hazelcast distributed pending replication tasks map*/
   private IMap<String, ReplicationTask> pendingReplicationTasks;
-  
+
   /**
    * Private Constructor - singleton pattern
    */
   public ReplicationService() {
     
-  	// Get configuration properties on instantiation
-  	groupName = 
+    // Get configuration properties on instantiation
+    this.groupName = 
       Settings.getConfiguration().getString("dataone.hazelcast.group");
-    groupPassword = 
+    this.groupPassword = 
       Settings.getConfiguration().getString("dataone.hazelcast.password");
-    addressList = 
+    this.addressList = 
       Settings.getConfiguration().getString("dataone.hazelcast.clusterInstances");
-    systemMetadataMap = 
+    this.nodeMap = 
+      Settings.getConfiguration().getString("dataone.hazelcast.nodes");
+    this.systemMetadataMap = 
       Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
-    tasksQueue = 
+    this.tasksQueue = 
       Settings.getConfiguration().getString("dataone.hazelcast.replicationQueuedTasks");
-    pendingTasksQueue = 
+    this.pendingTasksQueue = 
       Settings.getConfiguration().getString("dataone.hazelcast.replicationPendingTasks");
-
+    this.taskIds = 
+      Settings.getConfiguration().getString("dataone.hazelcast.tasksIdGenerator");
+    
     // Become a Hazelcast cluster client using the replication structures
     String[] addresses = this.addressList.split(",");
     this.hzClient = 
       HazelcastClient.newHazelcastClient(this.groupName, this.groupPassword, addresses);
+    this.nodes = this.hzClient.getMap(nodeMap);
     this.systemMetadata = this.hzClient.getMap(systemMetadataMap);
     this.replicationTasks = this.hzClient.getQueue(tasksQueue);
     this.pendingReplicationTasks = this.hzClient.getMap(pendingTasksQueue);
-    this.taskIdGenerator = this.hzClient.getIdGenerator("task-ids");
+    this.taskIdGenerator = this.hzClient.getIdGenerator(taskIds);
     
     // monitor the replication structures
     this.systemMetadata.addEntryListener(this, true);
@@ -187,11 +203,12 @@ public class ReplicationService implements CNReplication,
     NodeReference nodeRef, ReplicationStatus replicationStatus) 
     throws ServiceFailure, NotImplemented, InvalidToken, NotAuthorized, 
     InvalidRequest, NotFound {
-
+    
     throw new NotImplemented("", "");
     
   }
 
+  
   /**
    * Create a list of replication tasks given the identifier of an object
    * by evaluating its system metadata and the capabilities of the target
@@ -406,7 +423,6 @@ public class ReplicationService implements CNReplication,
     
     
   }
-
   
   /**
    * Implement the EntryListener interface, responding to entries being added to
@@ -458,7 +474,6 @@ public class ReplicationService implements CNReplication,
     }
     
   }
-
   
   /**
    * Implement the EntryListener interface, responding to entries being deleted from
@@ -470,7 +485,6 @@ public class ReplicationService implements CNReplication,
     // we don't remove replicas (do we?) 
     
   }
-
   
   /**
    * Implement the EntryListener interface, responding to entries being updated in
@@ -520,7 +534,6 @@ public class ReplicationService implements CNReplication,
     }
     
   }
-
   
   /**
    * Implement the EntryListener interface, responding to entries being evicted from
