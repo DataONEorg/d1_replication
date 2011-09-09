@@ -668,7 +668,10 @@ public class ReplicationService implements CNReplication,
   /* 
    * Verify an asserted checksum of a replica 
    * 
-   * @param replicaChecksum - the replica checksum asserted as the same
+   * @param sourceNode - the source node of the object
+   * @param replicaNode - the replica node of the object
+   * @param pid - the identifier of the object
+   * @param algorithm - the checksum algorithm
    */
   private boolean verifyChecksum(NodeReference sourceNode, NodeReference replicaNode,
     Identifier pid, String algorithm) 
