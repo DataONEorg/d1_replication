@@ -30,6 +30,7 @@ import com.hazelcast.core.ItemListener;
 import com.hazelcast.query.SqlPredicate;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -46,6 +47,7 @@ import org.dataone.service.exceptions.NotAuthorized;
 import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
+import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.Node;
 import org.dataone.service.types.v1.NodeReference;
@@ -60,6 +62,7 @@ import org.dataone.service.types.v1.SystemMetadata;
 
 import org.dataone.client.D1Client;
 import org.dataone.client.CNode;
+import org.dataone.client.MNode;
 
 /**
  * A DataONE Coordinating Node implementation of the CNReplication API which
@@ -204,7 +207,122 @@ public class ReplicationService implements CNReplication,
     throws ServiceFailure, NotImplemented, InvalidToken, NotAuthorized, 
     InvalidRequest, NotFound {
     
-    throw new NotImplemented("", "");
+    boolean success = false; // did the system metadata change succeeed?
+    boolean checksumIsValid = false;
+    SystemMetadata sysMeta;
+    List<Replica> replicaList;
+
+    // What type of Node is calling? If it's an MN, verify the checksum
+    NodeType callingNodeType = null;
+    Subject subject = session.getSubject();
+    List<Node> nodeList = (List<Node>) this.nodes.values();
+
+    // find the node identified by the subject
+    for (Node node : nodeList) {
+      List<Subject> subjectList = node.getSubjectList();
+      
+      if ( subjectList.contains(subject) ) {
+        callingNodeType = node.getType();
+        
+      }
+    }
+
+    // verify checksums for MNs only 
+    if ( callingNodeType == NodeType.MN ) {
+      
+      //is it the target MN? If not, don't allow it
+      if ( !isNodeAuthorized(session, session.getSubject(), pid, Permission.REPLICATE)) {
+        throw new NotAuthorized("4871",  "The calling node identified by " +
+          session.getSubject().getValue() +
+          " isn't authorized to set the replication status for the object" +
+          " identified by " + pid.getValue());
+        
+      }
+      
+      // verify the checksum
+      this.systemMetadata.lock(pid);
+      sysMeta = this.systemMetadata.get(pid);
+      this.systemMetadata.unlock(pid);
+      checksumIsValid = 
+        verifyChecksum(sysMeta.getAuthoritativeMemberNode(), nodeRef, pid, 
+          sysMeta.getChecksum().getAlgorithm());
+      
+      // TODO: update the Replication status
+      if ( checksumIsValid ) {
+        // set to ReplicationStatus.COMPLETE
+        
+        // remove from pending replication tasks map
+
+      } else {
+        // set to ReplicationStatus.INVALIDATED
+        
+      }
+    }
+    
+    try {
+      this.systemMetadata.lock(pid);
+      sysMeta = this.systemMetadata.get(pid);
+      this.systemMetadata.unlock(pid);
+    
+      if ( sysMeta == null ) {
+        // object doesn't exist
+        throw new NotFound("4740", "the object identified by " + pid.getValue() +
+            " was not found.");
+        
+      } else {
+        // find and update the correct replica's status
+        replicaList = sysMeta.getReplicaList();
+        
+        if ( replicaList.size() == 0 ) {
+          
+          // no replicas exist. create a new entry
+          replicaList = new ArrayList<Replica>();
+          Replica newReplica = new Replica();
+          newReplica.setReplicaMemberNode(nodeRef);
+          newReplica.setReplicationStatus(replicationStatus);
+          newReplica.setReplicaVerified(new Date());
+          replicaList.add(newReplica);
+          sysMeta.setReplicaList(replicaList);
+          sysMeta.setDateSysMetadataModified(new Date());
+
+          // update the replica status
+          this.systemMetadata.lock(pid);
+          this.systemMetadata.put(pid, sysMeta);
+          this.systemMetadata.unlock(pid);
+          success = true;
+          
+        } else {
+          // get the correct replica that is already listed
+          for (Replica replica : replicaList) {
+            NodeReference replicaNodeId = replica.getReplicaMemberNode();
+            
+            if (replicaNodeId == nodeRef ) {
+              // update the status in the list
+              replica.setReplicationStatus(replicationStatus);
+              sysMeta.setReplicaList(replicaList);
+              sysMeta.setDateSysMetadataModified(new Date());
+              // update the replica status
+              this.systemMetadata.lock(pid);
+              this.systemMetadata.put(pid, sysMeta);
+              this.systemMetadata.unlock(pid);
+              success = true;
+              break; // found it, we're done.
+              
+            }
+          }
+        }
+      }
+      
+    } catch (Exception e) {
+
+      // catch Hazelcast exceptions and recast them
+      throw new ServiceFailure("4700", "An error occurred while setting the " +
+        "replication status.  the message was: " + e.getMessage());
+      
+    }
+
+
+    return success;
     
   }
 
@@ -546,5 +664,38 @@ public class ReplicationService implements CNReplication,
     
   }
   
+
+  /* 
+   * Verify an asserted checksum of a replica 
+   * 
+   * @param replicaChecksum - the replica checksum asserted as the same
+   */
+  private boolean verifyChecksum(NodeReference sourceNode, NodeReference replicaNode,
+    Identifier pid, String algorithm) 
+    throws ServiceFailure, InvalidToken,
+    NotAuthorized, NotFound, InvalidRequest, NotImplemented {
+    
+    boolean isValid = false;
+    
+    Checksum sourceChecksum = null;
+    Checksum replicaChecksum = null;
+    Session session = new Session();
+    session.setSubject(null); // session will be overwritten by Session from SSL cert
+    
+    MNode replicaMN = D1Client.getMN(sourceNode);
+    replicaChecksum = replicaMN.getChecksum(session, pid, algorithm);
+
+    // Get the source node's checksum for the pid
+    MNode sourceMN = D1Client.getMN(sourceNode);
+    sourceChecksum = sourceMN.getChecksum(session, pid, algorithm);
+    
+    if ( sourceChecksum.equals(replicaChecksum) && sourceChecksum != null) {
+      isValid = true;
+      
+    }
+    
+    return isValid;
+    
+  }
   
 }
