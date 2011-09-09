@@ -211,7 +211,13 @@ public class ReplicationService implements CNReplication,
     boolean checksumIsValid = false;
     SystemMetadata sysMeta;
     List<Replica> replicaList;
-
+    NodeReference replicaNodeId;
+    String replicaNodeSubject;
+    
+    // Get the replica node subject for later use
+    Node replicaNode = this.nodes.get(nodeRef);
+    replicaNodeSubject = replicaNode.getSubject(0).getValue();
+    
     // What type of Node is calling? If it's an MN, verify the checksum
     NodeType callingNodeType = null;
     Subject subject = session.getSubject();
@@ -239,22 +245,74 @@ public class ReplicationService implements CNReplication,
         
       }
       
-      // verify the checksum
+      // verify the checksum if this is the final status
       this.systemMetadata.lock(pid);
       sysMeta = this.systemMetadata.get(pid);
       this.systemMetadata.unlock(pid);
-      checksumIsValid = 
-        verifyChecksum(sysMeta.getAuthoritativeMemberNode(), nodeRef, pid, 
-          sysMeta.getChecksum().getAlgorithm());
-      
-      // TODO: update the Replication status
-      if ( checksumIsValid ) {
-        // set to ReplicationStatus.COMPLETE
+
+      if (replicationStatus == ReplicationStatus.COMPLETED) {
         
-        // remove from pending replication tasks map
+        checksumIsValid = 
+          verifyChecksum(sysMeta.getAuthoritativeMemberNode(), nodeRef, pid, 
+            sysMeta.getChecksum().getAlgorithm());
+      
+      } else if (replicationStatus == ReplicationStatus.INVALIDATED) {
+        
+        // don't check if the MN wants to set it to INVALIDATED
+        checksumIsValid = true;
+        
+      }
+      
+      if ( checksumIsValid ) {
+        replicationStatus = ReplicationStatus.COMPLETED;        
 
       } else {
-        // set to ReplicationStatus.INVALIDATED
+        replicationStatus = ReplicationStatus.INVALIDATED;        
+        log.error("The checksums don't match for " + pid.getValue() +
+          "on the source node (" + sysMeta.getAuthoritativeMemberNode().getValue() +
+          ") and the target node (" + nodeRef.getValue() + ").");
+      }
+      
+      // get the system metadata again in case it changed
+      this.systemMetadata.lock(pid);
+      sysMeta = this.systemMetadata.get(pid);
+      this.systemMetadata.unlock(pid);
+      
+      // get the correct replica that is already listed
+      replicaList = sysMeta.getReplicaList();
+      for (Replica replica : replicaList) {
+        replicaNodeId = replica.getReplicaMemberNode();
+        
+        if (replicaNodeId == nodeRef ) {
+          // update the status in the list
+          replica.setReplicationStatus(replicationStatus);
+          sysMeta.setReplicaList(replicaList);
+          sysMeta.setDateSysMetadataModified(new Date());
+          // update the replica status
+          this.systemMetadata.lock(pid);
+          this.systemMetadata.put(pid, sysMeta);
+          this.systemMetadata.unlock(pid);
+          success = true;
+          break; // found it, we're done.
+          
+        }
+      }
+      
+      // remove the task from the pending tasks map
+      String query = "pid = " + pid.getValue() + 
+       " AND targetNodeSubject = " + replicaNodeSubject + "'";
+      
+      Set<ReplicationTask> pendingTasks = 
+        (Set<ReplicationTask>) this.pendingReplicationTasks.values(new SqlPredicate(query));
+      log.debug("For pid " + pid.getValue() + ", found " + pendingTasks.size() +
+        " tasks.");
+      // TODO: should only be one task, add checks or exceptions
+      for ( ReplicationTask task : pendingTasks ) {
+        String taskid = task.getTaskid();
+        this.pendingReplicationTasks.lock(taskid);
+        this.pendingReplicationTasks.remove(taskid);
+        log.info("Removed pending task (" + taskid + ") for pid " + pid.getValue());
+        this.pendingReplicationTasks.unlock(taskid);
         
       }
     }
@@ -292,13 +350,14 @@ public class ReplicationService implements CNReplication,
           success = true;
           
         } else {
+          
           // get the correct replica that is already listed
-          for (Replica replica : replicaList) {
-            NodeReference replicaNodeId = replica.getReplicaMemberNode();
+          for (Replica replica2 : replicaList) {
+            replicaNodeId = replica2.getReplicaMemberNode();
             
             if (replicaNodeId == nodeRef ) {
               // update the status in the list
-              replica.setReplicationStatus(replicationStatus);
+              replica2.setReplicationStatus(replicationStatus);
               sysMeta.setReplicaList(replicaList);
               sysMeta.setDateSysMetadataModified(new Date());
               // update the replica status
