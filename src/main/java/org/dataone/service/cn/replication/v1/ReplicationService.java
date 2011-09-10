@@ -183,6 +183,11 @@ public class ReplicationService implements CNReplication,
     throws NotImplemented, NotFound, NotAuthorized,
       ServiceFailure, InvalidRequest, InvalidToken {
 
+  	Subject authoritativeNodeSubject;
+  	Node authoritativeNode;
+  	Subject callingNodeSubject;
+  	Node callingNode;
+  	
     return false;
   }
 
@@ -256,10 +261,11 @@ public class ReplicationService implements CNReplication,
           verifyChecksum(sysMeta.getAuthoritativeMemberNode(), nodeRef, pid, 
             sysMeta.getChecksum().getAlgorithm());
       
-      } else if (replicationStatus == ReplicationStatus.INVALIDATED) {
-        
-        // don't check if the MN wants to set it to INVALIDATED
-        checksumIsValid = true;
+      } else if (replicationStatus == ReplicationStatus.REQUESTED || 
+      		       replicationStatus == ReplicationStatus.QUEUED ||
+      		       replicationStatus == ReplicationStatus.INVALIDATED) {
+        throw new NotAuthorized("", "Only Coordinating Nodes are currently " +
+        	"allowed to set replication status to " + replicationStatus.toString() );        
         
       }
       
@@ -380,11 +386,9 @@ public class ReplicationService implements CNReplication,
       
     }
 
-
     return success;
     
   }
-
   
   /**
    * Create a list of replication tasks given the identifier of an object
@@ -723,7 +727,6 @@ public class ReplicationService implements CNReplication,
     
   }
   
-
   /* 
    * Verify an asserted checksum of a replica 
    * 
