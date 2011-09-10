@@ -264,7 +264,7 @@ public class ReplicationService implements CNReplication,
       } else if (replicationStatus == ReplicationStatus.REQUESTED || 
       		       replicationStatus == ReplicationStatus.QUEUED ||
       		       replicationStatus == ReplicationStatus.INVALIDATED) {
-        throw new NotAuthorized("", "Only Coordinating Nodes are currently " +
+        throw new NotAuthorized("4720", "Only Coordinating Nodes are currently " +
         	"allowed to set replication status to " + replicationStatus.toString() );        
         
       }
