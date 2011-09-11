@@ -51,7 +51,7 @@ import com.hazelcast.core.IMap;
  * @author cjones
  *
  */
-public class ReplicationTask implements Serializable, Callable<String> {
+public class MNReplicationTask implements Serializable, Callable<String> {
 
   /* The identifier of this task */
   private String taskid;
@@ -80,7 +80,7 @@ public class ReplicationTask implements Serializable, Callable<String> {
   /**
    * Constructor - create an empty replication task instance
    */
-  public ReplicationTask() {
+  public MNReplicationTask() {
   }
 
   /**
@@ -90,7 +90,7 @@ public class ReplicationTask implements Serializable, Callable<String> {
    * @param pid
    * @param targetNode
    */
-  public ReplicationTask(String taskid, Identifier pid, 
+  public MNReplicationTask(String taskid, Identifier pid, 
     Node originatingNode, Node targetNode,
     Permission replicatePermission) {
     
