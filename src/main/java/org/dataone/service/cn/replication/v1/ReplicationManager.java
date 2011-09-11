@@ -65,9 +65,9 @@ import org.dataone.client.CNode;
 import org.dataone.client.MNode;
 
 /**
- * A DataONE Coordinating Node implementation of the CNReplication API which
+ * A DataONE Coordinating Node implementation which
  * manages replication queues and executes replication tasks. The service is
- * also a Hazelcast cluster member and listens for queued replication tasks. 
+ * a Hazelcast cluster member and client and listens for queued replication tasks. 
  * Queued tasks are popped from the queue on a first come first serve basis,
  * and are executed in a distributed manner (not necessarily on the node that
  * popped the task).
@@ -75,11 +75,11 @@ import org.dataone.client.MNode;
  * @author cjones
  *
  */
-public class ReplicationService implements CNReplication, 
-  EntryListener<Identifier, SystemMetadata>, ItemListener<ReplicationTask> {
+public class ReplicationManager implements 
+  EntryListener<Identifier, SystemMetadata>, ItemListener<MNReplicationTask> {
 
   /* Get a Log instance */
-  public static Log log = LogFactory.getLog(ReplicationService.class);
+  public static Log log = LogFactory.getLog(ReplicationManager.class);
   
   /* The instance of the Hazelcast client */
   private HazelcastClient hzClient;
@@ -119,15 +119,15 @@ public class ReplicationService implements CNReplication,
   private IMap<Identifier, SystemMetadata> systemMetadata;
   
   /* The Hazelcast distributed replication tasks queue*/
-  private IQueue<ReplicationTask> replicationTasks;
+  private IQueue<MNReplicationTask> replicationTasks;
   
   /* The Hazelcast distributed pending replication tasks map*/
-  private IMap<String, ReplicationTask> pendingReplicationTasks;
+  private IMap<String, MNReplicationTask> pendingReplicationTasks;
 
   /**
    * Private Constructor - singleton pattern
    */
-  public ReplicationService() {
+  public ReplicationManager() {
     
     // Get configuration properties on instantiation
     this.groupName = 
@@ -164,233 +164,6 @@ public class ReplicationService implements CNReplication,
 
       
   /**
-   * Update the replication policy entry for an object by updating the system metadata.
-   *
-   * @param session - Session information that contains the identity of the calling user
-   * @param pid - Identifier of the object to be replicated between Member Nodes
-   * @param status - Replication policy. See the replication policy schema.
-   * @return true if setting the status succeeds
-   * 
-   * @throws ServiceFailure
-   * @throws NotImplemented
-   * @throws InvalidToken
-   * @throws NotAuthorized
-   * @throws InvalidRequest
-   * @throws NotFound
-   */
-  public boolean setReplicationPolicy(Session session, Identifier pid,
-    ReplicationPolicy replicationPolicy) 
-    throws NotImplemented, NotFound, NotAuthorized,
-      ServiceFailure, InvalidRequest, InvalidToken {
-
-  	Subject authoritativeNodeSubject;
-  	Node authoritativeNode;
-  	Subject callingNodeSubject;
-  	Node callingNode;
-  	
-    return false;
-  }
-
-  /**
-   * Update the replication status of the system metadata, ensuring that the 
-   * change is appropriate for the given state of system metadata
-   * 
-   * @param session - Session information that contains the identity of the calling user
-   * @param pid - Identifier of the object to be replicated between Member Nodes
-   * @param status - Replication status. See system metadata schema for possible values.
-   * @return true if setting the status succeeds
-   * 
-   * @throws ServiceFailure
-   * @throws NotImplemented
-   * @throws InvalidToken
-   * @throws NotAuthorized
-   * @throws InvalidRequest
-   * @throws NotFound
-   */
-  public boolean setReplicationStatus(Session session, Identifier pid,
-    NodeReference nodeRef, ReplicationStatus replicationStatus) 
-    throws ServiceFailure, NotImplemented, InvalidToken, NotAuthorized, 
-    InvalidRequest, NotFound {
-    
-    boolean success = false; // did the system metadata change succeeed?
-    boolean checksumIsValid = false;
-    SystemMetadata sysMeta;
-    List<Replica> replicaList;
-    NodeReference replicaNodeId;
-    String replicaNodeSubject;
-    
-    // Get the replica node subject for later use
-    Node replicaNode = this.nodes.get(nodeRef);
-    replicaNodeSubject = replicaNode.getSubject(0).getValue();
-    
-    // What type of Node is calling? If it's an MN, verify the checksum
-    NodeType callingNodeType = null;
-    Subject subject = session.getSubject();
-    List<Node> nodeList = (List<Node>) this.nodes.values();
-
-    // find the node identified by the subject
-    for (Node node : nodeList) {
-      List<Subject> subjectList = node.getSubjectList();
-      
-      if ( subjectList.contains(subject) ) {
-        callingNodeType = node.getType();
-        
-      }
-    }
-
-    // verify checksums for MNs only 
-    if ( callingNodeType == NodeType.MN ) {
-      
-      //is it the target MN? If not, don't allow it
-      if ( !isNodeAuthorized(session, session.getSubject(), pid, Permission.REPLICATE)) {
-        throw new NotAuthorized("4871",  "The calling node identified by " +
-          session.getSubject().getValue() +
-          " isn't authorized to set the replication status for the object" +
-          " identified by " + pid.getValue());
-        
-      }
-      
-      // verify the checksum if this is the final status
-      this.systemMetadata.lock(pid);
-      sysMeta = this.systemMetadata.get(pid);
-      this.systemMetadata.unlock(pid);
-
-      if (replicationStatus == ReplicationStatus.COMPLETED) {
-        
-        checksumIsValid = 
-          verifyChecksum(sysMeta.getAuthoritativeMemberNode(), nodeRef, pid, 
-            sysMeta.getChecksum().getAlgorithm());
-      
-      } else if (replicationStatus == ReplicationStatus.REQUESTED || 
-      		       replicationStatus == ReplicationStatus.QUEUED ||
-      		       replicationStatus == ReplicationStatus.INVALIDATED) {
-        throw new NotAuthorized("4720", "Only Coordinating Nodes are currently " +
-        	"allowed to set replication status to " + replicationStatus.toString() );        
-        
-      }
-      
-      if ( checksumIsValid ) {
-        replicationStatus = ReplicationStatus.COMPLETED;        
-
-      } else {
-        replicationStatus = ReplicationStatus.INVALIDATED;        
-        log.error("The checksums don't match for " + pid.getValue() +
-          "on the source node (" + sysMeta.getAuthoritativeMemberNode().getValue() +
-          ") and the target node (" + nodeRef.getValue() + ").");
-      }
-      
-      // get the system metadata again in case it changed
-      this.systemMetadata.lock(pid);
-      sysMeta = this.systemMetadata.get(pid);
-      this.systemMetadata.unlock(pid);
-      
-      // get the correct replica that is already listed
-      replicaList = sysMeta.getReplicaList();
-      for (Replica replica : replicaList) {
-        replicaNodeId = replica.getReplicaMemberNode();
-        
-        if (replicaNodeId == nodeRef ) {
-          // update the status in the list
-          replica.setReplicationStatus(replicationStatus);
-          sysMeta.setReplicaList(replicaList);
-          sysMeta.setDateSysMetadataModified(new Date());
-          // update the replica status
-          this.systemMetadata.lock(pid);
-          this.systemMetadata.put(pid, sysMeta);
-          this.systemMetadata.unlock(pid);
-          success = true;
-          break; // found it, we're done.
-          
-        }
-      }
-      
-      // remove the task from the pending tasks map
-      String query = "pid = " + pid.getValue() + 
-       " AND targetNodeSubject = " + replicaNodeSubject + "'";
-      
-      Set<ReplicationTask> pendingTasks = 
-        (Set<ReplicationTask>) this.pendingReplicationTasks.values(new SqlPredicate(query));
-      log.debug("For pid " + pid.getValue() + ", found " + pendingTasks.size() +
-        " tasks.");
-      // TODO: should only be one task, add checks or exceptions
-      for ( ReplicationTask task : pendingTasks ) {
-        String taskid = task.getTaskid();
-        this.pendingReplicationTasks.lock(taskid);
-        this.pendingReplicationTasks.remove(taskid);
-        log.info("Removed pending task (" + taskid + ") for pid " + pid.getValue());
-        this.pendingReplicationTasks.unlock(taskid);
-        
-      }
-    }
-    
-    try {
-      this.systemMetadata.lock(pid);
-      sysMeta = this.systemMetadata.get(pid);
-      this.systemMetadata.unlock(pid);
-    
-      if ( sysMeta == null ) {
-        // object doesn't exist
-        throw new NotFound("4740", "the object identified by " + pid.getValue() +
-            " was not found.");
-        
-      } else {
-        // find and update the correct replica's status
-        replicaList = sysMeta.getReplicaList();
-        
-        if ( replicaList.size() == 0 ) {
-          
-          // no replicas exist. create a new entry
-          replicaList = new ArrayList<Replica>();
-          Replica newReplica = new Replica();
-          newReplica.setReplicaMemberNode(nodeRef);
-          newReplica.setReplicationStatus(replicationStatus);
-          newReplica.setReplicaVerified(new Date());
-          replicaList.add(newReplica);
-          sysMeta.setReplicaList(replicaList);
-          sysMeta.setDateSysMetadataModified(new Date());
-
-          // update the replica status
-          this.systemMetadata.lock(pid);
-          this.systemMetadata.put(pid, sysMeta);
-          this.systemMetadata.unlock(pid);
-          success = true;
-          
-        } else {
-          
-          // get the correct replica that is already listed
-          for (Replica replica2 : replicaList) {
-            replicaNodeId = replica2.getReplicaMemberNode();
-            
-            if (replicaNodeId == nodeRef ) {
-              // update the status in the list
-              replica2.setReplicationStatus(replicationStatus);
-              sysMeta.setReplicaList(replicaList);
-              sysMeta.setDateSysMetadataModified(new Date());
-              // update the replica status
-              this.systemMetadata.lock(pid);
-              this.systemMetadata.put(pid, sysMeta);
-              this.systemMetadata.unlock(pid);
-              success = true;
-              break; // found it, we're done.
-              
-            }
-          }
-        }
-      }
-      
-    } catch (Exception e) {
-
-      // catch Hazelcast exceptions and recast them
-      throw new ServiceFailure("4700", "An error occurred while setting the " +
-        "replication status.  the message was: " + e.getMessage());
-      
-    }
-
-    return success;
-    
-  }
-  
-  /**
    * Create a list of replication tasks given the identifier of an object
    * by evaluating its system metadata and the capabilities of the target
    * replication nodes. Queue the tasks for processing.
@@ -413,12 +186,12 @@ public class ReplicationService implements CNReplication,
     SystemMetadata sysmeta = this.systemMetadata.get(pid);
     
     // the list of replication tasks to create and queue
-    List<ReplicationTask> taskList = new ArrayList<ReplicationTask>();
+    List<MNReplicationTask> taskList = new ArrayList<MNReplicationTask>();
 
     // CN for getting nodes for tasks
     CNode cn = D1Client.getCN();
 
-    // List of Nodes for building ReplicationTasks
+    // List of Nodes for building MNReplicationTasks
     List<Node> nodes = cn.listNodes().getNodeList();
 
     // authoritative member node to replicate from
@@ -444,8 +217,8 @@ public class ReplicationService implements CNReplication,
     log.debug("Pending replication task query is: " + query);
 
     // perform query
-    Set<ReplicationTask> pendingTasksForPID = 
-        (Set<ReplicationTask>) 
+    Set<MNReplicationTask> pendingTasksForPID = 
+        (Set<MNReplicationTask>) 
         this.pendingReplicationTasks.values(new SqlPredicate(query));
 
     // flag for whether a node is in the preferred list for this pid
@@ -455,7 +228,7 @@ public class ReplicationService implements CNReplication,
     for(NodeReference nodeRef : preferredList) {
         alreadyAdded = false;
         // for each task in the pending tasks
-        for(ReplicationTask task : pendingTasksForPID) {
+        for(MNReplicationTask task : pendingTasksForPID) {
             // ensure that this node is not in the pending tasks list
             if(nodeRef.getValue().equals(
                         task.getTargetNode().getIdentifier().getValue())){
@@ -473,7 +246,7 @@ public class ReplicationService implements CNReplication,
             }
             Long taskid = taskIdGenerator.newId();
             // add the task to the task list
-            taskList.add(new ReplicationTask(
+            taskList.add(new MNReplicationTask(
                                 taskid.toString(),
                                 pid,
                                 originatingNode,
@@ -483,7 +256,7 @@ public class ReplicationService implements CNReplication,
     }
 
     // add list to the queue
-    for (ReplicationTask task : taskList) {
+    for (MNReplicationTask task : taskList) {
         this.replicationTasks.add(task);
     }
 
@@ -492,68 +265,12 @@ public class ReplicationService implements CNReplication,
   }
   
   /**
-   * Verify that a replication task is authorized by comparing the target node's
-   * Subject (from the X.509 certificate-derived Session) with the list of 
-   * subjects in the known, pending replication tasks map.
-   * 
-   * @param originatingNodeSession - Session information that contains the 
-   *                                 identity of the calling user
-   * @param targetNodeSubject - Subject identifying the target node
-   * @param pid - the identifier of the object to be replicated
-   * @param executePermission - the execute permission to be granted
-   * 
-   * @throws ServiceFailure
-   * @throws NotImplemented
-   * @throws InvalidToken
-   * @throws NotAuthorized
-   * @throws InvalidRequest
-   * @throws NotFound
-   */
-  public boolean isNodeAuthorized(Session originatingNodeSession,
-    Subject targetNodeSubject, Identifier pid, Permission replicatePermission)
-    throws NotImplemented, NotAuthorized, InvalidToken, ServiceFailure,
-    NotFound, InvalidRequest {
-
-    // build a predicate like: 
-    // "pid                    = '{pid}                   ' AND 
-    //  pemission              = '{permission}            ' AND
-    //  originatingNodeSubject = '{originatingNodeSubject}' AND
-    //  targetNodeSubject      = '{targetNodeSubject}     '"
-    boolean isAllowed = false;
-    String query = "";
-    query += "pid = '";
-    query += pid;
-    query += "' AND permission = '";
-    query += replicatePermission.name();
-    query += "' AND originatingNodeSubject = '";
-    query += originatingNodeSession.getSubject().getValue();
-    query += "' AND targetNodeSubject = '";
-    query += targetNodeSubject.getValue();
-    query += "'";
-    
-    log.debug("Pending replication task query is: " + query);
-    // search the hzPendingReplicationTasks map for the  originating node subject, 
-    // target node subject, pid, and replicate permission
-    
-    Set<ReplicationTask> tasks = 
-      (Set<ReplicationTask>) this.pendingReplicationTasks.values(new SqlPredicate(query));
-    
-    // do we have a matching task?
-    if ( tasks.size() >= 1 ) {
-      isAllowed = true;
-      
-    }
-    
-    return isAllowed;
-  }
-  
-  /**
    * Implement the ItemListener interface, responding to items being added to
    * the hzReplicationTasks queue.
    * 
-   * @param task - the ReplicationTask being added to the queue
+   * @param task - the MNReplicationTask being added to the queue
    */
-  public void itemAdded(ReplicationTask task) {
+  public void itemAdded(MNReplicationTask task) {
 
     // When a task is added to the queue, attempt to handle the task. If 
     // successful, execute the task.    
@@ -564,7 +281,7 @@ public class ReplicationService implements CNReplication,
         log.info("Scheduling replication task id " + task.getTaskid() +
                  " for object identifier: " + task.getPid().getValue());
         
-        // TODO: handle the case when a CN drops and the ReplicationTask.call()
+        // TODO: handle the case when a CN drops and the MNReplicationTask.call()
         // has not been made.
         ExecutorService executorService = this.hzClient.getExecutorService();
         Future<String> replicationTask = executorService.submit(task);
@@ -599,7 +316,7 @@ public class ReplicationService implements CNReplication,
    * 
    * @param task - the object being removed from the queue (ReplicationTask)
    */
-  public void itemRemoved(ReplicationTask task) {
+  public void itemRemoved(MNReplicationTask task) {
     // not implemented until needed
     
     
@@ -615,7 +332,7 @@ public class ReplicationService implements CNReplication,
     
     try {
       
-      // try to lock the pid and handle the event (only one ReplicationService
+      // try to lock the pid and handle the event (only one ReplicationManager
       // instance within the cluster should get the lock)
       boolean locked = 
         this.systemMetadata.tryLock(event.getKey(), 3, TimeUnit.SECONDS);
@@ -676,7 +393,7 @@ public class ReplicationService implements CNReplication,
   public void entryUpdated(EntryEvent<Identifier, SystemMetadata> event) {
     try {
       
-      // try to lock the pid and handle the event (only one ReplicationService
+      // try to lock the pid and handle the event (only one ReplicationManager
       // instance within the cluster should get the lock)
       boolean locked = 
         this.systemMetadata.tryLock(event.getKey(), 3, TimeUnit.SECONDS);
@@ -724,42 +441,6 @@ public class ReplicationService implements CNReplication,
    */
   public void entryEvicted(EntryEvent<Identifier, SystemMetadata> event) {
     // nothing to do, entry remains in backing store
-    
-  }
-  
-  /* 
-   * Verify an asserted checksum of a replica 
-   * 
-   * @param sourceNode - the source node of the object
-   * @param replicaNode - the replica node of the object
-   * @param pid - the identifier of the object
-   * @param algorithm - the checksum algorithm
-   */
-  private boolean verifyChecksum(NodeReference sourceNode, NodeReference replicaNode,
-    Identifier pid, String algorithm) 
-    throws ServiceFailure, InvalidToken,
-    NotAuthorized, NotFound, InvalidRequest, NotImplemented {
-    
-    boolean isValid = false;
-    
-    Checksum sourceChecksum = null;
-    Checksum replicaChecksum = null;
-    Session session = new Session();
-    session.setSubject(null); // session will be overwritten by Session from SSL cert
-    
-    MNode replicaMN = D1Client.getMN(sourceNode);
-    replicaChecksum = replicaMN.getChecksum(session, pid, algorithm);
-
-    // Get the source node's checksum for the pid
-    MNode sourceMN = D1Client.getMN(sourceNode);
-    sourceChecksum = sourceMN.getChecksum(session, pid, algorithm);
-    
-    if ( sourceChecksum.equals(replicaChecksum) && sourceChecksum != null) {
-      isValid = true;
-      
-    }
-    
-    return isValid;
     
   }
   
