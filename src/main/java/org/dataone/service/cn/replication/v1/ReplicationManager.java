@@ -23,6 +23,8 @@ package org.dataone.service.cn.replication.v1;
 import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.core.EntryEvent;
 import com.hazelcast.core.EntryListener;
+import com.hazelcast.core.Hazelcast;
+import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IMap;
 import com.hazelcast.core.IQueue;
 import com.hazelcast.core.IdGenerator;
@@ -81,9 +83,12 @@ public class ReplicationManager implements
   /* Get a Log instance */
   public static Log log = LogFactory.getLog(ReplicationManager.class);
   
-  /* The instance of the Hazelcast client */
+  /* The instance of the Hazelcast storage cluster client */
   private HazelcastClient hzClient;
 
+  /* the instance of the Hazelcast processing cluster member */
+  private HazelcastInstance hzMember;
+  
   /* The instance of the IdGenerator created by Hazelcast used 
      to generate "task-ids" */
   private IdGenerator taskIdGenerator;
@@ -151,11 +156,15 @@ public class ReplicationManager implements
     String[] addresses = this.addressList.split(",");
     this.hzClient = 
       HazelcastClient.newHazelcastClient(this.groupName, this.groupPassword, addresses);
-    this.nodes = this.hzClient.getMap(nodeMap);
+    
+    // Also become a Hazelcast processing cluster member
+    this.hzMember = Hazelcast.getDefaultInstance();
+    
+    this.nodes = this.hzMember.getMap(nodeMap);
     this.systemMetadata = this.hzClient.getMap(systemMetadataMap);
-    this.replicationTasks = this.hzClient.getQueue(tasksQueue);
-    this.pendingReplicationTasks = this.hzClient.getMap(pendingTasksQueue);
-    this.taskIdGenerator = this.hzClient.getIdGenerator(taskIds);
+    this.replicationTasks = this.hzMember.getQueue(tasksQueue);
+    this.pendingReplicationTasks = this.hzMember.getMap(pendingTasksQueue);
+    this.taskIdGenerator = this.hzMember.getIdGenerator(taskIds);
     
     // monitor the replication structures
     this.systemMetadata.addEntryListener(this, true);
