@@ -345,7 +345,38 @@ public class ReplicationManager implements
       // instance within the cluster should get the lock)
       boolean locked = 
         this.systemMetadata.tryLock(event.getKey(), 3, TimeUnit.SECONDS);
-      if ( locked ) { // TODO stiffen this condition
+
+      // query the pendingReplicationTasks for tasks pending for this pid
+      String query = "";
+      query += "pid = '";
+      query += event.getKey().getValue();
+      query += "'";
+
+      log.debug("Pending replication task query is: " + query);
+
+      // perform query
+      Set<MNReplicationTask> pendingTasksForPID = 
+          (Set<MNReplicationTask>) 
+          this.pendingReplicationTasks.values(new SqlPredicate(query));
+
+      // is the set of pending replication tasks with this pid empty? 
+      // if yes then the pid is not taken by another task
+      boolean not_pending = pendingTasksForPID.isEmpty();
+
+      // also need to check the current replicationTasks
+      boolean no_task_with_pid = true;
+
+      // for each MNReplicationTask
+      for(MNReplicationTask task : replicationTasks) {
+        // if the task's pid is equal to the event's pid
+        if(task.getPid().getValue().equals(event.getKey().getValue())){
+            no_task_with_pid = false;
+            break;
+        }
+      }
+
+      // if the pid is locked and not taken by a pending task
+      if ( locked && not_pending && no_task_with_pid ) {
         this.createAndQueueTasks(event.getKey());
         this.systemMetadata.unlock(event.getKey());
         
@@ -406,7 +437,38 @@ public class ReplicationManager implements
       // instance within the cluster should get the lock)
       boolean locked = 
         this.systemMetadata.tryLock(event.getKey(), 3, TimeUnit.SECONDS);
-      if ( locked ) {
+
+      // query the pendingReplicationTasks for tasks pending for this pid
+      String query = "";
+      query += "pid = '";
+      query += event.getKey().getValue();
+      query += "'";
+
+      log.debug("Pending replication task query is: " + query);
+
+      // perform query
+      Set<MNReplicationTask> pendingTasksForPID = 
+          (Set<MNReplicationTask>) 
+          this.pendingReplicationTasks.values(new SqlPredicate(query));
+
+      // is the set of pending replication tasks with this pid empty? 
+      // if yes then the pid is not taken by another task
+      boolean not_pending = pendingTasksForPID.isEmpty();
+
+      // also need to check the current replicationTasks
+      boolean no_task_with_pid = true;
+
+      // for each MNReplicationTask
+      for(MNReplicationTask task : replicationTasks) {
+        // if the task's pid is equal to the event's pid
+        if(task.getPid().getValue().equals(event.getKey().getValue())){
+            no_task_with_pid = false;
+            break;
+        }
+      }
+
+      // if the pid is locked and not taken by a pending task
+      if ( locked && not_pending && no_task_with_pid ) {
         this.createAndQueueTasks(event.getKey());
         this.systemMetadata.unlock(event.getKey());
       }
