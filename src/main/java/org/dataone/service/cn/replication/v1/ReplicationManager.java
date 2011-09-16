@@ -154,8 +154,16 @@ public class ReplicationManager implements
     
     // Become a Hazelcast cluster client using the replication structures
     String[] addresses = this.addressList.split(",");
+    System.out.println("Getting a new HazelcastClient using:");
+    System.out.print(this.groupName + " " + this.groupPassword);
+    for (String s : addresses) {
+        System.out.print(" " + s);
+    }
+    System.out.println();
+
     this.hzClient = 
       HazelcastClient.newHazelcastClient(this.groupName, this.groupPassword, addresses);
+    System.out.println("HazelcastClient got!");
     
     // Also become a Hazelcast processing cluster member
     this.hzMember = Hazelcast.getDefaultInstance();
