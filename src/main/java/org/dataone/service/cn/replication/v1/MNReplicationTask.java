@@ -21,6 +21,8 @@
 package org.dataone.service.cn.replication.v1;
 
 import java.io.Serializable;
+import java.util.Date;
+import java.util.List;
 import java.util.concurrent.Callable;
 
 import org.dataone.client.D1Client;
@@ -35,6 +37,8 @@ import org.dataone.service.exceptions.UnsupportedType;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.Node;
 import org.dataone.service.types.v1.Permission;
+import org.dataone.service.types.v1.Replica;
+import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.Subject;
 import org.dataone.service.types.v1.SystemMetadata;
@@ -289,12 +293,43 @@ public class MNReplicationTask implements Serializable, Callable<String> {
 		HazelcastClient.newHazelcastClient(groupName, groupPassword, addresses);
 	
 	IMap<String, SystemMetadata> sysMetaMap = hzClient.getMap(hzSystemMetadata);
-	SystemMetadata sysmeta = sysMetaMap.get(pid);
 	
 	// Initiate the MN to MN replication for this task
 	try {
+	  sysMetaMap.lock(this.pid);
+	  SystemMetadata sysmeta = sysMetaMap.get(this.pid);
+    List<Replica> replicaList = sysmeta.getReplicaList();
+    
+    // set the replica status for the correct replica
+    for (Replica replica : replicaList ) {
+      if (replica.getReplicaMemberNode() == this.targetNode.getIdentifier()) {
+        replica.setReplicationStatus(ReplicationStatus.REQUESTED);
+        
+      }
+      
+    }
+    
+    // no replica exists yet, make one
+    if ( replicaList == null || replicaList.size() < 1) {
+      Replica newReplica = new Replica();
+      newReplica.setReplicaMemberNode(this.targetNode.getIdentifier());
+      newReplica.setReplicationStatus(ReplicationStatus.REQUESTED);
+      replicaList.add(newReplica);
+      
+    }
+
+    // update the system metadata object
+	  sysmeta.setDateSysMetadataModified(new Date());
+	  sysmeta.setReplicaList(replicaList);
+	  
+	  // call for the replication
 	  targetMN.replicate(session, sysmeta, this.originatingNode.getIdentifier());
-  } catch (NotImplemented e) {
+	  
+	  // update the system metadata map
+	  sysMetaMap.put(this.pid, sysmeta);
+    sysMetaMap.unlock(this.pid);
+
+	} catch (NotImplemented e) {
 	  // TODO Auto-generated catch block
 	  e.printStackTrace();
   } catch (ServiceFailure e) {
@@ -312,10 +347,14 @@ public class MNReplicationTask implements Serializable, Callable<String> {
   } catch (UnsupportedType e) {
 	  // TODO Auto-generated catch block
 	  e.printStackTrace();
+  
+  } finally {
+    sysMetaMap.unlock(this.pid);
+    
   }
 	    
 	
-    return null;
+    return this.pid;
   }
 
 }
