@@ -32,7 +32,6 @@ import com.hazelcast.core.ItemListener;
 import com.hazelcast.query.SqlPredicate;
 
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -42,29 +41,23 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.dataone.configuration.Settings;
-import org.dataone.service.cn.v1.CNReplication;
 import org.dataone.service.exceptions.InvalidRequest;
 import org.dataone.service.exceptions.InvalidToken;
 import org.dataone.service.exceptions.NotAuthorized;
 import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
-import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.Node;
 import org.dataone.service.types.v1.NodeReference;
-import org.dataone.service.types.v1.NodeType;
 import org.dataone.service.types.v1.Permission;
 import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationPolicy;
 import org.dataone.service.types.v1.ReplicationStatus;
-import org.dataone.service.types.v1.Session;
-import org.dataone.service.types.v1.Subject;
 import org.dataone.service.types.v1.SystemMetadata;
 
 import org.dataone.client.D1Client;
 import org.dataone.client.CNode;
-import org.dataone.client.MNode;
 
 /**
  * A DataONE Coordinating Node implementation which
@@ -110,10 +103,7 @@ public class ReplicationManager implements
   
   /* The name of the replication tasks queue */
   private String tasksQueue;
-  
-  /* The name of the pending replication tasks map */
-  private String pendingTasksQueue;
-  
+    
   /* The Hazelcast distributed task id generator namespace */
   private String taskIds;
   
@@ -126,9 +116,6 @@ public class ReplicationManager implements
   /* The Hazelcast distributed replication tasks queue*/
   private IQueue<MNReplicationTask> replicationTasks;
   
-  /* The Hazelcast distributed pending replication tasks map*/
-  private IMap<String, MNReplicationTask> pendingReplicationTasks;
-
   /**
    * Private Constructor - singleton pattern
    */
@@ -147,8 +134,6 @@ public class ReplicationManager implements
       Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
     this.tasksQueue = 
       Settings.getConfiguration().getString("dataone.hazelcast.replicationQueuedTasks");
-    this.pendingTasksQueue = 
-      Settings.getConfiguration().getString("dataone.hazelcast.replicationPendingTasks");
     this.taskIds = 
       Settings.getConfiguration().getString("dataone.hazelcast.tasksIdGenerator");
     
@@ -171,7 +156,6 @@ public class ReplicationManager implements
     this.nodes = this.hzMember.getMap(nodeMap);
     this.systemMetadata = this.hzClient.getMap(systemMetadataMap);
     this.replicationTasks = this.hzMember.getQueue(tasksQueue);
-    this.pendingReplicationTasks = this.hzMember.getMap(pendingTasksQueue);
     this.taskIdGenerator = this.hzMember.getIdGenerator(taskIds);
     
     // monitor the replication structures
@@ -195,90 +179,93 @@ public class ReplicationManager implements
    * @throws InvalidRequest
    * @throws NotFound
    */
-  public int createAndQueueTasks(Identifier pid) 
+  private int createAndQueueTasks(Identifier pid) 
   throws ServiceFailure, NotImplemented, InvalidToken, NotAuthorized, 
   InvalidRequest, NotFound {
 
-    // get the system metadata for the pid
-    SystemMetadata sysmeta = this.systemMetadata.get(pid);
-    
     // the list of replication tasks to create and queue
     List<MNReplicationTask> taskList = new ArrayList<MNReplicationTask>();
+    List<Replica> replicaList;
+    
+    try {
+      // get the system metadata for the pid
+      SystemMetadata sysmeta = this.systemMetadata.get(pid);
+      replicaList = sysmeta.getReplicaList();
 
-    // CN for getting nodes for tasks
-    CNode cn = D1Client.getCN();
+      // List of Nodes for building MNReplicationTasks
+      List<Node> nodes = (List<Node>) this.nodes.values();
 
-    // List of Nodes for building MNReplicationTasks
-    List<Node> nodes = cn.listNodes().getNodeList();
-
-    // authoritative member node to replicate from
-    Node originatingNode = new Node();
-    for(Node node : nodes) {
-        if(node.getIdentifier().getValue() == 
-                sysmeta.getAuthoritativeMemberNode().getValue()) {
+      // authoritative member node to replicate from
+      Node originatingNode = new Node();
+      for(Node node : nodes) {
+          if(node.getIdentifier().getValue() == 
+            sysmeta.getAuthoritativeMemberNode().getValue()) {
             originatingNode = node;
-        }
-    }
+            
+          }
+      }
 
-    // parse the sysmeta.ReplicationPolicy
-    ReplicationPolicy replicationPolicy = sysmeta.getReplicationPolicy();
-    List<NodeReference> preferredList = 
-        replicationPolicy.getPreferredMemberNodeList();
+      // parse the sysmeta.ReplicationPolicy
+      ReplicationPolicy replicationPolicy = sysmeta.getReplicationPolicy();
+      List<NodeReference> preferredList = 
+          replicationPolicy.getPreferredMemberNodeList();
 
-    // query the pendingReplicationTasks for tasks pending for this pid
-    String query = "";
-    query += "pid = '";
-    query += pid;
-    query += "'";
+      boolean alreadyAdded = false;
 
-    log.debug("Pending replication task query is: " + query);
-
-    // perform query
-    Set<MNReplicationTask> pendingTasksForPID = 
-        (Set<MNReplicationTask>) 
-        this.pendingReplicationTasks.values(new SqlPredicate(query));
-
-    // flag for whether a node is in the preferred list for this pid
-    boolean alreadyAdded = false;
-
-    // for each node in the preferred list
-    for(NodeReference nodeRef : preferredList) {
-        alreadyAdded = false;
-        // for each task in the pending tasks
-        for(MNReplicationTask task : pendingTasksForPID) {
-            // ensure that this node is not in the pending tasks list
-            if(nodeRef.getValue().equals(
-                        task.getTargetNode().getIdentifier().getValue())){
-                alreadyAdded = true;
-                break;
+      // for each node in the preferred list
+      for(NodeReference nodeRef : preferredList) {
+          alreadyAdded = false;
+          // for each replica in the replica list
+          for(Replica replica : replicaList) {
+            // ensure that this node is not queued or requested
+            NodeReference replicaNode = replica.getReplicaMemberNode();
+            ReplicationStatus status = replica.getReplicationStatus();
+            if (nodeRef.getValue().equals(replicaNode.getValue()) &&
+                (status.equals(ReplicationStatus.QUEUED) ||
+                 status.equals(ReplicationStatus.REQUESTED))){
+              alreadyAdded = true;
+              break;
+              
             }
-        }
-        Node targetNode = new Node();
-        // if the node doesn't already exist in the pendingTasks for this pid
-        if(!alreadyAdded) {
-            for(Node node : nodes) {
-                if(nodeRef.getValue().equals(node.getIdentifier().getValue())) {
-                    targetNode = node;
-                }
-            }
-            Long taskid = taskIdGenerator.newId();
-            // add the task to the task list
-            taskList.add(new MNReplicationTask(
-                                taskid.toString(),
-                                pid,
-                                originatingNode,
-                                targetNode,
-                                Permission.REPLICATE));
-        }
-    }
+            
+          }
+          Node targetNode = new Node();
+          // if the node doesn't already exist in the pendingTasks for this pid
+          if(!alreadyAdded) {
+              for(Node node : nodes) {
+                  if(nodeRef.getValue().equals(node.getIdentifier().getValue())) {
+                      targetNode = node;
+                  }
+              }
+              Long taskid = taskIdGenerator.newId();
+              // add the task to the task list
+              taskList.add(new MNReplicationTask(
+                                  taskid.toString(),
+                                  pid,
+                                  originatingNode,
+                                  targetNode,
+                                  Permission.REPLICATE));
+          }
+      }
 
-    // add list to the queue
-    for (MNReplicationTask task : taskList) {
-        this.replicationTasks.add(task);
+      // add list to the queue
+      for (MNReplicationTask task : taskList) {
+          this.replicationTasks.add(task);
+      }
+      
+    } catch (Exception e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+      
+    } finally {
+      // always unlock the pid
+      this.systemMetadata.unlock(pid);
+      
     }
 
     // return the number of replication tasks queued
     return taskList.size();
+    
   }
   
   /**
@@ -351,26 +338,9 @@ public class ReplicationManager implements
       
       // try to lock the pid and handle the event (only one ReplicationManager
       // instance within the cluster should get the lock)
-      boolean locked = 
-        this.systemMetadata.tryLock(event.getKey(), 3, TimeUnit.SECONDS);
-
-      // query the pendingReplicationTasks for tasks pending for this pid
-      String query = "";
-      query += "pid = '";
-      query += event.getKey().getValue();
-      query += "'";
-
-      log.debug("Pending replication task query is: " + query);
-
-      // perform query
-      Set<MNReplicationTask> pendingTasksForPID = 
-          (Set<MNReplicationTask>) 
-          this.pendingReplicationTasks.values(new SqlPredicate(query));
-
-      // is the set of pending replication tasks with this pid empty? 
-      // if yes then the pid is not taken by another task
-      boolean not_pending = pendingTasksForPID.isEmpty();
-
+      this.systemMetadata.lock(event.getKey());
+      boolean is_pending = isPending(event.getKey());
+      
       // also need to check the current replicationTasks
       boolean no_task_with_pid = true;
 
@@ -384,7 +354,7 @@ public class ReplicationManager implements
       }
 
       // if the pid is locked and not taken by a pending task
-      if ( locked && not_pending && no_task_with_pid ) {
+      if ( !is_pending && no_task_with_pid ) {
         this.createAndQueueTasks(event.getKey());
         this.systemMetadata.unlock(event.getKey());
         
@@ -443,25 +413,8 @@ public class ReplicationManager implements
       
       // try to lock the pid and handle the event (only one ReplicationManager
       // instance within the cluster should get the lock)
-      boolean locked = 
-        this.systemMetadata.tryLock(event.getKey(), 3, TimeUnit.SECONDS);
-
-      // query the pendingReplicationTasks for tasks pending for this pid
-      String query = "";
-      query += "pid = '";
-      query += event.getKey().getValue();
-      query += "'";
-
-      log.debug("Pending replication task query is: " + query);
-
-      // perform query
-      Set<MNReplicationTask> pendingTasksForPID = 
-          (Set<MNReplicationTask>) 
-          this.pendingReplicationTasks.values(new SqlPredicate(query));
-
-      // is the set of pending replication tasks with this pid empty? 
-      // if yes then the pid is not taken by another task
-      boolean not_pending = pendingTasksForPID.isEmpty();
+      this.systemMetadata.lock(event.getKey());
+      boolean is_pending = isPending(event.getKey());
 
       // also need to check the current replicationTasks
       boolean no_task_with_pid = true;
@@ -476,7 +429,7 @@ public class ReplicationManager implements
       }
 
       // if the pid is locked and not taken by a pending task
-      if ( locked && not_pending && no_task_with_pid ) {
+      if ( !is_pending && no_task_with_pid ) {
         this.createAndQueueTasks(event.getKey());
         this.systemMetadata.unlock(event.getKey());
       }
@@ -521,6 +474,31 @@ public class ReplicationManager implements
   public void entryEvicted(EntryEvent<Identifier, SystemMetadata> event) {
     // nothing to do, entry remains in backing store
     
+  }
+
+  /*
+   * Check to see if replication tasks are pending for the given pid
+   * 
+   * @param pid - the identifier of the object to check
+   */
+  private boolean isPending(Identifier pid) {
+    SystemMetadata sysmeta = this.systemMetadata.get(pid);
+    List<Replica> replicaList = sysmeta.getReplicaList();
+    boolean is_pending = false;
+    
+    // do we have pending replicas for this pid?
+    for (Replica replica : replicaList) {
+      ReplicationStatus status = replica.getReplicationStatus();
+      if (status.equals(ReplicationStatus.QUEUED) || 
+          status.equals(ReplicationStatus.REQUESTED)) {
+        is_pending = true;
+        break;
+
+      }
+        
+    }
+
+    return is_pending;
   }
   
 }
