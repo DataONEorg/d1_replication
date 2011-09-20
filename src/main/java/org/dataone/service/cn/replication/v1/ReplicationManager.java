@@ -34,6 +34,7 @@ import com.hazelcast.query.SqlPredicate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.Collection;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -193,7 +194,7 @@ public class ReplicationManager implements
       replicaList = sysmeta.getReplicaList();
 
       // List of Nodes for building MNReplicationTasks
-      List<Node> nodes = (List<Node>) this.nodes.values();
+      Collection<Node> nodes = (Collection<Node>) this.nodes.values();
 
       // authoritative member node to replicate from
       Node originatingNode = new Node();
