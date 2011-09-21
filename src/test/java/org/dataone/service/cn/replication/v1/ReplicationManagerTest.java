@@ -116,7 +116,7 @@ public class ReplicationManagerTest extends TestCase {
 	public void testReplicationManager() {
         System.out.println("Testing creating a ReplicationManager");
 		replicationManager = new ReplicationManager();
-        //assertEquals(2, hzMember.getCluster().getMembers().size());
+        assertEquals(3, hzMember.getCluster().getMembers().size());
 	}
 
     /**
