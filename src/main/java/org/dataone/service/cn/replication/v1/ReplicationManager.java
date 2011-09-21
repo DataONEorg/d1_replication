@@ -261,11 +261,6 @@ public class ReplicationManager implements
         }
       }
        
-      // TODO: what is the D1 policy for max replicas?
-      if ( desiredReplicas > 3 ) {
-        desiredReplicas = 3; // sanity check
-        
-      }
       
       // can't have more replicas than MNs
       if ( desiredReplicas > potentialNodeList.size() ) {
