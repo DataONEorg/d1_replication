@@ -205,6 +205,9 @@ public class ReplicationManager implements
 
       // get the system metadata for the pid
       SystemMetadata sysmeta = this.systemMetadata.get(pid);
+      System.out.println("got this SystemMetadata object: " + sysmeta.getIdentifier().getValue());
+      System.out.println("object has auth node: " + sysmeta.getAuthoritativeMemberNode().getValue());
+      System.out.println("object has replication policy: " + sysmeta.getReplicationPolicy().getNumberReplicas() + " copies");
       replicaList = sysmeta.getReplicaList();
       
       // List of Nodes for building MNReplicationTasks
@@ -589,7 +592,7 @@ public class ReplicationManager implements
    * 
    * @param pid - the identifier of the object to check
    */
-  private boolean isPending(Identifier pid) {
+  public boolean isPending(Identifier pid) {
     SystemMetadata sysmeta = this.systemMetadata.get(pid);
     List<Replica> replicaList = sysmeta.getReplicaList();
     boolean is_pending = false;
