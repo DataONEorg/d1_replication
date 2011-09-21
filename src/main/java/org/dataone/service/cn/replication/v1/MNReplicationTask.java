@@ -27,6 +27,7 @@ import java.util.concurrent.Callable;
 
 import org.dataone.client.D1Client;
 import org.dataone.client.MNode;
+import org.dataone.client.auth.CertificateManager;
 import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.InsufficientResources;
 import org.dataone.service.exceptions.InvalidRequest;
@@ -40,7 +41,6 @@ import org.dataone.service.types.v1.Permission;
 import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.Session;
-import org.dataone.service.types.v1.Subject;
 import org.dataone.service.types.v1.SystemMetadata;
 
 import com.hazelcast.client.HazelcastClient;
@@ -267,13 +267,6 @@ public class MNReplicationTask implements Serializable, Callable<String> {
 	  e.printStackTrace();
   }
 	
-	// Create a session that will be overridden by D1Client's session from the
-	// SSL cert
-	Subject subject = new Subject();
-	subject.setValue(null);
-	Session session = new Session();
-	session.setSubject(subject);
-	
 	// Get the D1 Hazelcast configuration parameters
 	String hzSystemMetadata = 
 		Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
@@ -322,6 +315,14 @@ public class MNReplicationTask implements Serializable, Callable<String> {
 	  sysmeta.setDateSysMetadataModified(new Date());
 	  sysmeta.setReplicaList(replicaList);
 	  
+	  // set up the certificate location
+	  String clientCertificateLocation = 
+		  Settings.getConfiguration().getString("D1Client.certificate.directory") +
+		  "/" +Settings.getConfiguration().getString("cn.nodeId");
+	  CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
+	  
+	  // session is null - certificate is used
+	  Session session = null;
 	  // call for the replication
 	  targetMN.replicate(session, sysmeta, this.originatingNode.getIdentifier());
 	  
