@@ -29,12 +29,11 @@ import com.hazelcast.core.IMap;
 import com.hazelcast.core.IQueue;
 import com.hazelcast.core.IdGenerator;
 import com.hazelcast.core.ItemListener;
-import com.hazelcast.query.SqlPredicate;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Set;
-import java.util.Collection;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -51,14 +50,13 @@ import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.Node;
 import org.dataone.service.types.v1.NodeReference;
+import org.dataone.service.types.v1.NodeType;
 import org.dataone.service.types.v1.Permission;
 import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationPolicy;
 import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.SystemMetadata;
 
-import org.dataone.client.D1Client;
-import org.dataone.client.CNode;
 
 /**
  * A DataONE Coordinating Node implementation which
@@ -166,7 +164,7 @@ public class ReplicationManager implements
 
       
   /**
-   * Create a list of replication tasks given the identifier of an object
+   * Create replication tasks given the identifier of an object
    * by evaluating its system metadata and the capabilities of the target
    * replication nodes. Queue the tasks for processing.
    * 
@@ -180,92 +178,176 @@ public class ReplicationManager implements
    * @throws InvalidRequest
    * @throws NotFound
    */
-  private int createAndQueueTasks(Identifier pid) 
+  public int createAndQueueTasks(Identifier pid) 
   throws ServiceFailure, NotImplemented, InvalidToken, NotAuthorized, 
   InvalidRequest, NotFound {
 
-    // the list of replication tasks to create and queue
-    List<MNReplicationTask> taskList = new ArrayList<MNReplicationTask>();
-    List<Replica> replicaList;
+    boolean allowed;
+    int taskCount = 0;
+    int desiredReplicas;
+    List<Replica> replicaList;             // the replica list for this pid
+    Set<NodeReference> nodeList;           // the full nodes list
+    List<NodeReference> potentialNodeList; // the MN subset of the nodes list
+    Node targetNode = new Node();          // the target node for the replica
+    Node originatingNode = new Node();     // the source node of the object
     
     try {
+      
+      // if replication isn't allowed, return
+      allowed = isAllowed(pid);
+      
+      if ( !allowed ) {
+        log.info("Replication is not allowed for the object identified by " +
+            pid.getValue());
+        return 0;
+        
+      }
+
       // get the system metadata for the pid
       SystemMetadata sysmeta = this.systemMetadata.get(pid);
       replicaList = sysmeta.getReplicaList();
-
+      
       // List of Nodes for building MNReplicationTasks
-      Collection<Node> nodes = (Collection<Node>) this.nodes.values();
-
+      nodeList = (Set<NodeReference>) this.nodes.keySet();
+      potentialNodeList = new ArrayList<NodeReference>(); // will be our short list
+      
       // authoritative member node to replicate from
-      Node originatingNode = new Node();
-      for(Node node : nodes) {
-          if(node.getIdentifier().getValue() == 
-            sysmeta.getAuthoritativeMemberNode().getValue()) {
-            originatingNode = node;
+      originatingNode = this.nodes.get(sysmeta.getAuthoritativeMemberNode());
+      
+      // build the potential list of target nodes
+      for(NodeReference nodeReference : nodeList) {
+        Node node = this.nodes.get(nodeReference);
+          if ( node.getType() == NodeType.MN ) {
+            potentialNodeList.add(node.getIdentifier());
             
           }
       }
 
       // parse the sysmeta.ReplicationPolicy
       ReplicationPolicy replicationPolicy = sysmeta.getReplicationPolicy();
+      desiredReplicas = replicationPolicy.getNumberReplicas().intValue();
+
+      // get the preferred and blocked lists for prioritization
       List<NodeReference> preferredList = 
           replicationPolicy.getPreferredMemberNodeList();
+      List<NodeReference> blockedList = 
+        replicationPolicy.getBlockedMemberNodeList();
 
-      boolean alreadyAdded = false;
-
-      // for each node in the preferred list
-      for(NodeReference nodeRef : preferredList) {
-          alreadyAdded = false;
-          // for each replica in the replica list
-          for(Replica replica : replicaList) {
-            // ensure that this node is not queued or requested
-            NodeReference replicaNode = replica.getReplicaMemberNode();
-            ReplicationStatus status = replica.getReplicationStatus();
-            if (nodeRef.getValue().equals(replicaNode.getValue()) &&
-                (status.equals(ReplicationStatus.QUEUED) ||
-                 status.equals(ReplicationStatus.REQUESTED))){
-              alreadyAdded = true;
-              break;
-              
-            }
+      // remove blocked nodes from the potential nodelist
+      if ( !blockedList.isEmpty() ) {
+        for (NodeReference blockedNode : blockedList) {
+          if ( potentialNodeList.contains(blockedNode) ) {
+            potentialNodeList.remove(blockedNode);
             
           }
-          Node targetNode = new Node();
-          // if the node doesn't already exist in the pendingTasks for this pid
-          if(!alreadyAdded) {
-              for(Node node : nodes) {
-                  if(nodeRef.getValue().equals(node.getIdentifier().getValue())) {
-                      targetNode = node;
-                  }
-              }
-              Long taskid = taskIdGenerator.newId();
-              // add the task to the task list
-              taskList.add(new MNReplicationTask(
-                                  taskid.toString(),
-                                  pid,
-                                  originatingNode,
-                                  targetNode,
-                                  Permission.REPLICATE));
+        }
+      }
+      
+      // prioritize preferred nodes in the potential node list
+      if ( !preferredList.isEmpty() ) {
+        
+        // process preferred nodes backwards
+        for (int i = preferredList.size() - 1; i >= 0; i--) {
+          
+          NodeReference preferredNode = preferredList.get(i);
+          if ( potentialNodeList.contains( preferredNode) ) {
+            potentialNodeList.remove(preferredNode); // remove for reordering
+            potentialNodeList.add(0, preferredNode); // to the top of the list
+             
           }
+        }
+      }
+       
+      // TODO: what is the D1 policy for max replicas?
+      if ( desiredReplicas > 3 ) {
+        desiredReplicas = 3; // sanity check
+        
+      }
+      
+      // can't have more replicas than MNs
+      if ( desiredReplicas > potentialNodeList.size() ) {
+        desiredReplicas = potentialNodeList.size(); // yikes
+                
+      }
+      
+      boolean alreadyAdded = false;
+
+      // for each node in the potential node list up to the desired replicas
+      for(int j = 0; j < desiredReplicas; j++) {
+
+        NodeReference potentialNode = potentialNodeList.get(j);
+        // for each replica in the replica list
+        for (Replica replica : replicaList) {
+          
+          // ensure that this node is not queued, requested, or completed
+          NodeReference replicaNode = replica.getReplicaMemberNode();
+          ReplicationStatus status = replica.getReplicationStatus();
+          if (potentialNode.getValue().equals(replicaNode.getValue()) &&
+             (status.equals(ReplicationStatus.QUEUED) ||
+              status.equals(ReplicationStatus.REQUESTED) ||
+              status.equals(ReplicationStatus.COMPLETED))){
+            alreadyAdded = true;
+            break;
+            
+          }
+          
+        }
+        // if the node doesn't already exist as a pending task for this pid
+        if ( !alreadyAdded ) {
+          targetNode = this.nodes.get(potentialNode);
+                
+        }
+          
+        // update system metadata for the targetNode on this task
+        SystemMetadata sysMeta = this.systemMetadata.get(pid);
+        List<Replica> list = sysMeta.getReplicaList();
+        boolean replicaAdded = false;
+        
+        for (Replica replica : list) {
+          NodeReference replicaNode = replica.getReplicaMemberNode();
+          if ( replicaNode.getValue().equals(targetNode) ) {
+            replica.setReplicationStatus(ReplicationStatus.QUEUED);
+            replicaAdded = true;
+            break;
+            
+          }
+        }
+        
+        // a replica doesn't exist. add it
+        if ( !replicaAdded ) {
+          Replica newReplica = new Replica();
+          newReplica.setReplicaMemberNode(targetNode.getIdentifier());
+          newReplica.setReplicationStatus(ReplicationStatus.QUEUED);
+          sysMeta.addReplica(newReplica);
+
+        }
+        
+        sysMeta.setDateSysMetadataModified(new Date());
+        this.systemMetadata.put(pid, sysMeta);
+        
+        Long taskid = taskIdGenerator.newId();
+        // add the task to the task list
+        MNReplicationTask task = new MNReplicationTask(
+                            taskid.toString(),
+                            pid,
+                            originatingNode,
+                            targetNode,
+                            Permission.REPLICATE);
+        this.replicationTasks.add(task);
+        taskCount++;
+
       }
 
-      // add list to the queue
-      for (MNReplicationTask task : taskList) {
-          this.replicationTasks.add(task);
-      }
+          
+
       
     } catch (Exception e) {
       // TODO Auto-generated catch block
       e.printStackTrace();
       
-    } finally {
-      // always unlock the pid
-      this.systemMetadata.unlock(pid);
-      
     }
-
     // return the number of replication tasks queued
-    return taskList.size();
+    return taskCount;
     
   }
   
@@ -337,28 +419,34 @@ public class ReplicationManager implements
     
     try {
       
-      // try to lock the pid and handle the event (only one ReplicationManager
-      // instance within the cluster should get the lock)
+      // lock the pid and handle the event. If it's already pending, do nothing      
       this.systemMetadata.lock(event.getKey());
-      boolean is_pending = isPending(event.getKey());
       
       // also need to check the current replicationTasks
       boolean no_task_with_pid = true;
 
-      // for each MNReplicationTask
-      for(MNReplicationTask task : replicationTasks) {
-        // if the task's pid is equal to the event's pid
-        if(task.getPid().getValue().equals(event.getKey().getValue())){
+      // check if replication is allowed
+      boolean allowed = isAllowed(event.getKey());
+      
+      if ( allowed ) {
+        // check if there are pending tasks
+        boolean is_pending = isPending(event.getKey());
+        
+        // for each MNReplicationTask
+        for (MNReplicationTask task : replicationTasks) {
+          // if the task's pid is equal to the event's pid
+          if (task.getPid().getValue().equals(event.getKey().getValue())) {
             no_task_with_pid = false;
             break;
-        }
-      }
 
-      // if the pid is locked and not taken by a pending task
-      if ( !is_pending && no_task_with_pid ) {
-        this.createAndQueueTasks(event.getKey());
-        this.systemMetadata.unlock(event.getKey());
-        
+          }
+        }
+        // if the pid is locked and not taken by a pending task
+        if (!is_pending && no_task_with_pid) {
+          this.createAndQueueTasks(event.getKey());
+          this.systemMetadata.unlock(event.getKey());
+
+        }
       }
       
     } catch (ServiceFailure e) {
@@ -393,6 +481,20 @@ public class ReplicationManager implements
   }
   
   /**
+   * Check if replication is allowed for the given pid
+   * @param pid - the identifier of the object to check
+   * @return
+   */
+  public boolean isAllowed(Identifier pid) {
+    boolean isAllowed = false;
+    SystemMetadata sysmeta = this.systemMetadata.get(pid);
+    ReplicationPolicy policy = sysmeta.getReplicationPolicy();
+    
+    return policy.getReplicationAllowed().booleanValue();
+  }
+
+
+  /**
    * Implement the EntryListener interface, responding to entries being deleted from
    * the hzSystemMetadata map.
    * 
@@ -412,27 +514,32 @@ public class ReplicationManager implements
   public void entryUpdated(EntryEvent<Identifier, SystemMetadata> event) {
     try {
       
-      // try to lock the pid and handle the event (only one ReplicationManager
-      // instance within the cluster should get the lock)
+      // lock the pid and handle the event. If it's already pending, do nothing
       this.systemMetadata.lock(event.getKey());
-      boolean is_pending = isPending(event.getKey());
 
       // also need to check the current replicationTasks
       boolean no_task_with_pid = true;
 
-      // for each MNReplicationTask
-      for(MNReplicationTask task : replicationTasks) {
-        // if the task's pid is equal to the event's pid
-        if(task.getPid().getValue().equals(event.getKey().getValue())){
+      // check if replication is allowed
+      boolean allowed = isAllowed(event.getKey());
+
+      if ( allowed ) {
+        // check if there are pending tasks
+        boolean is_pending = isPending(event.getKey());
+        
+        // for each MNReplicationTask
+        for (MNReplicationTask task : replicationTasks) {
+          // if the task's pid is equal to the event's pid
+          if (task.getPid().getValue().equals(event.getKey().getValue())) {
             no_task_with_pid = false;
             break;
+          }
         }
-      }
-
-      // if the pid is locked and not taken by a pending task
-      if ( !is_pending && no_task_with_pid ) {
-        this.createAndQueueTasks(event.getKey());
-        this.systemMetadata.unlock(event.getKey());
+        // if the pid is locked and not taken by a pending task
+        if (!is_pending && no_task_with_pid) {
+          this.createAndQueueTasks(event.getKey());
+          this.systemMetadata.unlock(event.getKey());
+        }
       }
       
     } catch (ServiceFailure e) {
