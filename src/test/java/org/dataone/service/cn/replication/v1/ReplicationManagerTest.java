@@ -82,11 +82,11 @@ public class ReplicationManagerTest extends TestCase {
         }
         System.out.println();
         hzMember = Hazelcast.init(hzConfig);
-        //h1 = Hazelcast.newHazelcastInstance(hzConfig);
-        //h2 = Hazelcast.newHazelcastInstance(hzConfig);
+        h1 = Hazelcast.newHazelcastInstance(hzConfig);
+        h2 = Hazelcast.newHazelcastInstance(hzConfig);
         System.out.println("Hazelcast member hzMember name: " + hzMember.getName());
-        //System.out.println("Hazelcast member h1 name: " + h1.getName());
-        //System.out.println("Hazelcast member h2 name: " + h2.getName());
+        System.out.println("Hazelcast member h1 name: " + h1.getName());
+        System.out.println("Hazelcast member h2 name: " + h2.getName());
         Set<Member> members = hzMember.getCluster().getMembers();
         System.out.println("Cluster size " + members.size());
         for(Member m : members) {
@@ -107,6 +107,7 @@ public class ReplicationManagerTest extends TestCase {
 	public void testReplicationManager() {
         System.out.println("Testing creating a ReplicationManager");
 		replicationManager = new ReplicationManager();
+        //assertEquals(2, hzMember.getCluster().getMembers().size());
 	}
 
     /**
@@ -134,11 +135,23 @@ public class ReplicationManagerTest extends TestCase {
         // create a new ReplicationPolicy
         ReplicationPolicy repPolicy = new ReplicationPolicy();
         ArrayList<NodeReference> preflist = new ArrayList<NodeReference>();
+        NodeReference replica_target_1 = new NodeReference();
+        NodeReference replica_target_2 = new NodeReference();
+        NodeReference replica_target_3 = new NodeReference();
+        replica_target_1.setValue("replica_target_1");
+        replica_target_2.setValue("replica_target_2");
+        replica_target_3.setValue("replica_target_3");
+        preflist.add(replica_target_1);
+        preflist.add(replica_target_2);
+        preflist.add(replica_target_3);
         ArrayList<NodeReference> blocklist = new ArrayList<NodeReference>();
         repPolicy.setPreferredMemberNodeList(preflist);
         repPolicy.setBlockedMemberNodeList(blocklist);
         repPolicy.setReplicationAllowed(true);
         repPolicy.setNumberReplicas(3);
+        NodeReference authNode = new NodeReference();
+        authNode.setValue("authoritative_test_mn");
+        sysmeta.setAuthoritativeMemberNode(authNode);
         // set the ReplicationPolicy for this object
         sysmeta.setReplicationPolicy(repPolicy);
 
@@ -148,8 +161,6 @@ public class ReplicationManagerTest extends TestCase {
         String tasksQueueName = 
             Settings.getConfiguration().getString("dataone.hazelcast.replicationQueuedTasks");
 
-        // create the ReplicationManager
-        replicationManager = new ReplicationManager();
         
         // get the hzSystemMetadata map 
         sysMetaMap = hzMember.getMap(systemMetadataMapName);
@@ -157,9 +168,21 @@ public class ReplicationManagerTest extends TestCase {
         sysMetaMap.putAsync(pid, sysmeta);
 
         replicationTasks = hzMember.getQueue(tasksQueueName);
+        
+        // create the ReplicationManager
+        replicationManager = new ReplicationManager();
+
+        try{
+            //replicationManager.createAndQueueTasks(pid);
+            assertEquals((int) repPolicy.getNumberReplicas(), 
+                    (int) replicationManager.createAndQueueTasks(pid));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
         // Perform a query to see if the map has pending tasks
-        assertEquals(replicationTasks.size(), preflist.size());
+        //assertEquals((int) repPolicy.getNumberReplicas(), 
+        //             (int) replicationTasks.size());
 	}
 
 }
