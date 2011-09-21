@@ -138,16 +138,16 @@ public class ReplicationManager implements
     
     // Become a Hazelcast cluster client using the replication structures
     String[] addresses = this.addressList.split(",");
-    System.out.println("Getting a new HazelcastClient using:");
-    System.out.print(this.groupName + " " + this.groupPassword);
-    for (String s : addresses) {
-        System.out.print(" " + s);
-    }
-    System.out.println();
+    //System.out.println("Getting a new HazelcastClient using:");
+    //System.out.print(this.groupName + " " + this.groupPassword);
+    //for (String s : addresses) {
+    //    System.out.print(" " + s);
+    //}
+    //System.out.println();
 
     this.hzClient = 
       HazelcastClient.newHazelcastClient(this.groupName, this.groupPassword, addresses);
-    System.out.println("HazelcastClient got!");
+    //System.out.println("HazelcastClient got!");
     
     // Also become a Hazelcast processing cluster member
     this.hzMember = Hazelcast.getDefaultInstance();
@@ -205,9 +205,9 @@ public class ReplicationManager implements
 
       // get the system metadata for the pid
       SystemMetadata sysmeta = this.systemMetadata.get(pid);
-      System.out.println("got this SystemMetadata object: " + sysmeta.getIdentifier().getValue());
-      System.out.println("object has auth node: " + sysmeta.getAuthoritativeMemberNode().getValue());
-      System.out.println("object has replication policy: " + sysmeta.getReplicationPolicy().getNumberReplicas() + " copies");
+      //System.out.println("got this SystemMetadata object: " + sysmeta.getIdentifier().getValue());
+      //System.out.println("object has auth node: " + sysmeta.getAuthoritativeMemberNode().getValue());
+      //System.out.println("object has replication policy: " + sysmeta.getReplicationPolicy().getNumberReplicas() + " copies");
       replicaList = sysmeta.getReplicaList();
       
       // List of Nodes for building MNReplicationTasks
@@ -217,6 +217,7 @@ public class ReplicationManager implements
       // authoritative member node to replicate from
       originatingNode = this.nodes.get(sysmeta.getAuthoritativeMemberNode());
       
+      //System.out.println("nodeList.size() = " + nodeList.size());
       // build the potential list of target nodes
       for(NodeReference nodeReference : nodeList) {
         Node node = this.nodes.get(nodeReference);
@@ -235,6 +236,8 @@ public class ReplicationManager implements
           replicationPolicy.getPreferredMemberNodeList();
       List<NodeReference> blockedList = 
         replicationPolicy.getBlockedMemberNodeList();
+      //System.out.println("preferredList.size() = " + preferredList.size());
+      //System.out.println("blockedList.size() = " + blockedList.size());
 
       // remove blocked nodes from the potential nodelist
       if ( !blockedList.isEmpty() ) {
@@ -263,6 +266,7 @@ public class ReplicationManager implements
        
       
       // can't have more replicas than MNs
+      //System.out.println("potentialNodeList.size() = " + potentialNodeList.size());
       if ( desiredReplicas > potentialNodeList.size() ) {
         desiredReplicas = potentialNodeList.size(); // yikes
                 
@@ -270,10 +274,13 @@ public class ReplicationManager implements
       
       boolean alreadyAdded = false;
 
+      //System.out.println("desiredReplicas = " + desiredReplicas);
+
       // for each node in the potential node list up to the desired replicas
       for(int j = 0; j < desiredReplicas; j++) {
 
         NodeReference potentialNode = potentialNodeList.get(j);
+        //System.out.println("replicaList.size() = " + replicaList.size());
         // for each replica in the replica list
         for (Replica replica : replicaList) {
           
@@ -299,6 +306,7 @@ public class ReplicationManager implements
         // update system metadata for the targetNode on this task
         SystemMetadata sysMeta = this.systemMetadata.get(pid);
         List<Replica> list = sysMeta.getReplicaList();
+        //System.out.println("list.size() = " + list.size());
         boolean replicaAdded = false;
         
         for (Replica replica : list) {
@@ -333,6 +341,7 @@ public class ReplicationManager implements
                             Permission.REPLICATE);
         this.replicationTasks.add(task);
         taskCount++;
+        //System.out.println("this line gets reached, see taskCount = " + taskCount);
 
       }
 

@@ -37,7 +37,9 @@ import com.hazelcast.core.IQueue;
 
 import org.dataone.service.types.v1.SystemMetadata;
 import org.dataone.service.types.v1.Identifier;
+import org.dataone.service.types.v1.Node;
 import org.dataone.service.types.v1.NodeReference;
+import org.dataone.service.types.v1.NodeType;
 import org.dataone.service.types.v1.ReplicationPolicy;
 import org.dataone.configuration.Settings;
 
@@ -54,6 +56,8 @@ public class ReplicationManagerTest extends TestCase {
     private IMap<Identifier,SystemMetadata> sysMetaMap;
 
     private IQueue<MNReplicationTask> replicationTasks;
+    
+    private IMap<NodeReference, Node> nodes;
 
 	protected void setUp() throws Exception {
         // get reference to hazelcast.xml file and test exists
@@ -160,6 +164,8 @@ public class ReplicationManagerTest extends TestCase {
             Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
         String tasksQueueName = 
             Settings.getConfiguration().getString("dataone.hazelcast.replicationQueuedTasks");
+        String nodeMapName = 
+            Settings.getConfiguration().getString("dataone.hazelcast.nodes");
 
         
         // get the hzSystemMetadata map 
@@ -168,7 +174,29 @@ public class ReplicationManagerTest extends TestCase {
         sysMetaMap.putAsync(pid, sysmeta);
 
         replicationTasks = hzMember.getQueue(tasksQueueName);
+        Node replica_target_1_node = new Node();
+        Node replica_target_2_node = new Node();
+        Node replica_target_3_node = new Node();
+        replica_target_1_node.setIdentifier(replica_target_1);
+        replica_target_2_node.setIdentifier(replica_target_2);
+        replica_target_3_node.setIdentifier(replica_target_3);
+        replica_target_1_node.setName("DataONE test replica target 1");
+        replica_target_2_node.setName("DataONE test replica target 2");
+        replica_target_3_node.setName("DataONE test replica target 3");
+        replica_target_1_node.setDescription("A node for testing replication");
+        replica_target_2_node.setDescription("A node for testing replication");
+        replica_target_3_node.setDescription("A node for testing replication");
+        replica_target_1_node.setBaseURL("127.0.0.1");
+        replica_target_2_node.setBaseURL("127.0.0.1");
+        replica_target_3_node.setBaseURL("127.0.0.1");
+        replica_target_1_node.setType(NodeType.MN);
+        replica_target_2_node.setType(NodeType.MN);
+        replica_target_3_node.setType(NodeType.MN);
         
+        nodes = hzMember.getMap(nodeMapName);
+        nodes.put(replica_target_1,replica_target_1_node);
+        nodes.put(replica_target_2,replica_target_2_node);
+        nodes.put(replica_target_3,replica_target_3_node);
         // create the ReplicationManager
         replicationManager = new ReplicationManager();
 
