@@ -46,6 +46,7 @@ import org.dataone.service.types.v1.NodeState;
 import org.dataone.service.types.v1.Ping;
 import org.dataone.service.types.v1.Synchronization;
 import org.dataone.service.types.v1.Services;
+import org.dataone.service.types.v1.Service;
 import org.dataone.configuration.Settings;
 
 public class ReplicationManagerTest extends TestCase {
@@ -205,6 +206,26 @@ public class ReplicationManagerTest extends TestCase {
         Services replica_target_1_node_services = new Services();
         Services replica_target_2_node_services = new Services();
         Services replica_target_3_node_services = new Services();
+        Service origin_node_repl_service = new Service();
+        Service replica_target_1_rep_service = new Service();
+        Service replica_target_2_rep_service = new Service();
+        Service replica_target_3_rep_service = new Service();
+        origin_node_repl_service.setName("MNReplication");
+        replica_target_1_rep_service.setName("MNReplication");
+        replica_target_2_rep_service.setName("MNReplication");
+        replica_target_3_rep_service.setName("MNReplication");
+        origin_node_repl_service.setVersion("v1");
+        replica_target_1_rep_service.setVersion("v1");
+        replica_target_2_rep_service.setVersion("v1");
+        replica_target_3_rep_service.setVersion("v1");
+        origin_node_repl_service.setAvailable(true);
+        replica_target_1_rep_service.setAvailable(true);
+        replica_target_2_rep_service.setAvailable(true);
+        replica_target_3_rep_service.setAvailable(true);
+        origin_node_services.addService(origin_node_repl_service);
+        replica_target_1_node_services.addService(replica_target_1_rep_service);
+        replica_target_2_node_services.addService(replica_target_2_rep_service);
+        replica_target_3_node_services.addService(replica_target_3_rep_service);
         origin_node.setServices(origin_node_services);
         replica_target_1_node.setServices(replica_target_1_node_services);
         replica_target_2_node.setServices(replica_target_2_node_services);
