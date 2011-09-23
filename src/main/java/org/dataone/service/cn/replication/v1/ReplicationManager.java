@@ -56,6 +56,8 @@ import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationPolicy;
 import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.SystemMetadata;
+import org.dataone.service.types.v1.Services;
+import org.dataone.service.types.v1.Service;
 
 
 /**
@@ -215,7 +217,12 @@ public class ReplicationManager implements
       potentialNodeList = new ArrayList<NodeReference>(); // will be our short list
       
       // authoritative member node to replicate from
+      try {
       originatingNode = this.nodes.get(sysmeta.getAuthoritativeMemberNode());
+      } catch (NullPointerException npe) {
+          throw new InvalidRequest("1080", "Object " + pid.getValue() + 
+                  " has no authoritative Member Node in its SystemMetadata");
+      }
       
       //System.out.println("nodeList.size() = " + nodeList.size());
       // build the potential list of target nodes
@@ -319,8 +326,29 @@ public class ReplicationManager implements
           }
         }
         
+        String version = "";
+        List<Service> origServices = originatingNode.getServices().getServiceList();
+        for (Service service : origServices) {
+            if(service.getName().equals("MNReplication")) {
+                version = service.getVersion();
+            }
+        }
+        if (version.equals("")) {
+            throw new InvalidRequest("1080","MNReplication Service missing version");
+        }
+
+        boolean replicable = false;
+
+        for (Service service : targetNode.getServices().getServiceList()) {
+            if(service.getName().equals("MNReplication") &&
+               service.getVersion().equals(version) &&
+               service.getAvailable()) {
+                replicable = true;
+            }
+        }
+
         // a replica doesn't exist. add it
-        if ( !replicaAdded ) {
+        if ( !replicaAdded && replicable ) {
           Replica newReplica = new Replica();
           newReplica.setReplicaMemberNode(targetNode.getIdentifier());
           newReplica.setReplicationStatus(ReplicationStatus.QUEUED);
@@ -348,10 +376,13 @@ public class ReplicationManager implements
           
 
       
+    } catch (InvalidRequest ir) {
+
+        ir.printStackTrace();
+
     } catch (Exception e) {
       // TODO Auto-generated catch block
       e.printStackTrace();
-      
     }
     // return the number of replication tasks queued
     return taskCount;
@@ -400,6 +431,9 @@ public class ReplicationManager implements
       String message = "Polling of the replication task queue was interrupted. " +
                        "The message was: " + e.getMessage();
       log.info(message);
+    } catch (IllegalStateException ise) {
+        String message = "Hazelcast instance was lost due to cluster shutdown, " +
+            ise.getMessage();
     }
       
  }
