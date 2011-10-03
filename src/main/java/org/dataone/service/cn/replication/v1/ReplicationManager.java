@@ -29,6 +29,7 @@ import com.hazelcast.core.IMap;
 import com.hazelcast.core.IQueue;
 import com.hazelcast.core.IdGenerator;
 import com.hazelcast.core.ItemListener;
+import com.hazelcast.impl.base.RuntimeInterruptedException;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -390,6 +391,19 @@ public class ReplicationManager implements
   }
   
   /**
+   * Regular replication sweep over all of the objects on MNs
+   *
+  public void replicationSweep() {
+
+      nodeList = (Set<NodeReference>) this.nodes.keySet();
+
+      for (NodeReference nodeRef : nodeList) {
+          // 
+      }
+  }
+  */
+
+  /**
    * Implement the ItemListener interface, responding to items being added to
    * the hzReplicationTasks queue.
    * 
@@ -431,6 +445,9 @@ public class ReplicationManager implements
       String message = "Polling of the replication task queue was interrupted. " +
                        "The message was: " + e.getMessage();
       log.info(message);
+    } catch (RuntimeInterruptedException rie) {
+        String message = "Hazelcast instance was lost due to cluster shutdown, " +
+            rie.getMessage();
     } catch (IllegalStateException ise) {
         String message = "Hazelcast instance was lost due to cluster shutdown, " +
             ise.getMessage();

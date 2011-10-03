@@ -254,7 +254,7 @@ public class MNReplicationTask implements Serializable, Callable<String> {
    * 
    * @return pid - the identifier of the replicated object upon success
    */
-  public String call() {
+  public String call() throws IllegalStateException {
 
 	MNode targetMN = null;
   
@@ -264,7 +264,7 @@ public class MNReplicationTask implements Serializable, Callable<String> {
   } catch (ServiceFailure e) {
   	
 	  // TODO Auto-generated catch block
-	  e.printStackTrace();
+	  //e.printStackTrace();
   }
 	
 	// Get the D1 Hazelcast configuration parameters
