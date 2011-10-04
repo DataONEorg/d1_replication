@@ -141,26 +141,27 @@ public class ReplicationManager implements
     
     // Become a Hazelcast cluster client using the replication structures
     String[] addresses = this.addressList.split(",");
-    //System.out.println("Getting a new HazelcastClient using:");
-    //System.out.print(this.groupName + " " + this.groupPassword);
-    //for (String s : addresses) {
-    //    System.out.print(" " + s);
-    //}
-    //System.out.println();
 
+    log.debug("Becoming a DataONE Storage cluster hazelcast client where the group name " +
+        "is " + this.groupName + " and the cluster member IP addresses are " +
+        this.addressList + ".");
+    
     this.hzClient = 
       HazelcastClient.newHazelcastClient(this.groupName, this.groupPassword, addresses);
-    //System.out.println("HazelcastClient got!");
     
     // Also become a Hazelcast processing cluster member
-    this.hzMember = Hazelcast.getDefaultInstance();
+    log.debug("Becoming a DataONE Process cluster hazelcast member with the default instance.");
     
+    this.hzMember = Hazelcast.getDefaultInstance();
+
     this.nodes = this.hzMember.getMap(nodeMap);
     this.systemMetadata = this.hzClient.getMap(systemMetadataMap);
     this.replicationTasks = this.hzMember.getQueue(tasksQueue);
     this.taskIdGenerator = this.hzMember.getIdGenerator(taskIds);
-    
     // monitor the replication structures
+    
+    log.debug("Adding listeners to the " + this.systemMetadata.getName() +
+        " map and the " + this.replicationTasks.getName() + " queue.");
     this.systemMetadata.addEntryListener(this, true);
     this.replicationTasks.addItemListener(this, true);
   }
@@ -208,9 +209,6 @@ public class ReplicationManager implements
 
       // get the system metadata for the pid
       SystemMetadata sysmeta = this.systemMetadata.get(pid);
-      //System.out.println("got this SystemMetadata object: " + sysmeta.getIdentifier().getValue());
-      //System.out.println("object has auth node: " + sysmeta.getAuthoritativeMemberNode().getValue());
-      //System.out.println("object has replication policy: " + sysmeta.getReplicationPolicy().getNumberReplicas() + " copies");
       replicaList = sysmeta.getReplicaList();
       
       // List of Nodes for building MNReplicationTasks
@@ -225,7 +223,6 @@ public class ReplicationManager implements
                   " has no authoritative Member Node in its SystemMetadata");
       }
       
-      //System.out.println("nodeList.size() = " + nodeList.size());
       // build the potential list of target nodes
       for(NodeReference nodeReference : nodeList) {
         Node node = this.nodes.get(nodeReference);
@@ -244,8 +241,6 @@ public class ReplicationManager implements
           replicationPolicy.getPreferredMemberNodeList();
       List<NodeReference> blockedList = 
         replicationPolicy.getBlockedMemberNodeList();
-      //System.out.println("preferredList.size() = " + preferredList.size());
-      //System.out.println("blockedList.size() = " + blockedList.size());
 
       // remove blocked nodes from the potential nodelist
       if ( !blockedList.isEmpty() ) {
@@ -274,7 +269,6 @@ public class ReplicationManager implements
        
       
       // can't have more replicas than MNs
-      //System.out.println("potentialNodeList.size() = " + potentialNodeList.size());
       if ( desiredReplicas > potentialNodeList.size() ) {
         desiredReplicas = potentialNodeList.size(); // yikes
                 
@@ -282,13 +276,10 @@ public class ReplicationManager implements
       
       boolean alreadyAdded = false;
 
-      //System.out.println("desiredReplicas = " + desiredReplicas);
-
       // for each node in the potential node list up to the desired replicas
       for(int j = 0; j < desiredReplicas; j++) {
 
         NodeReference potentialNode = potentialNodeList.get(j);
-        //System.out.println("replicaList.size() = " + replicaList.size());
         // for each replica in the replica list
         for (Replica replica : replicaList) {
           
@@ -314,7 +305,6 @@ public class ReplicationManager implements
         // update system metadata for the targetNode on this task
         SystemMetadata sysMeta = this.systemMetadata.get(pid);
         List<Replica> list = sysMeta.getReplicaList();
-        //System.out.println("list.size() = " + list.size());
         boolean replicaAdded = false;
         
         for (Replica replica : list) {
@@ -362,6 +352,11 @@ public class ReplicationManager implements
         
         Long taskid = taskIdGenerator.newId();
         // add the task to the task list
+        log.debug("Adding a new MNreplicationTask to the queue where " + 
+          "pid = "                    + pid.getValue() + 
+          ", originatingNode name = " + originatingNode.getName() +
+          ", targetNode name = "      + targetNode.getName());
+        
         MNReplicationTask task = new MNReplicationTask(
                             taskid.toString(),
                             pid,
@@ -370,7 +365,6 @@ public class ReplicationManager implements
                             Permission.REPLICATE);
         this.replicationTasks.add(task);
         taskCount++;
-        //System.out.println("this line gets reached, see taskCount = " + taskCount);
 
       }
 
@@ -417,8 +411,8 @@ public class ReplicationManager implements
       task = this.replicationTasks.poll(3, TimeUnit.SECONDS);
       
       if ( task != null ) {
-        log.info("Scheduling replication task id " + task.getTaskid() +
-                 " for object identifier: " + task.getPid().getValue());
+        log.info("Submitting replication task id " + task.getTaskid() +
+                 " for execution with object identifier: " + task.getPid().getValue());
         
         // TODO: handle the case when a CN drops and the MNReplicationTask.call()
         // has not been made.
@@ -477,6 +471,9 @@ public class ReplicationManager implements
     
     try {
       
+      log.debug("Received entry added event on the " + 
+        this.systemMetadata.getName() + " map. Evaluating it for MN replication tasks.");
+      
       // lock the pid and handle the event. If it's already pending, do nothing      
       this.systemMetadata.lock(event.getKey());
       
@@ -501,6 +498,8 @@ public class ReplicationManager implements
         }
         // if the pid is locked and not taken by a pending task
         if (!is_pending && no_task_with_pid) {
+          log.debug("Calling createAndQueueTasks for identifier: " + 
+              event.getKey().getValue());
           this.createAndQueueTasks(event.getKey());
           this.systemMetadata.unlock(event.getKey());
 
@@ -572,6 +571,9 @@ public class ReplicationManager implements
   public void entryUpdated(EntryEvent<Identifier, SystemMetadata> event) {
     try {
       
+      log.debug("Received entry updated event on the " + 
+        this.systemMetadata.getName() + " map. Evaluating it for MN replication tasks.");
+
       // lock the pid and handle the event. If it's already pending, do nothing
       this.systemMetadata.lock(event.getKey());
 
@@ -595,6 +597,8 @@ public class ReplicationManager implements
         }
         // if the pid is locked and not taken by a pending task
         if (!is_pending && no_task_with_pid) {
+          log.debug("Calling createAndQueueTasks for identifier: " + 
+              event.getKey().getValue());
           this.createAndQueueTasks(event.getKey());
           this.systemMetadata.unlock(event.getKey());
         }
