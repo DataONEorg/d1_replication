@@ -25,6 +25,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.concurrent.Callable;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.dataone.client.D1Client;
 import org.dataone.client.MNode;
 import org.dataone.client.auth.CertificateManager;
@@ -57,6 +59,9 @@ import com.hazelcast.core.IMap;
  */
 public class MNReplicationTask implements Serializable, Callable<String> {
 
+  /* Get a Log instance */
+  public static Log log = LogFactory.getLog(MNReplicationTask.class);
+  
   /* The identifier of this task */
   private String taskid;
   
@@ -260,11 +265,15 @@ public class MNReplicationTask implements Serializable, Callable<String> {
   
 	// Get an target MNode reference to communicate with
 	try {
+	  log.debug("Getting the MNode reference for " + targetNode.getIdentifier().getValue());
 	  targetMN = D1Client.getMN(targetNode.getIdentifier());
-  } catch (ServiceFailure e) {
+	  
+    } catch (ServiceFailure e) {
+      log.debug("Failed to get the target MNode reference for " + 
+  	    targetNode.getIdentifier().getValue() + 
+  	    " while executing MNreplicationTask id " +
+  	    this.taskid);
   	
-	  // TODO Auto-generated catch block
-	  //e.printStackTrace();
   }
 	
 	// Get the D1 Hazelcast configuration parameters
@@ -291,16 +300,16 @@ public class MNReplicationTask implements Serializable, Callable<String> {
 	try {
 	  sysMetaMap.lock(this.pid);
 	  SystemMetadata sysmeta = sysMetaMap.get(this.pid);
-    List<Replica> replicaList = sysmeta.getReplicaList();
+      List<Replica> replicaList = sysmeta.getReplicaList();
     
     // set the replica status for the correct replica
-    for (Replica replica : replicaList ) {
-      if (replica.getReplicaMemberNode() == this.targetNode.getIdentifier()) {
-        replica.setReplicationStatus(ReplicationStatus.REQUESTED);
+      for (Replica replica : replicaList ) {
+        if (replica.getReplicaMemberNode() == this.targetNode.getIdentifier()) {
+          replica.setReplicationStatus(ReplicationStatus.REQUESTED);
         
-      }
+        }
       
-    }
+      }
     
     // no replica exists yet, make one
     if ( replicaList == null || replicaList.size() < 1) {
@@ -320,39 +329,48 @@ public class MNReplicationTask implements Serializable, Callable<String> {
 		  Settings.getConfiguration().getString("D1Client.certificate.directory") +
 		  "/" +Settings.getConfiguration().getString("cn.nodeId");
 	  CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
-	  
+	  log.debug("MNReplicationTask task id " + this.taskid + "is using an X509 certificate " +
+	    "from " + clientCertificateLocation);
+
 	  // session is null - certificate is used
 	  Session session = null;
+	  
 	  // call for the replication
+	  log.debug("Calling MNreplication.replicate() at targetNode id " + targetMN.getNodeId());
 	  targetMN.replicate(session, sysmeta, this.originatingNode.getIdentifier());
 	  
 	  // update the system metadata map
 	  sysMetaMap.put(this.pid, sysmeta);
-    sysMetaMap.unlock(this.pid);
+      sysMetaMap.unlock(this.pid);
 
 	} catch (NotImplemented e) {
 	  // TODO Auto-generated catch block
 	  e.printStackTrace();
-  } catch (ServiceFailure e) {
+    
+	} catch (ServiceFailure e) {
 	  // TODO Auto-generated catch block
 	  e.printStackTrace();
-  } catch (NotAuthorized e) {
+    
+	} catch (NotAuthorized e) {
 	  // TODO Auto-generated catch block
 	  e.printStackTrace();
-  } catch (InvalidRequest e) {
+    
+	} catch (InvalidRequest e) {
 	  // TODO Auto-generated catch block
 	  e.printStackTrace();
-  } catch (InsufficientResources e) {
+    
+	} catch (InsufficientResources e) {
 	  // TODO Auto-generated catch block
 	  e.printStackTrace();
-  } catch (UnsupportedType e) {
+    
+	} catch (UnsupportedType e) {
 	  // TODO Auto-generated catch block
 	  e.printStackTrace();
   
-  } finally {
-    sysMetaMap.unlock(this.pid);
+    } finally {
+      sysMetaMap.unlock(this.pid);
     
-  }
+    }
 	    
 	
     return this.pid;
