@@ -8,14 +8,44 @@
   <name>DataONE_Replication</name>
   <description>DataONE Coordinating Node replication manager</description>
   <url>http://dataone.org</url>
-  <build>
-  	<plugins>
-  	</plugins>
-  </build>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>1.6</source>
+                    <target>1.6</target>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+            </plugin>
+
+        </plugins>
+    </build>
   <repositories>
+    <repository>
+        <id>sonatype.org</id>
+        <url>http://repository.sonatype.org/content/repositories/central</url>
+        <releases>
+            <enabled>true</enabled>
+        </releases>
+        <snapshots>
+            <enabled>false</enabled>
+        </snapshots>
+    </repository>
     <repository>
       <id>dataone.org</id>
       <url>http://dev-testing.dataone.org/maven</url>
+        <releases>
+            <enabled>true</enabled>
+        </releases>
+        <snapshots>
+            <enabled>true</enabled>
+        </snapshots>
     </repository>
   </repositories>
   <dependencies>
