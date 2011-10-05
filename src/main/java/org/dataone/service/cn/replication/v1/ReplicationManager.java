@@ -142,7 +142,7 @@ public class ReplicationManager implements
     // Become a Hazelcast cluster client using the replication structures
     String[] addresses = this.addressList.split(",");
 
-    log.debug("Becoming a DataONE Storage cluster hazelcast client where the group name " +
+    log.info("Becoming a DataONE Storage cluster hazelcast client where the group name " +
         "is " + this.groupName + " and the cluster member IP addresses are " +
         this.addressList + ".");
     
@@ -150,7 +150,7 @@ public class ReplicationManager implements
       HazelcastClient.newHazelcastClient(this.groupName, this.groupPassword, addresses);
     
     // Also become a Hazelcast processing cluster member
-    log.debug("Becoming a DataONE Process cluster hazelcast member with the default instance.");
+    log.info("Becoming a DataONE Process cluster hazelcast member with the default instance.");
     
     this.hzMember = Hazelcast.getDefaultInstance();
 
@@ -160,13 +160,15 @@ public class ReplicationManager implements
     this.taskIdGenerator = this.hzMember.getIdGenerator(taskIds);
     // monitor the replication structures
     
-    log.debug("Adding listeners to the " + this.systemMetadata.getName() +
+    log.info("Adding listeners to the " + this.systemMetadata.getName() +
         " map and the " + this.replicationTasks.getName() + " queue.");
     this.systemMetadata.addEntryListener(this, true);
     this.replicationTasks.addItemListener(this, true);
   }
 
-      
+  public void init() {
+      log.info("initialization");
+  }
   /**
    * Create replication tasks given the identifier of an object
    * by evaluating its system metadata and the capabilities of the target
@@ -352,7 +354,7 @@ public class ReplicationManager implements
         
         Long taskid = taskIdGenerator.newId();
         // add the task to the task list
-        log.debug("Adding a new MNreplicationTask to the queue where " + 
+        log.info("Adding a new MNreplicationTask to the queue where " +
           "pid = "                    + pid.getValue() + 
           ", originatingNode name = " + originatingNode.getName() +
           ", targetNode name = "      + targetNode.getName());
@@ -471,7 +473,7 @@ public class ReplicationManager implements
     
     try {
       
-      log.debug("Received entry added event on the " + 
+      log.info("Received entry added event on the " +
         this.systemMetadata.getName() + " map. Evaluating it for MN replication tasks.");
       
       // lock the pid and handle the event. If it's already pending, do nothing      
@@ -498,7 +500,7 @@ public class ReplicationManager implements
         }
         // if the pid is locked and not taken by a pending task
         if (!is_pending && no_task_with_pid) {
-          log.debug("Calling createAndQueueTasks for identifier: " + 
+          log.info("Calling createAndQueueTasks for identifier: " +
               event.getKey().getValue());
           this.createAndQueueTasks(event.getKey());
           this.systemMetadata.unlock(event.getKey());
@@ -571,7 +573,7 @@ public class ReplicationManager implements
   public void entryUpdated(EntryEvent<Identifier, SystemMetadata> event) {
     try {
       
-      log.debug("Received entry updated event on the " + 
+      log.info("Received entry updated event on the " +
         this.systemMetadata.getName() + " map. Evaluating it for MN replication tasks.");
 
       // lock the pid and handle the event. If it's already pending, do nothing
@@ -597,7 +599,7 @@ public class ReplicationManager implements
         }
         // if the pid is locked and not taken by a pending task
         if (!is_pending && no_task_with_pid) {
-          log.debug("Calling createAndQueueTasks for identifier: " + 
+          log.info("Calling createAndQueueTasks for identifier: " +
               event.getKey().getValue());
           this.createAndQueueTasks(event.getKey());
           this.systemMetadata.unlock(event.getKey());
