@@ -261,15 +261,17 @@ public class MNReplicationTask implements Serializable, Callable<String> {
    */
   public String call() throws IllegalStateException {
 
+  log.info("MNReplicationTask.call() called for identifier " + this.pid);
+  
 	MNode targetMN = null;
   
 	// Get an target MNode reference to communicate with
 	try {
-	  log.debug("Getting the MNode reference for " + targetNode.getIdentifier().getValue());
+	  log.info("Getting the MNode reference for " + targetNode.getIdentifier().getValue());
 	  targetMN = D1Client.getMN(targetNode.getIdentifier());
 	  
     } catch (ServiceFailure e) {
-      log.debug("Failed to get the target MNode reference for " + 
+      log.info("Failed to get the target MNode reference for " + 
   	    targetNode.getIdentifier().getValue() + 
   	    " while executing MNreplicationTask id " +
   	    this.taskid);
@@ -281,14 +283,18 @@ public class MNReplicationTask implements Serializable, Callable<String> {
 		Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
 
 	String groupName = 
-		Settings.getConfiguration().getString("replication.hazelcast.groupName");
+		Settings.getConfiguration().getString("dataone.hazelcast.groupName");
 
 	String groupPassword = 
-		Settings.getConfiguration().getString("replication.hazelcast.password");
+		Settings.getConfiguration().getString("dataone.hazelcast.password");
 	
 	String addressList = 
-		Settings.getConfiguration().getString("replication.hazelcast.clusterInstances");
+		Settings.getConfiguration().getString("dataone.hazelcast.clusterInstances");
 	String[] addresses = addressList.split(",");
+	
+	log.info("Becoming a DataONE storage cluster client with group name: " +
+	        groupName + ", password: " + groupPassword + ", cluster instances: " +
+	        addresses);
 	
 	// get the system metadata for the pid
 	HazelcastClient hzClient = 
@@ -298,15 +304,21 @@ public class MNReplicationTask implements Serializable, Callable<String> {
 	
 	// Initiate the MN to MN replication for this task
 	try {
+	  log.info("Getting a lock on identifier " + this.pid + " for task id " +
+	          this.taskid);
 	  sysMetaMap.lock(this.pid);
 	  SystemMetadata sysmeta = sysMetaMap.get(this.pid);
       List<Replica> replicaList = sysmeta.getReplicaList();
     
     // set the replica status for the correct replica
       for (Replica replica : replicaList ) {
+
         if (replica.getReplicaMemberNode() == this.targetNode.getIdentifier()) {
           replica.setReplicationStatus(ReplicationStatus.REQUESTED);
-        
+          log.info("Setting the replication status for identifier " + this.pid + 
+                  " and replica node " + replica.getReplicaMemberNode().getValue() + 
+                  " to " + ReplicationStatus.REQUESTED);
+
         }
       
       }
@@ -317,7 +329,10 @@ public class MNReplicationTask implements Serializable, Callable<String> {
       newReplica.setReplicaMemberNode(this.targetNode.getIdentifier());
       newReplica.setReplicationStatus(ReplicationStatus.REQUESTED);
       replicaList.add(newReplica);
-      
+      log.info("Setting the replication status for identifier " + this.pid + 
+              " and replica node " + newReplica.getReplicaMemberNode().getValue() + 
+              " to " + ReplicationStatus.REQUESTED);
+
     }
 
     // update the system metadata object
@@ -329,18 +344,21 @@ public class MNReplicationTask implements Serializable, Callable<String> {
 		  Settings.getConfiguration().getString("D1Client.certificate.directory") +
 		  "/" +Settings.getConfiguration().getString("cn.nodeId");
 	  CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
-	  log.debug("MNReplicationTask task id " + this.taskid + "is using an X509 certificate " +
+	  log.info("MNReplicationTask task id " + this.taskid + "is using an X509 certificate " +
 	    "from " + clientCertificateLocation);
 
 	  // session is null - certificate is used
 	  Session session = null;
 	  
 	  // call for the replication
-	  log.debug("Calling MNreplication.replicate() at targetNode id " + targetMN.getNodeId());
+	  log.info("Calling MNreplication.replicate() at targetNode id " + targetMN.getNodeId());
 	  targetMN.replicate(session, sysmeta, this.originatingNode.getIdentifier());
 	  
 	  // update the system metadata map
 	  sysMetaMap.put(this.pid, sysmeta);
+	  
+	  log.info("Updated system metadata for identifier " + this.pid + "during " +
+	          " MNreplicationTask id " + this.taskid);
       sysMetaMap.unlock(this.pid);
 
 	} catch (NotImplemented e) {
