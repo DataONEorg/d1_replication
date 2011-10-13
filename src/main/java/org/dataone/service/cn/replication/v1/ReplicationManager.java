@@ -59,7 +59,12 @@ import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.SystemMetadata;
 import org.dataone.service.types.v1.Services;
 import org.dataone.service.types.v1.Service;
+import org.dataone.client.D1Client;
+import org.dataone.client.CNode;
 
+import org.apache.solr.client.solrj.SolrServerException;
+import org.apache.solr.common.SolrDocument;
+import org.apache.solr.common.SolrDocumentList;
 
 /**
  * A DataONE Coordinating Node implementation which
@@ -108,7 +113,16 @@ public class ReplicationManager implements
     
   /* The Hazelcast distributed task id generator namespace */
   private String taskIds;
+
+  /* The Hazelcast distributed audit lock string name */
+  private String hzAuditString;
   
+  /* The Hazelcast distributed audit lock string name */
+  private String shortListAge;
+
+  /* The Hazelcast distributed audit lock string name */
+  private String shortListNumRows;
+
   /* The Hazelcast distributed system metadata map */
   private IMap<NodeReference, Node> nodes;
 
@@ -138,6 +152,12 @@ public class ReplicationManager implements
       Settings.getConfiguration().getString("dataone.hazelcast.replicationQueuedTasks");
     this.taskIds = 
       Settings.getConfiguration().getString("dataone.hazelcast.tasksIdGenerator");
+    this.hzAuditString = 
+      Settings.getConfiguration().getString("dataone.hazelcast.auditString");
+    this.shortListAge = 
+      Settings.getConfiguration().getString("dataone.hazelcast.shortListAge");
+    this.shortListNumRows = 
+      Settings.getConfiguration().getString("dataone.hazelcast.shortListNumRows");
     
     // Become a Hazelcast cluster client using the replication structures
     String[] addresses = this.addressList.split(",");
@@ -428,16 +448,44 @@ public class ReplicationManager implements
   
   /**
    * Regular replication sweep over all of the objects on MNs
-   *
-  public void replicationSweep() {
+   */
+  public void auditReplicas() {
+      try{
+          // get lock on hzAuditString
+          Hazelcast.getLock(this.hzAuditString);
 
-      nodeList = (Set<NodeReference>) this.nodes.keySet();
+          CNode cn = null;
 
-      for (NodeReference nodeRef : nodeList) {
-          // 
+          log.info("Getting the CNode reference for the audit list query.");
+          cn = D1Client.getCN();
+
+          // call against the SOLR Indexer to receive a short list of identifiers
+          // which have replicas unchecked in > shortListAge
+          SolrDocumentList shortList = 
+              cn.getAuditShortList(this.shortListAge, 
+                                   Integer.parseInt(this.shortListNumRows));
+
+          SystemMetadata sysmeta = null;
+
+          // bin the tasks by NodeReference for bulk processing by MNAuditTask
+          for (SolrDocument doc : shortList) {
+              sysmeta = this.systemMetadata.get(doc.get("id"));
+              for (Replica replica : sysmeta.getReplicaList()) {
+                  /*
+                  if (replica.getReplicaVerified()) {
+                      //
+                  } else {
+                      //
+                  }
+                  */
+              }
+          }
+      } catch (ServiceFailure sf) {
+          log.error("Failed to get the CNode for the audit list query.");
+      } catch (SolrServerException sse) {
+          log.error("Failed to perform query on SOLR Index for audit short list");
       }
   }
-  */
 
   /**
    * Implement the ItemListener interface, responding to items being added to

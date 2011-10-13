@@ -95,12 +95,10 @@ public class MNAuditTask implements Serializable, Callable<String> {
    */
   public MNAuditTask(String taskid, Node auditTargetNode, 
     ArrayList<Identifier> auditIDs) {
-    
     this.taskid = taskid;
     this.auditTargetNode = auditTargetNode;
     this.auditTargetNodeSubject = auditTargetNode.getSubject(0).getValue();
     this.auditIDs = auditIDs;
-
   }
 
   /**
@@ -158,9 +156,7 @@ public class MNAuditTask implements Serializable, Callable<String> {
    * @return subject - the subject listed in the audit target Node object as a string
    */
   public String getAuditTargetNodeSubject() {
-    
     return this.auditTargetNodeSubject;
-    
   }
   
   /**
