@@ -234,7 +234,7 @@ public class ReplicationManager implements
       replicaList = sysmeta.getReplicaList();
       
       // List of Nodes for building MNReplicationTasks
-      log.info("GBuilding a potential target node list for identifier " + pid.getValue());
+      log.info("Building a potential target node list for identifier " + pid.getValue());
       nodeList = (Set<NodeReference>) this.nodes.keySet();
       potentialNodeList = new ArrayList<NodeReference>(); // will be our short list
       
@@ -298,8 +298,8 @@ public class ReplicationManager implements
         }
       }
        
-      log.info("Desired replicas for identifier " + pid.getValue() + "is " + desiredReplicas);
-      log.info("Potential target node list size for " + pid.getValue() + "is " + desiredReplicas);
+      log.info("Desired replicas for identifier " + pid.getValue() + " is " + desiredReplicas);
+      log.info("Potential target node list size for " + pid.getValue() + " is " + desiredReplicas);
 
       // can't have more replicas than MNs
       if ( desiredReplicas > potentialNodeList.size() ) {
@@ -374,15 +374,17 @@ public class ReplicationManager implements
         if ( replicable ) {
             List<Replica> list = sysMeta.getReplicaList();
 
-            for (Replica replica : list) {
-                NodeReference replicaNode = replica.getReplicaMemberNode();
-                if ( replicaNode.getValue().equals(targetNode.getIdentifier().getValue()) ) {
-                  replica.setReplicationStatus(ReplicationStatus.QUEUED);
-                  log.info("Set the replication status for " + replicaNode.getValue() +
-                          " to " + ReplicationStatus.QUEUED);
-                  replicaAdded = true;
-                  break;
-                  
+            if ( list != null && !list.isEmpty() ) {
+                for (Replica replica : list) {
+                    NodeReference replicaNode = replica.getReplicaMemberNode();
+                    if ( replicaNode.getValue().equals(targetNode.getIdentifier().getValue()) ) {
+                      replica.setReplicationStatus(ReplicationStatus.QUEUED);
+                      log.info("Set the replication status for " + replicaNode.getValue() +
+                              " to " + ReplicationStatus.QUEUED);
+                      replicaAdded = true;
+                      break;
+                      
+                    }
                 }
             }
               
@@ -436,7 +438,7 @@ public class ReplicationManager implements
       e.printStackTrace();
     }
     // return the number of replication tasks queued
-    log.info("Added " + taskCount + "MNreplicationTasks to the queue.");
+    log.info("Added " + taskCount + " MNreplicationTasks to the queue.");
     
     return taskCount;
     
