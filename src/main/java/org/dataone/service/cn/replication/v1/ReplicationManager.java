@@ -271,7 +271,7 @@ public class ReplicationManager implements
       log.info("Removing blocked nodes from the potential replication list for " +
         pid.getValue());
       // remove blocked nodes from the potential nodelist
-      if ( !blockedList.isEmpty() ) {
+      if ( blockedList != null && !blockedList.isEmpty() ) {
         for (NodeReference blockedNode : blockedList) {
           if ( potentialNodeList.contains(blockedNode) ) {
             potentialNodeList.remove(blockedNode);
@@ -284,7 +284,7 @@ public class ReplicationManager implements
         pid.getValue());
 
       // prioritize preferred nodes in the potential node list
-      if ( !preferredList.isEmpty() ) {
+      if ( preferredList != null && !preferredList.isEmpty() ) {
         
         // process preferred nodes backwards
         for (int i = preferredList.size() - 1; i >= 0; i--) {
