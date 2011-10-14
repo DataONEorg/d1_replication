@@ -62,10 +62,6 @@ import org.dataone.service.types.v1.Service;
 import org.dataone.client.D1Client;
 import org.dataone.client.CNode;
 
-import org.apache.solr.client.solrj.SolrServerException;
-import org.apache.solr.common.SolrDocument;
-import org.apache.solr.common.SolrDocumentList;
-
 /**
  * A DataONE Coordinating Node implementation which
  * manages replication queues and executes replication tasks. The service is
@@ -448,7 +444,7 @@ public class ReplicationManager implements
   
   /**
    * Regular replication sweep over all of the objects on MNs
-   */
+   *
   public void auditReplicas() {
       try{
           // get lock on hzAuditString
@@ -471,13 +467,11 @@ public class ReplicationManager implements
           for (SolrDocument doc : shortList) {
               sysmeta = this.systemMetadata.get(doc.get("id"));
               for (Replica replica : sysmeta.getReplicaList()) {
-                  /*
                   if (replica.getReplicaVerified()) {
                       //
                   } else {
                       //
                   }
-                  */
               }
           }
       } catch (ServiceFailure sf) {
@@ -486,6 +480,7 @@ public class ReplicationManager implements
           log.error("Failed to perform query on SOLR Index for audit short list");
       }
   }
+  */
 
   /**
    * Implement the ItemListener interface, responding to items being added to
