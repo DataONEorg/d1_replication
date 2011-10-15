@@ -49,6 +49,7 @@ import org.dataone.service.types.v1.SystemMetadata;
 
 import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.core.IMap;
+import org.dataone.cn.hazelcast.HazelcastClientInstance;
 
 /**
  * A single replication task to be queued and executed by the Replication Service.
@@ -281,27 +282,27 @@ public class MNReplicationTask implements Serializable, Callable<String> {
   }
 	
 	// Get the D1 Hazelcast configuration parameters
-	String hzSystemMetadata = 
-		Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
+	 String hzSystemMetadata =
+	 	Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
 
-	String groupName = 
-		Settings.getConfiguration().getString("dataone.hazelcast.groupName");
+	// String groupName =
+	//	Settings.getConfiguration().getString("dataone.hazelcast.groupName");
 
-	String groupPassword = 
-		Settings.getConfiguration().getString("dataone.hazelcast.password");
+	// String groupPassword =
+	// 	Settings.getConfiguration().getString("dataone.hazelcast.password");
 	
-	String addressList = 
-		Settings.getConfiguration().getString("dataone.hazelcast.clusterInstances");
-	String[] addresses = addressList.split(",");
+	// String addressList =
+	// 	Settings.getConfiguration().getString("dataone.hazelcast.clusterInstances");
+	// String[] addresses = addressList.split(",");
 	
-	log.info("Becoming a DataONE storage cluster client with group name: " +
-	        groupName + ", password: " + groupPassword + ", cluster instances: " +
-	        addresses);
+	// log.info("Becoming a DataONE storage cluster client with group name: " +
+	//       groupName + ", password: " + groupPassword + ", cluster instances: " +
+	//        addresses);
 	
 	// get the system metadata for the pid
-	HazelcastClient hzClient = 
-		HazelcastClient.newHazelcastClient(groupName, groupPassword, addresses);
-	
+	// HazelcastClient hzClient =
+	//	HazelcastClient.newHazelcastClient(groupName, groupPassword, addresses);
+	HazelcastClient hzClient = HazelcastClientInstance.getHazelcastClient();
 	IMap<String, SystemMetadata> sysMetaMap = hzClient.getMap(hzSystemMetadata);
 	
 	// Initiate the MN to MN replication for this task

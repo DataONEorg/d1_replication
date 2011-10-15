@@ -1,13 +1,14 @@
+
 <project xmlns="http://maven.apache.org/POM/4.0.0" 
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-  <modelVersion>4.0.0</modelVersion>
-  <groupId>org.dataone</groupId>
-  <artifactId>d1_replication</artifactId>
-  <version>0.6.4-SNAPSHOT</version>
-  <name>DataONE_Replication</name>
-  <description>DataONE Coordinating Node replication manager</description>
-  <url>http://dataone.org</url>
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.dataone</groupId>
+    <artifactId>d1_replication</artifactId>
+    <version>0.6.4-SNAPSHOT</version>
+    <name>DataONE_Replication</name>
+    <description>DataONE Coordinating Node replication manager</description>
+    <url>http://dataone.org</url>
     <build>
         <plugins>
             <plugin>
@@ -26,50 +27,56 @@
 
         </plugins>
     </build>
-  <repositories>
-    <repository>
-        <id>sonatype.org</id>
-        <url>http://repository.sonatype.org/content/repositories/central</url>
-        <releases>
-            <enabled>true</enabled>
-        </releases>
-        <snapshots>
-            <enabled>false</enabled>
-        </snapshots>
-    </repository>
-    <repository>
-      <id>dataone.org</id>
-      <url>http://dev-testing.dataone.org/maven</url>
-        <releases>
-            <enabled>true</enabled>
-        </releases>
-        <snapshots>
-            <enabled>true</enabled>
-        </snapshots>
-    </repository>
-  </repositories>
-  <dependencies>
-    <dependency>
-      <groupId>org.dataone</groupId>
-      <artifactId>d1_common_java</artifactId>
-      <version>0.6.4-SNAPSHOT</version>
-    </dependency>
-    <dependency>
-      <groupId>org.dataone</groupId>
-      <artifactId>d1_libclient_java</artifactId>
-      <version>0.6.4-SNAPSHOT</version>
-    </dependency>
-    <dependency>
-      <groupId>com.hazelcast</groupId>
-      <artifactId>hazelcast</artifactId>
-      <version>1.9.3.4</version>
-    </dependency>
-    <dependency>
-    	<groupId>com.hazelcast</groupId>
-    	<artifactId>hazelcast-client</artifactId>
-    	<version>1.9.3.4</version>
-    	<type>jar</type>
-    	<scope>compile</scope>
-    </dependency>
-  </dependencies>
+    <repositories>
+        <repository>
+            <id>sonatype.org</id>
+            <url>http://repository.sonatype.org/content/repositories/central</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+        <repository>
+            <id>dataone.org</id>
+            <url>http://dev-testing.dataone.org/maven</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+    <dependencies>
+        <dependency>
+            <groupId>org.dataone</groupId>
+            <artifactId>d1_common_java</artifactId>
+            <version>0.6.4-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>org.dataone</groupId>
+            <artifactId>d1_libclient_java</artifactId>
+            <version>0.6.4-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>org.dataone</groupId>
+            <artifactId>d1_cn_common</artifactId>
+            <version>0.6.4-SNAPSHOT</version>
+            <type>jar</type>
+        </dependency>
+        <dependency>
+            <groupId>com.hazelcast</groupId>
+            <artifactId>hazelcast</artifactId>
+            <version>1.9.3.4</version>
+        </dependency>
+        <dependency>
+            <groupId>com.hazelcast</groupId>
+            <artifactId>hazelcast-client</artifactId>
+            <version>1.9.3.4</version>
+            <type>jar</type>
+            <scope>compile</scope>
+        </dependency>
+    </dependencies>
 </project>

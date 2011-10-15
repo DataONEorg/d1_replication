@@ -2,4 +2,5 @@
 <!-- Apache Commons Configuration -->
 <configuration>
   <properties fileName="replication.properties"/>
+  <properties fileName="d1client.properties"/>
 </configuration>
