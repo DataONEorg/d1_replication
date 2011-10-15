@@ -61,6 +61,7 @@ import org.dataone.service.types.v1.Services;
 import org.dataone.service.types.v1.Service;
 import org.dataone.client.D1Client;
 import org.dataone.client.CNode;
+import org.dataone.cn.hazelcast.HazelcastClientInstance;
 
 /**
  * A DataONE Coordinating Node implementation which
@@ -134,12 +135,12 @@ public class ReplicationManager implements
   public ReplicationManager() {
     
     // Get configuration properties on instantiation
-    this.groupName = 
-      Settings.getConfiguration().getString("dataone.hazelcast.group");
-    this.groupPassword = 
-      Settings.getConfiguration().getString("dataone.hazelcast.password");
-    this.addressList = 
-      Settings.getConfiguration().getString("dataone.hazelcast.clusterInstances");
+   // this.groupName =
+   //   Settings.getConfiguration().getString("dataone.hazelcast.group");
+   // this.groupPassword =
+   //   Settings.getConfiguration().getString("dataone.hazelcast.password");
+   // this.addressList =
+   //   Settings.getConfiguration().getString("dataone.hazelcast.clusterInstances");
     this.nodeMap = 
       Settings.getConfiguration().getString("dataone.hazelcast.nodes");
     this.systemMetadataMap = 
@@ -156,15 +157,16 @@ public class ReplicationManager implements
       Settings.getConfiguration().getString("dataone.hazelcast.shortListNumRows");
     
     // Become a Hazelcast cluster client using the replication structures
-    String[] addresses = this.addressList.split(",");
+    // String[] addresses = this.addressList.split(",");
 
-    log.info("Becoming a DataONE Storage cluster hazelcast client where the group name " +
-        "is " + this.groupName + " and the cluster member IP addresses are " +
-        this.addressList + ".");
+    //log.info("Becoming a DataONE Storage cluster hazelcast client where the group name " +
+    //   "is " + this.groupName + " and the cluster member IP addresses are " +
+    //    this.addressList + ".");
     
-    this.hzClient = 
-      HazelcastClient.newHazelcastClient(this.groupName, this.groupPassword, addresses);
-    
+    //this.hzClient =
+    //  HazelcastClient.newHazelcastClient(this.groupName, this.groupPassword, addresses);
+
+    this.hzClient = HazelcastClientInstance.getHazelcastClient();
     // Also become a Hazelcast processing cluster member
     log.info("Becoming a DataONE Process cluster hazelcast member with the default instance.");
     
@@ -232,7 +234,9 @@ public class ReplicationManager implements
       
       SystemMetadata sysmeta = this.systemMetadata.get(pid);
       replicaList = sysmeta.getReplicaList();
-      
+      if (replicaList == null) {
+          replicaList = new ArrayList<Replica>();
+      }
       // List of Nodes for building MNReplicationTasks
       log.info("Building a potential target node list for identifier " + pid.getValue());
       nodeList = (Set<NodeReference>) this.nodes.keySet();
@@ -250,8 +254,8 @@ public class ReplicationManager implements
       for(NodeReference nodeReference : nodeList) {
         Node node = this.nodes.get(nodeReference);
         
-          // only add MNs as targets, excluding the authoritative MN
-          if ( node.getType() == NodeType.MN && 
+          // only add MNs as targets, excluding the authoritative MN and MNs that are not tagged to replicate
+          if ( (node.getType() == NodeType.MN) && node.isReplicate() &&
               !node.getIdentifier().getValue().equals(authoritativeNode.getIdentifier().getValue())) {
             potentialNodeList.add(node.getIdentifier());
             
@@ -339,29 +343,34 @@ public class ReplicationManager implements
         if ( !alreadyAdded ) {
           targetNode = this.nodes.get(potentialNode);
                 
+        } else {
+            // skip on to the next one right? -rpw (otherwise targetnode is empty or is the last targetnode assigned)
+            continue;
         }
         
         boolean replicaAdded = false;
           
         // update system metadata for the targetNode on this task
         SystemMetadata sysMeta = this.systemMetadata.get(pid);
-        
-        String version = "";
+
+        // may be more than one version of MNReplication
+        List<String> implementedVersions = new ArrayList<String>();
         List<Service> origServices = authoritativeNode.getServices().getServiceList();
         for (Service service : origServices) {
-            if(service.getName().equals("MNReplication")) {
-                version = service.getVersion();
+            if(service.getName().equals("MNReplication") &&
+               service.getAvailable()) {
+                implementedVersions.add(service.getVersion());
             }
         }
-        if (version.equals("")) {
-            throw new InvalidRequest("1080","MNReplication Service missing version");
+        if (implementedVersions.isEmpty()) {
+            throw new InvalidRequest("1080","Authoritative Node:" + authoritativeNode.getIdentifier().getValue() + " MNReplication Service is not available or is missing version");
         }
 
         boolean replicable = false;
 
         for (Service service : targetNode.getServices().getServiceList()) {
             if(service.getName().equals("MNReplication") &&
-               service.getVersion().equals(version) &&
+               implementedVersions.contains(service.getVersion()) &&
                service.getAvailable()) {
                 replicable = true;
             }
@@ -503,7 +512,8 @@ public class ReplicationManager implements
         
         // TODO: handle the case when a CN drops and the MNReplicationTask.call()
         // has not been made.
-        ExecutorService executorService = this.hzClient.getExecutorService();
+        // submit to the processing cluster, not the storage cluster
+        ExecutorService executorService = this.hzMember.getExecutorService();
         Future<String> replicationTask = executorService.submit(task);
         
         // check for completion
