@@ -307,15 +307,18 @@ public class MNReplicationTask implements Serializable, Callable<String> {
 	
 	// Initiate the MN to MN replication for this task
 	try {
-	  log.info("Getting a lock on identifier " + this.pid + " for task id " +
-	          this.taskid);
-	  sysMetaMap.lock(this.pid);
-	  SystemMetadata sysmeta = sysMetaMap.get(this.pid);
+	    log.info("Getting a lock on identifier " + this.pid + " for task id " +
+	            this.taskid);
+	    sysMetaMap.lock(this.pid);
+	    SystemMetadata sysmeta = sysMetaMap.get(this.pid);
+	    log.info("Lock acquired for identifier " + this.pid);
+	    
+      log.info("Evaluating replica list for identifer " + this.pid);
       List<Replica> replicaList = sysmeta.getReplicaList();
-    
-    // set the replica status for the correct replica
+      
+      // set the replica status for the correct replica
       for (Replica replica : replicaList ) {
-
+        
         if (replica.getReplicaMemberNode() == this.targetNode.getIdentifier()) {
           replica.setReplicationStatus(ReplicationStatus.REQUESTED);
           log.info("Setting the replication status for identifier " + this.pid + 
@@ -327,7 +330,7 @@ public class MNReplicationTask implements Serializable, Callable<String> {
       }
     
     // no replica exists yet, make one
-    if ( replicaList == null || replicaList.size() < 1) {
+    if ( replicaList == null || replicaList.isEmpty()) {
       Replica newReplica = new Replica();
       newReplica.setReplicaMemberNode(this.targetNode.getIdentifier());
       newReplica.setReplicationStatus(ReplicationStatus.REQUESTED);
