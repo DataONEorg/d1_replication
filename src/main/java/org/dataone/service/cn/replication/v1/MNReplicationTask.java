@@ -303,34 +303,37 @@ public class MNReplicationTask implements Serializable, Callable<String> {
 	// HazelcastClient hzClient =
 	//	HazelcastClient.newHazelcastClient(groupName, groupPassword, addresses);
 	HazelcastClient hzClient = HazelcastClientInstance.getHazelcastClient();
-	IMap<String, SystemMetadata> sysMetaMap = hzClient.getMap(hzSystemMetadata);
+	IMap<Identifier, SystemMetadata> sysMetaMap = hzClient.getMap(hzSystemMetadata);
 	
 	// Initiate the MN to MN replication for this task
 	try {
 	    log.info("Getting a lock on identifier " + this.pid + " for task id " +
 	            this.taskid);
-	    sysMetaMap.lock(this.pid);
-	    SystemMetadata sysmeta = sysMetaMap.get(this.pid);
+	    sysMetaMap.lock(getPid());
+	    SystemMetadata sysmeta = sysMetaMap.get(getPid());
 	    log.info("Lock acquired for identifier " + this.pid);
 	    
       log.info("Evaluating replica list for identifer " + this.pid);
       List<Replica> replicaList = sysmeta.getReplicaList();
+      boolean replicaEntryExists = false;
       
       // set the replica status for the correct replica
       for (Replica replica : replicaList ) {
         
         if (replica.getReplicaMemberNode() == this.targetNode.getIdentifier()) {
           replica.setReplicationStatus(ReplicationStatus.REQUESTED);
+          replicaEntryExists = true;
           log.info("Setting the replication status for identifier " + this.pid + 
                   " and replica node " + replica.getReplicaMemberNode().getValue() + 
                   " to " + ReplicationStatus.REQUESTED);
+          break;
 
         }
       
       }
     
     // no replica exists yet, make one
-    if ( replicaList == null || replicaList.isEmpty()) {
+    if ( !replicaEntryExists || replicaList == null || replicaList.isEmpty()) {
       Replica newReplica = new Replica();
       newReplica.setReplicaMemberNode(this.targetNode.getIdentifier());
       newReplica.setReplicationStatus(ReplicationStatus.REQUESTED);
@@ -361,11 +364,11 @@ public class MNReplicationTask implements Serializable, Callable<String> {
 	  targetMN.replicate(session, sysmeta, this.originatingNode.getIdentifier());
 	  
 	  // update the system metadata map
-	  sysMetaMap.put(this.pid, sysmeta);
+	  sysMetaMap.put(getPid(), sysmeta);
 	  
 	  log.info("Updated system metadata for identifier " + this.pid + "during " +
 	          " MNreplicationTask id " + this.taskid);
-      sysMetaMap.unlock(this.pid);
+      sysMetaMap.unlock(getPid());
 
 	} catch (NotImplemented e) {
 	  // TODO Auto-generated catch block
@@ -392,7 +395,7 @@ public class MNReplicationTask implements Serializable, Callable<String> {
 	  e.printStackTrace();
   
     } finally {
-      sysMetaMap.unlock(this.pid);
+      sysMetaMap.unlock(getPid());
     
     }
 	    
