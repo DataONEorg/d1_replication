@@ -240,159 +240,159 @@ public class MNReplicationTask implements Serializable, Callable<String> {
    * @return pid - the identifier of the replicated object upon success
    */
   public String call() throws IllegalStateException {
-  /* The Hazelcast distributed system metadata map */
-   String   nodeMap =
-      Settings.getConfiguration().getString("dataone.hazelcast.nodes");
-   HazelcastInstance hzMember = Hazelcast.getDefaultInstance();
-   IMap<NodeReference, Node> nodes = hzMember.getMap(nodeMap);;
-   log.info("MNReplicationTask.call() called for identifier " + this.pid);
-  
-	//MNode targetMN = null;
-        String mnUrl = nodes.get(targetNode).getBaseURL();
-	// Get an target MNode reference to communicate with
-//	try {
-        // XXX need to figure out better way to handle versioning! -rpw
-	  log.info("Getting the MNode reference for " + targetNode.getValue());
-	  MNode targetMN = new MNode(mnUrl + "/v1");
-	  
-//    } catch (ServiceFailure e) {
-//      log.info("Failed to get the target MNode reference for " +
- // 	    targetNode.getValue() +
- // 	    " while executing MNreplicationTask id " +
- // 	    this.taskid);
-  	
- // }
-	
-	// Get the D1 Hazelcast configuration parameters
-	 String hzSystemMetadata =
-	 	Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
+      /* The Hazelcast distributed system metadata map */
+      String   nodeMap =
+          Settings.getConfiguration().getString("dataone.hazelcast.nodes");
+      HazelcastInstance hzMember = Hazelcast.getDefaultInstance();
+      IMap<NodeReference, Node> nodes = hzMember.getMap(nodeMap);;
+      log.info("MNReplicationTask.call() called for identifier " + this.pid);
 
-	// String groupName =
-	//	Settings.getConfiguration().getString("dataone.hazelcast.groupName");
+      //MNode targetMN = null;
+      String mnUrl = nodes.get(targetNode).getBaseURL();
+      // Get an target MNode reference to communicate with
+      //	try {
+      // XXX need to figure out better way to handle versioning! -rpw
+      log.info("Getting the MNode reference for " + targetNode.getValue());
+      MNode targetMN = new MNode(mnUrl + "/v1");
 
-	// String groupPassword =
-	// 	Settings.getConfiguration().getString("dataone.hazelcast.password");
-	
-	// String addressList =
-	// 	Settings.getConfiguration().getString("dataone.hazelcast.clusterInstances");
-	// String[] addresses = addressList.split(",");
-	
-	// log.info("Becoming a DataONE storage cluster client with group name: " +
-	//       groupName + ", password: " + groupPassword + ", cluster instances: " +
-	//        addresses);
-	
-	// get the system metadata for the pid
-	// HazelcastClient hzClient =
-	//	HazelcastClient.newHazelcastClient(groupName, groupPassword, addresses);
-	HazelcastClient hzClient = HazelcastClientInstance.getHazelcastClient();
-	IMap<Identifier, SystemMetadata> sysMetaMap = hzClient.getMap(hzSystemMetadata);
-	log.info("syMetaMap size " + sysMetaMap.size());
-	// Initiate the MN to MN replication for this task
-	try {
-	    log.info("Getting a lock on identifier " + this.pid + " for task id " +
-	            this.taskid);
+      //    } catch (ServiceFailure e) {
+      //      log.info("Failed to get the target MNode reference for " +
+      // 	    targetNode.getValue() +
+      // 	    " while executing MNreplicationTask id " +
+      // 	    this.taskid);
 
-	    sysMetaMap.lock(this.pid);
-	    SystemMetadata sysmeta = sysMetaMap.get(this.pid);
-	    log.info("Lock acquired for identifier " + this.pid);
-	    
-      log.info("Evaluating replica list for identifer " + this.pid);
-      List<Replica> replicaList = sysmeta.getReplicaList();
-      boolean replicaEntryExists = false;
-      
-      // set the replica status for the correct replica
-      for (Replica replica : replicaList ) {
-        log.debug("Found the replica " +  replica.getReplicaMemberNode().getValue());
-        if (replica.getReplicaMemberNode().equals(this.targetNode)) {
-          replica.setReplicationStatus(ReplicationStatus.REQUESTED);
-          replicaEntryExists = true;
-          log.info("Setting the replication status for identifier " + this.pid + 
-                  " and replica node " + replica.getReplicaMemberNode().getValue() + 
-                  " to " + ReplicationStatus.REQUESTED);
-          break;
+      // }
 
-        }
-      
-      }
-    
-    // no replica exists yet, make one
-    if ( !replicaEntryExists || replicaList == null || replicaList.isEmpty()) {
-      Replica newReplica = new Replica();
-      newReplica.setReplicaMemberNode(this.targetNode);
-      newReplica.setReplicationStatus(ReplicationStatus.REQUESTED);
-      replicaList.add(newReplica);
-      log.info("Setting the replication status for identifier " + this.pid + 
-              " and replica node " + newReplica.getReplicaMemberNode().getValue() + 
-              " to " + ReplicationStatus.REQUESTED);
+      // Get the D1 Hazelcast configuration parameters
+      String hzSystemMetadata =
+          Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
 
-    }
+      // String groupName =
+      //	Settings.getConfiguration().getString("dataone.hazelcast.groupName");
 
-    // update the system metadata object
-	  sysmeta.setDateSysMetadataModified(new Date());
-	  sysmeta.setReplicaList(replicaList);
-	  
-	  // set up the certificate location
-	  String clientCertificateLocation = 
-		  Settings.getConfiguration().getString("D1Client.certificate.directory") +
-		  "/" +Settings.getConfiguration().getString("cn.nodeId");
-	  CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
-	  log.info("MNReplicationTask task id " + this.taskid + "is using an X509 certificate " +
-	    "from " + clientCertificateLocation);
+      // String groupPassword =
+      // 	Settings.getConfiguration().getString("dataone.hazelcast.password");
 
-	  // session is null - certificate is used
-	  Session session = null;
-	  
-	  // call for the replication
-	  log.info("Calling MNreplication.replicate() at targetNode id " + targetMN.getNodeId());
-	  targetMN.replicate(session, sysmeta, this.originatingNode);
-	  
-	  // update the system metadata map
-	  sysMetaMap.put(this.pid, sysmeta);
-	  
-	  log.info("Updated system metadata for identifier " + this.pid + "during " +
-	          " MNreplicationTask id " + this.taskid);
-      sysMetaMap.unlock(this.pid);
+      // String addressList =
+      // 	Settings.getConfiguration().getString("dataone.hazelcast.clusterInstances");
+      // String[] addresses = addressList.split(",");
 
-	} catch (NotImplemented e) {
-	  // TODO Auto-generated catch block
-             log.error(e.getMessage(), e);
-	  e.printStackTrace();
-    
-	} catch (ServiceFailure e) {
-	  // TODO Auto-generated catch block
-             log.error(e.getMessage(), e);
-	  e.printStackTrace();
-    
-	} catch (NotAuthorized e) {
-	  // TODO Auto-generated catch block
-             log.error(e.getMessage(), e);
-	  e.printStackTrace();
-    
-	} catch (InvalidRequest e) {
-	  // TODO Auto-generated catch block
-             log.error(e.getMessage(), e);
-	  e.printStackTrace();
-    
-	} catch (InsufficientResources e) {
-	  // TODO Auto-generated catch block
-             log.error(e.getMessage(), e);
-	  e.printStackTrace();
-    
-	} catch (UnsupportedType e) {
-	  // TODO Auto-generated catch block
-             log.error(e.getMessage(), e);
-	  e.printStackTrace();
-	} catch (Exception e) {
-	  // TODO Auto-generated catch block
+      // log.info("Becoming a DataONE storage cluster client with group name: " +
+      //       groupName + ", password: " + groupPassword + ", cluster instances: " +
+      //        addresses);
+
+      // get the system metadata for the pid
+      // HazelcastClient hzClient =
+      //	HazelcastClient.newHazelcastClient(groupName, groupPassword, addresses);
+      HazelcastClient hzClient = HazelcastClientInstance.getHazelcastClient();
+      IMap<Identifier, SystemMetadata> sysMetaMap = hzClient.getMap(hzSystemMetadata);
+      log.info("syMetaMap size " + sysMetaMap.size());
+      // Initiate the MN to MN replication for this task
+      try {
+          log.info("Getting a lock on identifier " + this.pid + " for task id " +
+                  this.taskid);
+
+          sysMetaMap.lock(this.pid);
+          SystemMetadata sysmeta = sysMetaMap.get(this.pid);
+          log.info("Lock acquired for identifier " + this.pid);
+
+          log.info("Evaluating replica list for identifer " + this.pid);
+          List<Replica> replicaList = sysmeta.getReplicaList();
+          boolean replicaEntryExists = false;
+
+          // set the replica status for the correct replica
+          for (Replica replica : replicaList ) {
+              log.debug("Found the replica " +  replica.getReplicaMemberNode().getValue());
+              if (replica.getReplicaMemberNode().equals(this.targetNode)) {
+                  replica.setReplicationStatus(ReplicationStatus.REQUESTED);
+                  replicaEntryExists = true;
+                  log.info("Setting the replication status for identifier " + this.pid + 
+                          " and replica node " + replica.getReplicaMemberNode().getValue() + 
+                          " to " + ReplicationStatus.REQUESTED);
+                  break;
+
+              }
+
+          }
+
+          // no replica exists yet, make one
+          if ( !replicaEntryExists || replicaList == null || replicaList.isEmpty()) {
+              Replica newReplica = new Replica();
+              newReplica.setReplicaMemberNode(this.targetNode);
+              newReplica.setReplicationStatus(ReplicationStatus.REQUESTED);
+              replicaList.add(newReplica);
+              log.info("Setting the replication status for identifier " + this.pid + 
+                      " and replica node " + newReplica.getReplicaMemberNode().getValue() + 
+                      " to " + ReplicationStatus.REQUESTED);
+
+          }
+
+          // update the system metadata object
+          sysmeta.setDateSysMetadataModified(new Date());
+          sysmeta.setReplicaList(replicaList);
+
+          // set up the certificate location
+          String clientCertificateLocation = 
+              Settings.getConfiguration().getString("D1Client.certificate.directory") +
+              "/" +Settings.getConfiguration().getString("cn.nodeId");
+          CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
+          log.info("MNReplicationTask task id " + this.taskid + "is using an X509 certificate " +
+                  "from " + clientCertificateLocation);
+
+          // session is null - certificate is used
+          Session session = null;
+
+          // call for the replication
+          log.info("Calling MNreplication.replicate() at targetNode id " + targetMN.getNodeId());
+          targetMN.replicate(session, sysmeta, this.originatingNode);
+
+          // update the system metadata map
+          sysMetaMap.put(this.pid, sysmeta);
+
+          log.info("Updated system metadata for identifier " + this.pid + "during " +
+                  " MNreplicationTask id " + this.taskid);
+          sysMetaMap.unlock(this.pid);
+
+      } catch (NotImplemented e) {
+          // TODO Auto-generated catch block
           log.error(e.getMessage(), e);
-	  e.printStackTrace();
-    } finally {
-      sysMetaMap.unlock(this.pid);
-    log.debug("Finally completed");
-    }
-	    
-	
-    return this.pid.getValue();
+          e.printStackTrace();
+
+      } catch (ServiceFailure e) {
+          // TODO Auto-generated catch block
+          log.error(e.getMessage(), e);
+          e.printStackTrace();
+
+      } catch (NotAuthorized e) {
+          // TODO Auto-generated catch block
+          log.error(e.getMessage(), e);
+          e.printStackTrace();
+
+      } catch (InvalidRequest e) {
+          // TODO Auto-generated catch block
+          log.error(e.getMessage(), e);
+          e.printStackTrace();
+
+      } catch (InsufficientResources e) {
+          // TODO Auto-generated catch block
+          log.error(e.getMessage(), e);
+          e.printStackTrace();
+
+      } catch (UnsupportedType e) {
+          // TODO Auto-generated catch block
+          log.error(e.getMessage(), e);
+          e.printStackTrace();
+      } catch (Exception e) {
+          // TODO Auto-generated catch block
+          log.error(e.getMessage(), e);
+          e.printStackTrace();
+      } finally {
+          sysMetaMap.unlock(this.pid);
+          log.debug("Finally completed");
+      }
+
+
+      return this.pid.getValue();
   }
 
 }
