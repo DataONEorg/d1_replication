@@ -247,13 +247,13 @@ public class MNReplicationTask implements Serializable, Callable<String> {
    IMap<NodeReference, Node> nodes = hzMember.getMap(nodeMap);;
    log.info("MNReplicationTask.call() called for identifier " + this.pid);
   
-	MNode targetMN = null;
+	//MNode targetMN = null;
         String mnUrl = nodes.get(targetNode).getBaseURL();
 	// Get an target MNode reference to communicate with
 //	try {
         // XXX need to figure out better way to handle versioning! -rpw
 	  log.info("Getting the MNode reference for " + targetNode.getValue());
-	  MNode mNode = new MNode(mnUrl + "/v1");
+	  MNode targetMN = new MNode(mnUrl + "/v1");
 	  
 //    } catch (ServiceFailure e) {
 //      log.info("Failed to get the target MNode reference for " +
