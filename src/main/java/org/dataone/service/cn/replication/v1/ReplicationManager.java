@@ -401,6 +401,7 @@ public class ReplicationManager implements
                 Replica newReplica = new Replica();
                 newReplica.setReplicaMemberNode(targetNode.getIdentifier());
                 newReplica.setReplicationStatus(ReplicationStatus.QUEUED);
+                newReplica.setReplicaVerified(new Date());
                 sysMeta.addReplica(newReplica);
                 log.info("No replica listed for " + targetNode.getIdentifier().getValue() +
                         ". Added a new replica item to identifier " + pid.getValue());
@@ -425,9 +426,8 @@ public class ReplicationManager implements
             MNReplicationTask task = new MNReplicationTask(
                                 taskid.toString(),
                                 pid,
-                                authoritativeNode,
-                                targetNode,
-                                Permission.REPLICATE);
+                                authoritativeNode.getIdentifier(),
+                                targetNode.getIdentifier());
             this.replicationTasks.add(task);
             taskCount++;
 
