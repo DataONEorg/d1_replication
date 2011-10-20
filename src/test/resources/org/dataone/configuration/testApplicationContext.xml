@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<spring:beans
+	xmlns:spring="http://www.springframework.org/schema/beans"
+	xmlns:context="http://www.springframework.org/schema/context"
+        xmlns:util="http://www.springframework.org/schema/util"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+		http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+	    http://www.springframework.org/schema/context
+        http://www.springframework.org/schema/context/spring-context-3.0.xsd
+        http://www.springframework.org/schema/util
+        http://www.springframework.org/schema/util/spring-util-2.0.xsd">
+    <context:annotation-config/>
+    <spring:bean id="mylog"
+    class="org.springframework.beans.factory.config.CommonsLogFactoryBean">
+        <spring:property name="logName" value="log"/>
+    </spring:bean>
+    <spring:bean id="log4jInitialization"
+		class="org.springframework.beans.factory.config.MethodInvokingFactoryBean">
+        <spring:property name="targetClass">
+            <spring:value>org.springframework.util.Log4jConfigurer</spring:value>
+        </spring:property>
+        <spring:property name="targetMethod" value="initLogging" />
+        <spring:property name="arguments">
+            <spring:list>
+                <spring:value>classpath:org/dataone/configuration/log4j.properties</spring:value>
+            </spring:list>
+        </spring:property>
+    </spring:bean>
+
+    <spring:bean id="contextSourceConfiguration" class="org.dataone.cn.ldap.v1.ContextSourceConfiguration" />
+
+    <spring:bean id="contextSource" class="org.springframework.ldap.core.support.LdapContextSource"
+        factory-bean="contextSourceConfiguration" factory-method="getLdapContextSource" />
+
+    <spring:bean id="ldapTemplate" class="org.springframework.ldap.core.LdapTemplate">
+        <spring:constructor-arg ref="contextSource" />
+    </spring:bean>
+    <context:component-scan base-package="org.dataone.cn.ldap.v1" />
+    
+    <spring:bean id="readSystemMetadataResource" class="org.springframework.core.io.ClassPathResource" >
+        <spring:constructor-arg type="java.lang.String" value="org/dataone/cn/resources/samples/v1/systemMetadataSample.xml"/>
+        <spring:qualifier value="readSystemMetadataResource"/>
+    </spring:bean>
+    <spring:bean id="nodeListResource" class="org.springframework.core.io.ClassPathResource" >
+        <spring:constructor-arg type="java.lang.String" value="org/dataone/cn/resources/samples/v1/nodeList.xml"/>
+        <spring:qualifier value="nodeListResource"/>
+    </spring:bean>
+
+</spring:beans>

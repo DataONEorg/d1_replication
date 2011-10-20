@@ -19,7 +19,6 @@
  * 
  * $Id: $
  */
-
 package org.dataone.service.cn.replication.v1;
 
 import java.io.Serializable;
@@ -65,334 +64,325 @@ import com.hazelcast.core.HazelcastInstance;
  */
 public class MNReplicationTask implements Serializable, Callable<String> {
 
-  /* Get a Log instance */
-  public static Log log = LogFactory.getLog(MNReplicationTask.class);
-  
-  /* The identifier of this task */
-  private String taskid;
-  
-  /* The identifier of the system metadata map event that precipitated this task */
-  private String eventid;
-  
-  /* The identifier of the object to replicate */
-  private Identifier pid;
-  
-  /* The target Node object */
-  private NodeReference targetNode;
-  
-  /* The originating Node object */
-  private NodeReference originatingNode;
+    /* Get a Log instance */
+    public static Log log = LogFactory.getLog(MNReplicationTask.class);
+    /* The identifier of this task */
+    private String taskid;
+    /* The identifier of the system metadata map event that precipitated this task */
+    private String eventid;
+    /* The identifier of the object to replicate */
+    private Identifier pid;
+    /* The target Node object */
+    private NodeReference targetNode;
+    /* The originating Node object */
+    private NodeReference originatingNode;
 
-  /* The subject of the target node, extracted from the Node object */
-  private String targetNodeSubject;
-  
-  /* The subject of the originating node, extracted from the Node object */
-  private String originatingNodeSubject;
-  
+    /* The subject of the target node, extracted from the Node object */
+    private String targetNodeSubject;
+    /* The subject of the originating node, extracted from the Node object */
+    private String originatingNodeSubject;
 
-  /**
-   * Constructor - create an empty replication task instance
-   */
-  public MNReplicationTask() {
-  }
+    /**
+     * Constructor - create an empty replication task instance
+     */
+    public MNReplicationTask() {
+    }
 
-  /**
-   * Constructor - create a replication task instance
-   * 
-   * @param taskid
-   * @param pid
-   * @param targetNode
-   */
-  public MNReplicationTask(String taskid, Identifier pid,
-    NodeReference originatingNode, NodeReference targetNode) {
+    /**
+     * Constructor - create a replication task instance
+     *
+     * @param taskid
+     * @param pid
+     * @param targetNode
+     */
+    public MNReplicationTask(String taskid, Identifier pid,
+            NodeReference originatingNode, NodeReference targetNode) {
 
-    this.taskid = taskid;
+        this.taskid = taskid;
+        this.pid = pid;
+        this.originatingNode = originatingNode;
+        this.targetNode = targetNode;
+
+    }
+
+    /**
+     * Get the task identifier for this task
+     * @return the taskid
+     */
+    public String getTaskid() {
+        return taskid;
+    }
+
+    /**
+     * Set the task identifier for this task
+     * @param taskid the taskid to set
+     */
+    public void setTaskid(String taskid) {
+        this.taskid = taskid;
+    }
+
+    /**
+     * Get the object identifier to be replicated
+     * @return the pid
+     */
+    public Identifier getPid() {
+        return this.pid;
+    }
+
+    /**
+     * Set the object identifier to be replicated
+     * @param pid the pid to set
+
+    public void setPid(Identifier pid) {
     this.pid = pid;
-    this.originatingNode = originatingNode;
-    this.targetNode = targetNode;
+    }
+     */
+    /**
+     * Get the event identifier
+     * @return the eventid
+     */
+    public String getEventid() {
+        return eventid;
+    }
 
-  }
+    /**
+     * Set the event identifier
+     * @param eventid the eventid to set
+     */
+    public void setEventid(String eventid) {
+        this.eventid = eventid;
+    }
 
-  /**
-   * Get the task identifier for this task
-   * @return the taskid
-   */
-  public String getTaskid() {
-    return taskid;
-  }
+    /**
+     * Get the target node
+     * @return the targetNode
+     */
+    public NodeReference getTargetNode() {
+        return targetNode;
+    }
 
-  /**
-   * Set the task identifier for this task
-   * @param taskid the taskid to set
-   */
-  public void setTaskid(String taskid) {
-    this.taskid = taskid;
-  }
+    /**
+     * Set the target node
+     * @param targetNode the targetNode to set
+     */
+    public void setTargetNode(NodeReference targetNode) {
+        this.targetNode = targetNode;
+    }
 
-  /**
-   * Get the object identifier to be replicated
-   * @return the pid
-   */
-  public Identifier getPid() {
-    return this.pid;
-  }
+    /**
+     * Get the originating node
+     * @return the originatingNode
+     */
+    public NodeReference getOriginatingNode() {
+        return originatingNode;
+    }
 
-  /**
-   * Set the object identifier to be replicated
-   * @param pid the pid to set
-   
-  public void setPid(Identifier pid) {
-    this.pid = pid;
-  }
-*/
-  /**
-   * Get the event identifier 
-   * @return the eventid
-   */
-  public String getEventid() {
-    return eventid;
-  }
+    /**
+     * Set the originating node
+     * @param originatingNode the originatingNode to set
+     */
+    public void setOriginatingNode(NodeReference originatingNode) {
+        this.originatingNode = originatingNode;
+    }
 
-  /**
-   * Set the event identifier 
-   * @param eventid the eventid to set
-   */
-  public void setEventid(String eventid) {
-    this.eventid = eventid;
-  }
+    /**
+     * For the given Replication task, return the Subject listed in the target
+     * node.  Usually used in authorizing a replication event.
+     *
+     * @return subject - the subject listed in the target Node object as a string
+     */
+    public String getTargetNodeSubject() {
 
-  /**
-   * Get the target node
-   * @return the targetNode
-   */
-  public NodeReference getTargetNode() {
-    return targetNode;
-  }
+        return this.targetNodeSubject;
 
-  /**
-   * Set the target node
-   * @param targetNode the targetNode to set
-   */
-  public void setTargetNode(NodeReference targetNode) {
-    this.targetNode = targetNode;
-  }
+    }
 
-  /**
-   * Get the originating node
-   * @return the originatingNode
-   */
-  public NodeReference getOriginatingNode() {
-    return originatingNode;
-  }
+    /**
+     * Set the target node subject identifying the node
+     * @param subject the targetNode subject
+     */
+    public void setTargetNodeSubject(String subject) {
+        this.targetNodeSubject = subject;
+    }
 
-  /**
-   * Set the originating node
-   * @param originatingNode the originatingNode to set
-   */
-  public void setOriginatingNode(NodeReference originatingNode) {
-    this.originatingNode = originatingNode;
-  }
+    /**
+     * For the given Replication task, return the Subject listed in the target
+     * node.  Usually used in authorizing a replication event.
+     *
+     * @return subject - the subject listed in the target Node object as a string
+     */
+    public String getOriginatingNodeSubject() {
 
-  /**
-   * For the given Replication task, return the Subject listed in the target
-   * node.  Usually used in authorizing a replication event.
-   * 
-   * @return subject - the subject listed in the target Node object as a string
-   */
-  public String getTargetNodeSubject() {
-    
-    return this.targetNodeSubject;
-    
-  }
-  
-  /**
-   * Set the target node subject identifying the node
-   * @param subject the targetNode subject
-   */
-  public void setTargetNodeSubject(String subject) {
-    this.targetNodeSubject = subject;
-  }
-  
-  /**
-   * For the given Replication task, return the Subject listed in the target
-   * node.  Usually used in authorizing a replication event.
-   * 
-   * @return subject - the subject listed in the target Node object as a string
-   */
-  public String getOriginatingNodeSubject() {
-    
-    return this.originatingNodeSubject;
-    
-  }
-  
-  /**
-   * Set the target node subject identifying the node
-   * @param subject the targetNode subject
-   */
-  public void setOriginatingNodeSubject(String subject) {
-    this.originatingNodeSubject = subject;
-  }
-  
-  
-  /**
-   * Implement the Callable interface, providing code that initiates replication.
-   * 
-   * @return pid - the identifier of the replicated object upon success
-   */
-  public String call() throws IllegalStateException {
-      /* The Hazelcast distributed system metadata map */
-      String   nodeMap =
-          Settings.getConfiguration().getString("dataone.hazelcast.nodes");
-      HazelcastInstance hzMember = Hazelcast.getDefaultInstance();
-      IMap<NodeReference, Node> nodes = hzMember.getMap(nodeMap);;
-      log.info("MNReplicationTask.call() called for identifier " + this.pid);
+        return this.originatingNodeSubject;
 
-      //MNode targetMN = null;
-      String mnUrl = nodes.get(targetNode).getBaseURL();
-      // Get an target MNode reference to communicate with
-      //	try {
-      // XXX need to figure out better way to handle versioning! -rpw
-      log.info("Getting the MNode reference for " + targetNode.getValue());
-      MNode targetMN = new MNode(mnUrl + "/v1");
+    }
 
-      //    } catch (ServiceFailure e) {
-      //      log.info("Failed to get the target MNode reference for " +
-      // 	    targetNode.getValue() +
-      // 	    " while executing MNreplicationTask id " +
-      // 	    this.taskid);
+    /**
+     * Set the target node subject identifying the node
+     * @param subject the targetNode subject
+     */
+    public void setOriginatingNodeSubject(String subject) {
+        this.originatingNodeSubject = subject;
+    }
 
-      // }
+    /**
+     * Implement the Callable interface, providing code that initiates replication.
+     *
+     * @return pid - the identifier of the replicated object upon success
+     */
+    public String call() throws IllegalStateException {
+        /* The Hazelcast distributed system metadata map */
+        String nodeMap =
+                Settings.getConfiguration().getString("dataone.hazelcast.nodes");
+        HazelcastInstance hzMember = Hazelcast.getDefaultInstance();
+        IMap<NodeReference, Node> nodes = hzMember.getMap(nodeMap);
+        ;
+        log.info("MNReplicationTask.call() called for identifier " + this.pid);
 
-      // Get the D1 Hazelcast configuration parameters
-      String hzSystemMetadata =
-          Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
+        //MNode targetMN = null;
+        String mnUrl = nodes.get(targetNode).getBaseURL();
+        // Get an target MNode reference to communicate with
+        //	try {
+        // XXX need to figure out better way to handle versioning! -rpw
+        log.info("Getting the MNode reference for " + targetNode.getValue() + " with baseURL " + mnUrl);
+        MNode targetMN = new MNode(mnUrl + "/v1");
 
-      // String groupName =
-      //	Settings.getConfiguration().getString("dataone.hazelcast.groupName");
+        //    } catch (ServiceFailure e) {
+        //      log.info("Failed to get the target MNode reference for " +
+        // 	    targetNode.getValue() +
+        // 	    " while executing MNreplicationTask id " +
+        // 	    this.taskid);
 
-      // String groupPassword =
-      // 	Settings.getConfiguration().getString("dataone.hazelcast.password");
+        // }
 
-      // String addressList =
-      // 	Settings.getConfiguration().getString("dataone.hazelcast.clusterInstances");
-      // String[] addresses = addressList.split(",");
+        // Get the D1 Hazelcast configuration parameters
+        String hzSystemMetadata =
+                Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
 
-      // log.info("Becoming a DataONE storage cluster client with group name: " +
-      //       groupName + ", password: " + groupPassword + ", cluster instances: " +
-      //        addresses);
+        // String groupName =
+        //	Settings.getConfiguration().getString("dataone.hazelcast.groupName");
 
-      // get the system metadata for the pid
-      // HazelcastClient hzClient =
-      //	HazelcastClient.newHazelcastClient(groupName, groupPassword, addresses);
-      HazelcastClient hzClient = HazelcastClientInstance.getHazelcastClient();
-      IMap<Identifier, SystemMetadata> sysMetaMap = hzClient.getMap(hzSystemMetadata);
-      log.info("syMetaMap size " + sysMetaMap.size());
-      // Initiate the MN to MN replication for this task
-      try {
-          log.info("Getting a lock on identifier " + this.pid + " for task id " +
-                  this.taskid);
+        // String groupPassword =
+        // 	Settings.getConfiguration().getString("dataone.hazelcast.password");
 
-          sysMetaMap.lock(this.pid);
-          SystemMetadata sysmeta = sysMetaMap.get(this.pid);
-          log.info("Lock acquired for identifier " + this.pid);
+        // String addressList =
+        // 	Settings.getConfiguration().getString("dataone.hazelcast.clusterInstances");
+        // String[] addresses = addressList.split(",");
 
-          log.info("Evaluating replica list for identifer " + this.pid);
-          List<Replica> replicaList = sysmeta.getReplicaList();
-          boolean replicaEntryExists = false;
+        // log.info("Becoming a DataONE storage cluster client with group name: " +
+        //       groupName + ", password: " + groupPassword + ", cluster instances: " +
+        //        addresses);
 
-          // set the replica status for the correct replica
-          for (Replica replica : replicaList ) {
-              log.debug("Found the replica " +  replica.getReplicaMemberNode().getValue());
-              if (replica.getReplicaMemberNode().equals(this.targetNode)) {
-                  replica.setReplicationStatus(ReplicationStatus.REQUESTED);
-                  replicaEntryExists = true;
-                  log.info("Setting the replication status for identifier " + this.pid + 
-                          " and replica node " + replica.getReplicaMemberNode().getValue() + 
-                          " to " + ReplicationStatus.REQUESTED);
-                  break;
+        // get the system metadata for the pid
+        // HazelcastClient hzClient =
+        //	HazelcastClient.newHazelcastClient(groupName, groupPassword, addresses);
+        HazelcastClient hzClient = HazelcastClientInstance.getHazelcastClient();
+        IMap<Identifier, SystemMetadata> sysMetaMap = hzClient.getMap(hzSystemMetadata);
+        log.info("syMetaMap size " + sysMetaMap.size());
+        // Initiate the MN to MN replication for this task
+        try {
+            log.info("Getting a lock on identifier " + this.pid + " for task id "
+                    + this.taskid);
 
-              }
+            sysMetaMap.lock(this.pid);
+            SystemMetadata sysmeta = sysMetaMap.get(this.pid);
+            log.info("Lock acquired for identifier " + this.pid);
 
-          }
+            log.info("Evaluating replica list for identifer " + this.pid);
+            List<Replica> replicaList = sysmeta.getReplicaList();
+            boolean replicaEntryExists = false;
 
-          // no replica exists yet, make one
-          if ( !replicaEntryExists || replicaList == null || replicaList.isEmpty()) {
-              Replica newReplica = new Replica();
-              newReplica.setReplicaMemberNode(this.targetNode);
-              newReplica.setReplicationStatus(ReplicationStatus.REQUESTED);
-              replicaList.add(newReplica);
-              log.info("Setting the replication status for identifier " + this.pid + 
-                      " and replica node " + newReplica.getReplicaMemberNode().getValue() + 
-                      " to " + ReplicationStatus.REQUESTED);
+            // set the replica status for the correct replica
+            for (Replica replica : replicaList) {
+                log.debug("Found the replica " + replica.getReplicaMemberNode().getValue());
+                if (replica.getReplicaMemberNode().equals(this.targetNode)) {
+                    replica.setReplicationStatus(ReplicationStatus.REQUESTED);
+                    replicaEntryExists = true;
+                    log.info("Setting the replication status for identifier " + this.pid
+                            + " and replica node " + replica.getReplicaMemberNode().getValue()
+                            + " to " + ReplicationStatus.REQUESTED);
+                    break;
 
-          }
+                }
 
-          // update the system metadata object
-          sysmeta.setDateSysMetadataModified(new Date());
-          sysmeta.setReplicaList(replicaList);
+            }
 
-          // set up the certificate location
-          String clientCertificateLocation = 
-              Settings.getConfiguration().getString("D1Client.certificate.directory") +
-              "/" +Settings.getConfiguration().getString("cn.nodeId");
-          CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
-          log.info("MNReplicationTask task id " + this.taskid + "is using an X509 certificate " +
-                  "from " + clientCertificateLocation);
+            // no replica exists yet, make one
+            if (!replicaEntryExists || replicaList == null || replicaList.isEmpty()) {
+                Replica newReplica = new Replica();
+                newReplica.setReplicaMemberNode(this.targetNode);
+                newReplica.setReplicationStatus(ReplicationStatus.REQUESTED);
+                replicaList.add(newReplica);
+                log.info("Setting the replication status for identifier " + this.pid
+                        + " and replica node " + newReplica.getReplicaMemberNode().getValue()
+                        + " to " + ReplicationStatus.REQUESTED);
 
-          // session is null - certificate is used
-          Session session = null;
+            }
 
-          // call for the replication
-          log.info("Calling MNreplication.replicate() at targetNode id " + targetMN.getNodeId());
-          targetMN.replicate(session, sysmeta, this.originatingNode);
+            // update the system metadata object
+            sysmeta.setDateSysMetadataModified(new Date());
+            sysmeta.setReplicaList(replicaList);
 
-          // update the system metadata map
-          sysMetaMap.put(this.pid, sysmeta);
+            // set up the certificate location
+            String clientCertificateLocation =
+                    Settings.getConfiguration().getString("D1Client.certificate.directory")
+                    + "/" + Settings.getConfiguration().getString("cn.nodeId");
+            CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
+            log.info("MNReplicationTask task id " + this.taskid + "is using an X509 certificate "
+                    + "from " + clientCertificateLocation);
 
-          log.info("Updated system metadata for identifier " + this.pid + "during " +
-                  " MNreplicationTask id " + this.taskid);
-          sysMetaMap.unlock(this.pid);
+            // session is null - certificate is used
+            Session session = null;
 
-      } catch (NotImplemented e) {
-          // TODO Auto-generated catch block
-          log.error(e.getMessage(), e);
-          e.printStackTrace();
+            // call for the replication
+            log.info("Calling MNreplication.replicate() at targetNode id " + targetMN.getNodeBaseServiceUrl());
+            targetMN.replicate(session, sysmeta, this.originatingNode);
 
-      } catch (ServiceFailure e) {
-          // TODO Auto-generated catch block
-          log.error(e.getMessage(), e);
-          e.printStackTrace();
+            log.info("Updated system metadata for identifier " + this.pid + "during "
+                    + " MNreplicationTask id " + this.taskid);
+            // update the system metadata map
+            sysMetaMap.put(this.pid, sysmeta);
 
-      } catch (NotAuthorized e) {
-          // TODO Auto-generated catch block
-          log.error(e.getMessage(), e);
-          e.printStackTrace();
+        } catch (NotImplemented e) {
+            // TODO Auto-generated catch block
+            log.error(e.getMessage(), e);
+            e.printStackTrace();
 
-      } catch (InvalidRequest e) {
-          // TODO Auto-generated catch block
-          log.error(e.getMessage(), e);
-          e.printStackTrace();
+        } catch (ServiceFailure e) {
+            // TODO Auto-generated catch block
+            log.error(e.getMessage(), e);
+            e.printStackTrace();
 
-      } catch (InsufficientResources e) {
-          // TODO Auto-generated catch block
-          log.error(e.getMessage(), e);
-          e.printStackTrace();
+        } catch (NotAuthorized e) {
+            // TODO Auto-generated catch block
+            log.error(e.getMessage(), e);
+            e.printStackTrace();
 
-      } catch (UnsupportedType e) {
-          // TODO Auto-generated catch block
-          log.error(e.getMessage(), e);
-          e.printStackTrace();
-      } catch (Exception e) {
-          // TODO Auto-generated catch block
-          log.error(e.getMessage(), e);
-          e.printStackTrace();
-      } finally {
-          sysMetaMap.unlock(this.pid);
-          log.debug("Finally completed");
-      }
+        } catch (InvalidRequest e) {
+            // TODO Auto-generated catch block
+            log.error(e.getMessage(), e);
+            e.printStackTrace();
+
+        } catch (InsufficientResources e) {
+            // TODO Auto-generated catch block
+            log.error(e.getMessage(), e);
+            e.printStackTrace();
+
+        } catch (UnsupportedType e) {
+            // TODO Auto-generated catch block
+            log.error(e.getMessage(), e);
+            e.printStackTrace();
+        } catch (Exception e) {
+            // TODO Auto-generated catch block
+            log.error(e.getMessage(), e);
+            e.printStackTrace();
+        } finally {
+
+            sysMetaMap.unlock(this.pid);
+            log.debug("Finally completed");
+        }
 
 
-      return this.pid.getValue();
-  }
-
+        return this.pid.getValue();
+    }
 }
