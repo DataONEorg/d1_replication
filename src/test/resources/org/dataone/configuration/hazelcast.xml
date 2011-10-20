@@ -175,6 +175,14 @@
       hz.LATEST_UPDATE ; entry with the latest update wins.
     -->
     <merge-policy>hz.ADD_NEW_ENTRY</merge-policy>
+    <!--
+      Use Metacat as the backing store for the System Metadata map, using
+      a write-through policy for fault tolerance.
+     -->
+    <map-store enabled="true">
+      <class-name>org.dataone.cn.hazelcast.ldap.HazelcastLdapStore</class-name>
+      <write-delay-seconds>0</write-delay-seconds>
+    </map-store>
   </map>
 
   <map name="hzSystemMetadata">
@@ -225,14 +233,6 @@
     -->
     <merge-policy>hz.ADD_NEW_ENTRY</merge-policy>
     
-    <!-- 
-      Use Metacat as the backing store for the System Metadata map, using 
-      a write-through policy for fault tolerance.
-     -->
-    <map-store enabled="false">
-      <class-name>edu.ucsb.nceas.metacat.dataone.hazelcast.SystemMetadataMap</class-name>
-      <write-delay-seconds>0</write-delay-seconds>
-    </map-store>
   </map>
 
   <!-- Add your own map merge policy implementations here:   
