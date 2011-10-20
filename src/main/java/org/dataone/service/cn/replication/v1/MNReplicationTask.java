@@ -50,6 +50,9 @@ import org.dataone.service.types.v1.SystemMetadata;
 import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.core.IMap;
 import org.dataone.cn.hazelcast.HazelcastClientInstance;
+import org.dataone.service.types.v1.NodeReference;
+import com.hazelcast.core.Hazelcast;
+import com.hazelcast.core.HazelcastInstance;
 
 /**
  * A single replication task to be queued and executed by the Replication Service.
@@ -72,13 +75,13 @@ public class MNReplicationTask implements Serializable, Callable<String> {
   private String eventid;
   
   /* The identifier of the object to replicate */
-  private String pid;
+  private Identifier pid;
   
   /* The target Node object */
-  private Node targetNode;
+  private NodeReference targetNode;
   
   /* The originating Node object */
-  private Node originatingNode;
+  private NodeReference originatingNode;
 
   /* The subject of the target node, extracted from the Node object */
   private String targetNodeSubject;
@@ -86,8 +89,6 @@ public class MNReplicationTask implements Serializable, Callable<String> {
   /* The subject of the originating node, extracted from the Node object */
   private String originatingNodeSubject;
   
-  /* The permission to be executed (in this case, always 'replicate') */
-  String permission;
 
   /**
    * Constructor - create an empty replication task instance
@@ -102,18 +103,14 @@ public class MNReplicationTask implements Serializable, Callable<String> {
    * @param pid
    * @param targetNode
    */
-  public MNReplicationTask(String taskid, Identifier pid, 
-    Node originatingNode, Node targetNode,
-    Permission replicatePermission) {
-    
+  public MNReplicationTask(String taskid, Identifier pid,
+    NodeReference originatingNode, NodeReference targetNode) {
+
     this.taskid = taskid;
-    this.pid = pid.getValue();
+    this.pid = pid;
     this.originatingNode = originatingNode;
     this.targetNode = targetNode;
-    this.originatingNodeSubject = originatingNode.getSubject(0).getValue();
-    this.targetNodeSubject = targetNode.getSubject(0).getValue();
-    this.permission = replicatePermission.name();
-    
+
   }
 
   /**
@@ -137,19 +134,17 @@ public class MNReplicationTask implements Serializable, Callable<String> {
    * @return the pid
    */
   public Identifier getPid() {
-    Identifier identifier = new Identifier();
-    identifier.setValue(pid);
-    return identifier;
+    return this.pid;
   }
 
   /**
    * Set the object identifier to be replicated
    * @param pid the pid to set
-   */
+   
   public void setPid(Identifier pid) {
-    this.pid = pid.getValue();
+    this.pid = pid;
   }
-
+*/
   /**
    * Get the event identifier 
    * @return the eventid
@@ -170,7 +165,7 @@ public class MNReplicationTask implements Serializable, Callable<String> {
    * Get the target node
    * @return the targetNode
    */
-  public Node getTargetNode() {
+  public NodeReference getTargetNode() {
     return targetNode;
   }
 
@@ -178,7 +173,7 @@ public class MNReplicationTask implements Serializable, Callable<String> {
    * Set the target node
    * @param targetNode the targetNode to set
    */
-  public void setTargetNode(Node targetNode) {
+  public void setTargetNode(NodeReference targetNode) {
     this.targetNode = targetNode;
   }
 
@@ -186,7 +181,7 @@ public class MNReplicationTask implements Serializable, Callable<String> {
    * Get the originating node
    * @return the originatingNode
    */
-  public Node getOriginatingNode() {
+  public NodeReference getOriginatingNode() {
     return originatingNode;
   }
 
@@ -194,7 +189,7 @@ public class MNReplicationTask implements Serializable, Callable<String> {
    * Set the originating node
    * @param originatingNode the originatingNode to set
    */
-  public void setOriginatingNode(Node originatingNode) {
+  public void setOriginatingNode(NodeReference originatingNode) {
     this.originatingNode = originatingNode;
   }
 
@@ -238,48 +233,35 @@ public class MNReplicationTask implements Serializable, Callable<String> {
     this.originatingNodeSubject = subject;
   }
   
-  /**
-   * Get the permission being allowed for this task
-   * 
-   * @return subject - the subject listed in the target Node object
-   */
-  public String getPermission() {
-    return this.permission;
-    
-  }
   
-  /**
-   * Set the permission being allowed for this task
-   * @param subject the targetNode subject
-   */
-  public void setPermission(Permission permission) {
-    this.permission = permission.name();
-    
-  }
- 
   /**
    * Implement the Callable interface, providing code that initiates replication.
    * 
    * @return pid - the identifier of the replicated object upon success
    */
   public String call() throws IllegalStateException {
-
-  log.info("MNReplicationTask.call() called for identifier " + this.pid);
+  /* The Hazelcast distributed system metadata map */
+   String   nodeMap =
+      Settings.getConfiguration().getString("dataone.hazelcast.nodes");
+   HazelcastInstance hzMember = Hazelcast.getDefaultInstance();
+   IMap<NodeReference, Node> nodes = hzMember.getMap(nodeMap);;
+   log.info("MNReplicationTask.call() called for identifier " + this.pid);
   
 	MNode targetMN = null;
-  
+        String mnUrl = nodes.get(targetNode).getBaseURL();
 	// Get an target MNode reference to communicate with
-	try {
-	  log.info("Getting the MNode reference for " + targetNode.getIdentifier().getValue());
-	  targetMN = D1Client.getMN(targetNode.getIdentifier());
+//	try {
+        // XXX need to figure out better way to handle versioning! -rpw
+	  log.info("Getting the MNode reference for " + targetNode.getValue());
+	  MNode mNode = new MNode(mnUrl + "/v1");
 	  
-    } catch (ServiceFailure e) {
-      log.info("Failed to get the target MNode reference for " + 
-  	    targetNode.getIdentifier().getValue() + 
-  	    " while executing MNreplicationTask id " +
-  	    this.taskid);
+//    } catch (ServiceFailure e) {
+//      log.info("Failed to get the target MNode reference for " +
+ // 	    targetNode.getValue() +
+ // 	    " while executing MNreplicationTask id " +
+ // 	    this.taskid);
   	
-  }
+ // }
 	
 	// Get the D1 Hazelcast configuration parameters
 	 String hzSystemMetadata =
@@ -304,13 +286,14 @@ public class MNReplicationTask implements Serializable, Callable<String> {
 	//	HazelcastClient.newHazelcastClient(groupName, groupPassword, addresses);
 	HazelcastClient hzClient = HazelcastClientInstance.getHazelcastClient();
 	IMap<Identifier, SystemMetadata> sysMetaMap = hzClient.getMap(hzSystemMetadata);
-	
+	log.info("syMetaMap size " + sysMetaMap.size());
 	// Initiate the MN to MN replication for this task
 	try {
 	    log.info("Getting a lock on identifier " + this.pid + " for task id " +
 	            this.taskid);
-	    sysMetaMap.lock(getPid());
-	    SystemMetadata sysmeta = sysMetaMap.get(getPid());
+
+	    sysMetaMap.lock(this.pid);
+	    SystemMetadata sysmeta = sysMetaMap.get(this.pid);
 	    log.info("Lock acquired for identifier " + this.pid);
 	    
       log.info("Evaluating replica list for identifer " + this.pid);
@@ -319,8 +302,8 @@ public class MNReplicationTask implements Serializable, Callable<String> {
       
       // set the replica status for the correct replica
       for (Replica replica : replicaList ) {
-        
-        if (replica.getReplicaMemberNode() == this.targetNode.getIdentifier()) {
+        log.debug("Found the replica " +  replica.getReplicaMemberNode().getValue());
+        if (replica.getReplicaMemberNode().equals(this.targetNode)) {
           replica.setReplicationStatus(ReplicationStatus.REQUESTED);
           replicaEntryExists = true;
           log.info("Setting the replication status for identifier " + this.pid + 
@@ -335,7 +318,7 @@ public class MNReplicationTask implements Serializable, Callable<String> {
     // no replica exists yet, make one
     if ( !replicaEntryExists || replicaList == null || replicaList.isEmpty()) {
       Replica newReplica = new Replica();
-      newReplica.setReplicaMemberNode(this.targetNode.getIdentifier());
+      newReplica.setReplicaMemberNode(this.targetNode);
       newReplica.setReplicationStatus(ReplicationStatus.REQUESTED);
       replicaList.add(newReplica);
       log.info("Setting the replication status for identifier " + this.pid + 
@@ -361,46 +344,55 @@ public class MNReplicationTask implements Serializable, Callable<String> {
 	  
 	  // call for the replication
 	  log.info("Calling MNreplication.replicate() at targetNode id " + targetMN.getNodeId());
-	  targetMN.replicate(session, sysmeta, this.originatingNode.getIdentifier());
+	  targetMN.replicate(session, sysmeta, this.originatingNode);
 	  
 	  // update the system metadata map
-	  sysMetaMap.put(getPid(), sysmeta);
+	  sysMetaMap.put(this.pid, sysmeta);
 	  
 	  log.info("Updated system metadata for identifier " + this.pid + "during " +
 	          " MNreplicationTask id " + this.taskid);
-      sysMetaMap.unlock(getPid());
+      sysMetaMap.unlock(this.pid);
 
 	} catch (NotImplemented e) {
 	  // TODO Auto-generated catch block
+             log.error(e.getMessage(), e);
 	  e.printStackTrace();
     
 	} catch (ServiceFailure e) {
 	  // TODO Auto-generated catch block
+             log.error(e.getMessage(), e);
 	  e.printStackTrace();
     
 	} catch (NotAuthorized e) {
 	  // TODO Auto-generated catch block
+             log.error(e.getMessage(), e);
 	  e.printStackTrace();
     
 	} catch (InvalidRequest e) {
 	  // TODO Auto-generated catch block
+             log.error(e.getMessage(), e);
 	  e.printStackTrace();
     
 	} catch (InsufficientResources e) {
 	  // TODO Auto-generated catch block
+             log.error(e.getMessage(), e);
 	  e.printStackTrace();
     
 	} catch (UnsupportedType e) {
 	  // TODO Auto-generated catch block
+             log.error(e.getMessage(), e);
 	  e.printStackTrace();
-  
+	} catch (Exception e) {
+	  // TODO Auto-generated catch block
+          log.error(e.getMessage(), e);
+	  e.printStackTrace();
     } finally {
-      sysMetaMap.unlock(getPid());
-    
+      sysMetaMap.unlock(this.pid);
+    log.debug("Finally completed");
     }
 	    
 	
-    return this.pid;
+    return this.pid.getValue();
   }
 
 }
