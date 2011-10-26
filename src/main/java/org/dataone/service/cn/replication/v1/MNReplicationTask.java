@@ -236,7 +236,7 @@ public class MNReplicationTask implements Serializable, Callable<String> {
         // Get an target MNode reference to communicate with
         // TODO: need to figure out better way to handle versioning! -rpw
         log.info("Getting the MNode reference for " + targetNode.getValue() + " with baseURL " + mnUrl);
-        MNode targetMN = new MNode(mnUrl + "/v1");
+        MNode targetMN = new MNode(mnUrl);
 
         // Get the D1 Hazelcast configuration parameters
         String hzSystemMetadata =
