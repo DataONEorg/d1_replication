@@ -130,14 +130,6 @@ public class MNReplicationTask implements Serializable, Callable<String> {
     }
 
     /**
-     * Set the object identifier to be replicated
-     * @param pid the pid to set
-
-    public void setPid(Identifier pid) {
-    this.pid = pid;
-    }
-     */
-    /**
      * Get the event identifier
      * @return the eventid
      */
@@ -239,56 +231,30 @@ public class MNReplicationTask implements Serializable, Callable<String> {
         ;
         log.info("MNReplicationTask.call() called for identifier " + this.pid);
 
-        //MNode targetMN = null;
         String mnUrl = nodes.get(targetNode).getBaseURL();
+        
         // Get an target MNode reference to communicate with
-        //	try {
-        // XXX need to figure out better way to handle versioning! -rpw
+        // TODO: need to figure out better way to handle versioning! -rpw
         log.info("Getting the MNode reference for " + targetNode.getValue() + " with baseURL " + mnUrl);
         MNode targetMN = new MNode(mnUrl + "/v1");
-
-        //    } catch (ServiceFailure e) {
-        //      log.info("Failed to get the target MNode reference for " +
-        // 	    targetNode.getValue() +
-        // 	    " while executing MNreplicationTask id " +
-        // 	    this.taskid);
-
-        // }
 
         // Get the D1 Hazelcast configuration parameters
         String hzSystemMetadata =
                 Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
 
-        // String groupName =
-        //	Settings.getConfiguration().getString("dataone.hazelcast.groupName");
-
-        // String groupPassword =
-        // 	Settings.getConfiguration().getString("dataone.hazelcast.password");
-
-        // String addressList =
-        // 	Settings.getConfiguration().getString("dataone.hazelcast.clusterInstances");
-        // String[] addresses = addressList.split(",");
-
-        // log.info("Becoming a DataONE storage cluster client with group name: " +
-        //       groupName + ", password: " + groupPassword + ", cluster instances: " +
-        //        addresses);
-
-        // get the system metadata for the pid
-        // HazelcastClient hzClient =
-        //	HazelcastClient.newHazelcastClient(groupName, groupPassword, addresses);
         HazelcastClient hzClient = HazelcastClientInstance.getHazelcastClient();
         IMap<Identifier, SystemMetadata> sysMetaMap = hzClient.getMap(hzSystemMetadata);
         log.info("syMetaMap size " + sysMetaMap.size());
         // Initiate the MN to MN replication for this task
         try {
-            log.info("Getting a lock on identifier " + this.pid + " for task id "
+            log.info("Getting a lock on identifier " + this.pid.getValue() + " for task id "
                     + this.taskid);
 
             sysMetaMap.lock(this.pid);
             SystemMetadata sysmeta = sysMetaMap.get(this.pid);
-            log.info("Lock acquired for identifier " + this.pid);
+            log.info("Lock acquired for identifier " + this.pid.getValue());
 
-            log.info("Evaluating replica list for identifer " + this.pid);
+            log.info("Evaluating replica list for identifer " + this.pid.getValue());
             List<Replica> replicaList = sysmeta.getReplicaList();
             boolean replicaEntryExists = false;
 
@@ -298,7 +264,7 @@ public class MNReplicationTask implements Serializable, Callable<String> {
                 if (replica.getReplicaMemberNode().equals(this.targetNode)) {
                     replica.setReplicationStatus(ReplicationStatus.REQUESTED);
                     replicaEntryExists = true;
-                    log.info("Setting the replication status for identifier " + this.pid
+                    log.info("Setting the replication status for identifier " + this.pid.getValue()
                             + " and replica node " + replica.getReplicaMemberNode().getValue()
                             + " to " + ReplicationStatus.REQUESTED);
                     break;
@@ -313,7 +279,7 @@ public class MNReplicationTask implements Serializable, Callable<String> {
                 newReplica.setReplicaMemberNode(this.targetNode);
                 newReplica.setReplicationStatus(ReplicationStatus.REQUESTED);
                 replicaList.add(newReplica);
-                log.info("Setting the replication status for identifier " + this.pid
+                log.info("Setting the replication status for identifier " + this.pid.getValue()
                         + " and replica node " + newReplica.getReplicaMemberNode().getValue()
                         + " to " + ReplicationStatus.REQUESTED);
 
@@ -338,7 +304,7 @@ public class MNReplicationTask implements Serializable, Callable<String> {
             log.info("Calling MNreplication.replicate() at targetNode id " + targetMN.getNodeBaseServiceUrl());
             targetMN.replicate(session, sysmeta, this.originatingNode);
 
-            log.info("Updated system metadata for identifier " + this.pid + "during "
+            log.info("Updated system metadata for identifier " + this.pid.getValue() + " during "
                     + " MNreplicationTask id " + this.taskid);
             // update the system metadata map
             sysMetaMap.put(this.pid, sysmeta);
