@@ -21,8 +21,7 @@
 package org.dataone.service.cn.replication.v1;
 
 import java.io.Serializable;
-import java.util.Date;
-import java.util.List;
+import java.util.Calendar;
 import java.util.ArrayList;
 import java.util.concurrent.Callable;
 
@@ -41,7 +40,6 @@ import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.Node;
-import org.dataone.service.types.v1.Permission;
 import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.Session;
@@ -267,9 +265,10 @@ public class MNAuditTask implements Serializable, Callable<String> {
 
               if (targetChecksum != sysmeta.getChecksum()) {
                   replicaList.get(replicaIndex).setReplicationStatus(ReplicationStatus.INVALIDATED);
-                  replicaList.get(replicaIndex).setReplicaVerified(new Date());
+                  replicaList.get(replicaIndex).setReplicaVerified(Calendar.getInstance().getTime());
+
               } else {
-                  replicaList.get(replicaIndex).setReplicaVerified(new Date());
+                  replicaList.get(replicaIndex).setReplicaVerified(Calendar.getInstance().getTime());
               }
 
               sysmeta.setReplicaList(replicaList);

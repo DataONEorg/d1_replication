@@ -22,13 +22,12 @@
 package org.dataone.service.cn.replication.v1;
 
 import java.io.Serializable;
-import java.util.Date;
+import java.util.Calendar;
 import java.util.List;
 import java.util.concurrent.Callable;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.dataone.client.D1Client;
 import org.dataone.client.MNode;
 import org.dataone.client.auth.CertificateManager;
 import org.dataone.configuration.Settings;
@@ -40,7 +39,6 @@ import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.exceptions.UnsupportedType;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.Node;
-import org.dataone.service.types.v1.Permission;
 import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.Session;
@@ -286,7 +284,7 @@ public class MNReplicationTask implements Serializable, Callable<String> {
             }
 
             // update the system metadata object
-            sysmeta.setDateSysMetadataModified(new Date());
+            sysmeta.setDateSysMetadataModified(Calendar.getInstance().getTime());
             sysmeta.setReplicaList(replicaList);
 
             // set up the certificate location
