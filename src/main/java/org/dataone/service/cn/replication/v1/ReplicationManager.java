@@ -32,7 +32,7 @@ import com.hazelcast.core.ItemListener;
 import com.hazelcast.impl.base.RuntimeInterruptedException;
 
 import java.util.ArrayList;
-import java.util.Date;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -52,15 +52,11 @@ import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.Node;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.NodeType;
-import org.dataone.service.types.v1.Permission;
 import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationPolicy;
 import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.SystemMetadata;
-import org.dataone.service.types.v1.Services;
 import org.dataone.service.types.v1.Service;
-import org.dataone.client.D1Client;
-import org.dataone.client.CNode;
 import org.dataone.cn.hazelcast.HazelcastClientInstance;
 
 /**
@@ -401,7 +397,7 @@ public class ReplicationManager implements
                 Replica newReplica = new Replica();
                 newReplica.setReplicaMemberNode(targetNode.getIdentifier());
                 newReplica.setReplicationStatus(ReplicationStatus.QUEUED);
-                newReplica.setReplicaVerified(new Date());
+                newReplica.setReplicaVerified(Calendar.getInstance().getTime());
                 sysMeta.addReplica(newReplica);
                 log.info("No replica listed for " + targetNode.getIdentifier().getValue() +
                         ". Added a new replica item to identifier " + pid.getValue());
@@ -410,7 +406,7 @@ public class ReplicationManager implements
             }
 
         
-            sysMeta.setDateSysMetadataModified(new Date());
+            sysMeta.setDateSysMetadataModified(Calendar.getInstance().getTime());
             this.systemMetadata.put(pid, sysMeta);
             
             log.info("Updated system metadata for identifier " + pid.getValue() + 
