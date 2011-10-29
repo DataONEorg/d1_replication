@@ -88,6 +88,8 @@ public class NodeLdapPopulation {
         context.setAttributeValue("d1NodeType", node.getType().xmlValue());
         context.setAttributeValue("d1NodeState", node.getState().xmlValue());
         context.setAttributeValue("subject", node.getSubject(0).getValue());
+        context.setAttributeValue("d1NodeContactSubject", node.getContactSubject(0).getValue());
+        context.setAttributeValue("d1NodeApproved", Boolean.toString(Boolean.TRUE).toUpperCase());
     }
 
     protected void mapServiceToContext(org.dataone.service.types.v1.Service service, String nodeId, String nodeServiceId, DirContextOperations context) {
