@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <d1:systemMetadata xmlns:d1="http://ns.dataone.org/service/types/v1"
 	 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <serialVersion>1</serialVersion>
     <identifier>42</identifier>
-    <fmtid>eml://ecoinformatics.org/eml-2.0.1</fmtid>
+    <formatId>eml://ecoinformatics.org/eml-2.0.1</formatId>
 
     <size>1000</size>
     <checksum algorithm="SHA-1">2e01e17467891f7c933dbaa00e1459d23db3fe4f</checksum>

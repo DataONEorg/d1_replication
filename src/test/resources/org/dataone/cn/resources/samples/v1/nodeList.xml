@@ -18,6 +18,7 @@
             <lastCompleteHarvest>1900-01-01T00:00:00.000+00:00</lastCompleteHarvest>
         </synchronization>
         <subject>cn=sq1d,dc=dataone,dc=org</subject>
+        <contactSubject>cn=sq1d,dc=dataone,dc=org</contactSubject>
     </node>
     <node replicate="true" synchronize="true" type="mn" state="up">
         <identifier>sqR1</identifier>
@@ -37,6 +38,7 @@
             <lastCompleteHarvest>1900-01-01T00:00:00.000+00:00</lastCompleteHarvest>
         </synchronization>
         <subject>cn=sqR1,dc=dataone,dc=org</subject>
+        <contactSubject>cn=sq1d,dc=dataone,dc=org</contactSubject>
     </node>
     <node replicate="true" synchronize="true" type="mn" state="up">
         <identifier>sq4k</identifier>
@@ -56,6 +58,7 @@
             <lastCompleteHarvest>1900-01-01T00:00:00.000+00:00</lastCompleteHarvest>
         </synchronization>
         <subject>cn=sq4k,dc=dataone,dc=org</subject>
+        <contactSubject>cn=sq1d,dc=dataone,dc=org</contactSubject>
     </node>
     <node replicate="true" synchronize="true" type="mn" state="up">
         <identifier>sqrm</identifier>
@@ -75,6 +78,7 @@
             <lastCompleteHarvest>1900-01-01T00:00:00.000+00:00</lastCompleteHarvest>
         </synchronization>
         <subject>cn=sqrm,dc=dataone,dc=org</subject>
+        <contactSubject>cn=sq1d,dc=dataone,dc=org</contactSubject>
     </node>
 
 </d1:nodeList>
