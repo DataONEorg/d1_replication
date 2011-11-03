@@ -22,6 +22,7 @@
 package org.dataone.service.cn.replication.v1;
 
 import java.io.Serializable;
+import java.math.BigInteger;
 import java.util.Calendar;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -284,6 +285,7 @@ public class MNReplicationTask implements Serializable, Callable<String> {
             }
 
             // update the system metadata object
+            sysmeta.setSerialVersion(sysmeta.getSerialVersion().add(BigInteger.ONE));
             sysmeta.setDateSysMetadataModified(Calendar.getInstance().getTime());
             sysmeta.setReplicaList(replicaList);
 
@@ -306,6 +308,7 @@ public class MNReplicationTask implements Serializable, Callable<String> {
                     + " MNreplicationTask id " + this.taskid);
             // update the system metadata map
             sysMetaMap.put(this.pid, sysmeta);
+            sysMetaMap.unlock(this.pid);
 
         } catch (NotImplemented e) {
             // TODO Auto-generated catch block
