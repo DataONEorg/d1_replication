@@ -31,6 +31,7 @@ import com.hazelcast.core.IdGenerator;
 import com.hazelcast.core.ItemListener;
 import com.hazelcast.impl.base.RuntimeInterruptedException;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
@@ -406,6 +407,7 @@ public class ReplicationManager implements
             }
 
         
+            sysMeta.setSerialVersion(sysMeta.getSerialVersion().add(BigInteger.ONE));
             sysMeta.setDateSysMetadataModified(Calendar.getInstance().getTime());
             this.systemMetadata.put(pid, sysMeta);
             
