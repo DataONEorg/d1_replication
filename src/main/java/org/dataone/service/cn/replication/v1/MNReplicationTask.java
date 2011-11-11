@@ -300,14 +300,14 @@ public class MNReplicationTask implements Serializable, Callable<String> {
             // session is null - certificate is used
             Session session = null;
 
-            // call for the replication
-            log.info("Calling MNreplication.replicate() at targetNode id " + targetMN.getNodeBaseServiceUrl());
-            targetMN.replicate(session, sysmeta, this.originatingNode);
-
             log.info("Updated system metadata for identifier " + this.pid.getValue() + " during "
                     + " MNreplicationTask id " + this.taskid);
             // update the system metadata map
             sysMetaMap.put(this.pid, sysmeta);
+            // call for the replication
+            log.info("Calling MNreplication.replicate() at targetNode id " + targetMN.getNodeBaseServiceUrl());
+            targetMN.replicate(session, sysmeta, this.originatingNode);
+
             sysMetaMap.unlock(this.pid);
 
         } catch (NotImplemented e) {
