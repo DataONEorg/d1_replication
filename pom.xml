@@ -63,16 +63,6 @@
         </dependency>
         <dependency>
             <groupId>org.dataone</groupId>
-            <artifactId>d1_common_java</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
-        <dependency>
-            <groupId>org.dataone</groupId>
-            <artifactId>d1_libclient_java</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
-        <dependency>
-            <groupId>org.dataone</groupId>
             <artifactId>d1_cn_noderegistry</artifactId>
             <version>1.0.0-SNAPSHOT</version>
             <type>jar</type>
@@ -109,6 +99,13 @@
             <version>${org.springframework.version}</version>
             <type>jar</type>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+        	<groupId>org.dataone</groupId>
+        	<artifactId>d1_libclient_java</artifactId>
+        	<version>1.0.1-SNAPSHOT</version>
+        	<type>jar</type>
+        	<scope>compile</scope>
         </dependency>
     </dependencies>
 </project>
