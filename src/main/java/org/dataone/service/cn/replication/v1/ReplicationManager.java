@@ -567,11 +567,14 @@ public class ReplicationManager implements
     try {
       
       log.info("Received entry added event on the " +
-        this.systemMetadata.getName() + " map. Evaluating it for MN replication tasks.");
+        this.systemMetadata.getName() + " map. Evaluating it for MN replication task. " + event.getKey().getValue());
       
       // lock the pid and handle the event. If it's already pending, do nothing      
       this.systemMetadata.lock(event.getKey());
-      
+
+      log.info("Locked entryAdded on the " +
+        this.systemMetadata.getName() + " map. " + event.getKey().getValue());
+
       // also need to check the current replicationTasks
       boolean no_task_with_pid = true;
 
@@ -596,7 +599,7 @@ public class ReplicationManager implements
           log.info("Calling createAndQueueTasks for identifier: " +
               event.getKey().getValue());
           this.createAndQueueTasks(event.getKey());
-          this.systemMetadata.unlock(event.getKey());
+//          this.systemMetadata.unlock(event.getKey());
 
         }
       }
@@ -624,7 +627,9 @@ public class ReplicationManager implements
     } catch (NotFound e) {
       // TODO Auto-generated catch block
       e.printStackTrace();
-    
+    } catch (Exception e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();    
     } finally {
       this.systemMetadata.unlock(event.getKey());
       
