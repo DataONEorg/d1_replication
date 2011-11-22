@@ -647,10 +647,14 @@ public class ReplicationManager implements
     SystemMetadata sysmeta = this.systemMetadata.get(pid);
     ReplicationPolicy policy = sysmeta.getReplicationPolicy();
     
-    if ( policy.getReplicationAllowed() != null ) {
-        isAllowed = policy.getReplicationAllowed().booleanValue();
+        try {
+            isAllowed = policy.getReplicationAllowed().booleanValue();
         
-    }
+        } catch (NullPointerException e) {
+            isAllowed = false;
+            
+        }
+        
     return isAllowed;
   }
 
