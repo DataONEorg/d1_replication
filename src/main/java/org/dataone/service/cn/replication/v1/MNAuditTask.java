@@ -47,6 +47,7 @@ import org.dataone.service.types.v1.SystemMetadata;
 
 import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.core.IMap;
+import org.dataone.cn.hazelcast.HazelcastClientInstance;
 
 /**
  * A single audit task to be queued and executed by the Replication Service.
@@ -191,19 +192,8 @@ public class MNAuditTask implements Serializable, Callable<String> {
       String hzSystemMetadata = 
           Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
 
-      String groupName = 
-          Settings.getConfiguration().getString("replication.hazelcast.groupName");
-
-      String groupPassword = 
-          Settings.getConfiguration().getString("replication.hazelcast.password");
-
-      String addressList = 
-          Settings.getConfiguration().getString("replication.hazelcast.clusterInstances");
-      String[] addresses = addressList.split(",");
-
       // get the system metadata for the pid
-      HazelcastClient hzClient = 
-          HazelcastClient.newHazelcastClient(groupName, groupPassword, addresses);
+      HazelcastClient hzClient = HazelcastClientInstance.getHazelcastClient();
 
       IMap<String, SystemMetadata> sysMetaMap = hzClient.getMap(hzSystemMetadata);
 

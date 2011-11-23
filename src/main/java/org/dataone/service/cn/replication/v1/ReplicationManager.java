@@ -159,9 +159,6 @@ public class ReplicationManager implements
     //log.info("Becoming a DataONE Storage cluster hazelcast client where the group name " +
     //   "is " + this.groupName + " and the cluster member IP addresses are " +
     //    this.addressList + ".");
-    
-    //this.hzClient =
-    //  HazelcastClient.newHazelcastClient(this.groupName, this.groupPassword, addresses);
 
     this.hzClient = HazelcastClientInstance.getHazelcastClient();
     // Also become a Hazelcast processing cluster member
