@@ -227,8 +227,8 @@ public class MNReplicationTask implements Serializable, Callable<String> {
                 Settings.getConfiguration().getString("dataone.hazelcast.nodes");
         HazelcastInstance hzMember = Hazelcast.getDefaultInstance();
         IMap<NodeReference, Node> nodes = hzMember.getMap(nodeMap);
-        ;
-        log.info("MNReplicationTask.call() called for identifier " + this.pid);
+        
+        log.info("MNReplicationTask.call() called for identifier " + this.pid.getValue());
 
         String mnUrl = nodes.get(targetNode).getBaseURL();
         
@@ -265,7 +265,7 @@ public class MNReplicationTask implements Serializable, Callable<String> {
                     replicaEntryExists = true;
                     log.info("Setting the replication status for identifier " + this.pid.getValue()
                             + " and replica node " + replica.getReplicaMemberNode().getValue()
-                            + " to " + ReplicationStatus.REQUESTED);
+                            + " to " + ReplicationStatus.REQUESTED.toString());
                     break;
 
                 }
