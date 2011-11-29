@@ -39,6 +39,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -561,13 +562,15 @@ public class ReplicationManager implements
    */
   public void entryAdded(EntryEvent<Identifier, SystemMetadata> event) {
     
+    Lock lock = this.hzClient.getLock(event.getKey()); // an explicit lock on the Identifier
+
     try {
       
       log.info("Received entry added event on the " +
         this.systemMetadata.getName() + " map. Evaluating it for MN replication task. " + event.getKey().getValue());
       
-      // lock the pid and handle the event. If it's already pending, do nothing      
-      this.systemMetadata.lock(event.getKey());
+      // lock the pid and handle the event. If it's already pending, do nothing  
+      lock.lock();
 
       log.info("Locked entryAdded on the " +
         this.systemMetadata.getName() + " map. " + event.getKey().getValue());
@@ -596,7 +599,6 @@ public class ReplicationManager implements
           log.info("Calling createAndQueueTasks for identifier: " +
               event.getKey().getValue());
           this.createAndQueueTasks(event.getKey());
-//          this.systemMetadata.unlock(event.getKey());
 
         }
       }
@@ -628,7 +630,7 @@ public class ReplicationManager implements
       // TODO Auto-generated catch block
       e.printStackTrace();    
     } finally {
-      this.systemMetadata.unlock(event.getKey());
+      lock.unlock();
       
     }
     
@@ -674,6 +676,9 @@ public class ReplicationManager implements
    * @param event - the entry event being updated in the map
    */
   public void entryUpdated(EntryEvent<Identifier, SystemMetadata> event) {
+    
+    Lock lock = this.hzClient.getLock(event.getKey()); // an explicit lock on the Identifier
+
     try {
       
       log.info("Received entry updated event on the " +
@@ -681,7 +686,7 @@ public class ReplicationManager implements
 
       // lock the pid and handle the event. If it's already pending, do nothing
       log.info("Getting a lock on identifier " + event.getKey().getValue());
-      this.systemMetadata.lock(event.getKey());
+      lock.lock();
 
       // also need to check the current replicationTasks
       boolean no_task_with_pid = true;
@@ -749,7 +754,7 @@ public class ReplicationManager implements
       e.printStackTrace();
     
     } finally {
-      this.systemMetadata.unlock(event.getKey());
+      lock.unlock();
       
     }
     
