@@ -51,6 +51,7 @@ import org.dataone.cn.hazelcast.HazelcastClientInstance;
 import org.dataone.service.types.v1.NodeReference;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
+import java.util.concurrent.locks.Lock;
 
 /**
  * A single replication task to be queued and executed by the Replication Service.
@@ -80,6 +81,7 @@ public class MNReplicationTask implements Serializable, Callable<String> {
     private String targetNodeSubject;
     /* The subject of the originating node, extracted from the Node object */
     private String originatingNodeSubject;
+
 
     /**
      * Constructor - create an empty replication task instance
@@ -223,6 +225,8 @@ public class MNReplicationTask implements Serializable, Callable<String> {
      */
     public String call() throws IllegalStateException {
         /* The Hazelcast distributed system metadata map */
+        Lock lock = null;
+        boolean isLocked = false;
         String nodeMap =
                 Settings.getConfiguration().getString("dataone.hazelcast.nodes");
         HazelcastInstance hzMember = Hazelcast.getDefaultInstance();
@@ -248,8 +252,10 @@ public class MNReplicationTask implements Serializable, Callable<String> {
         try {
             log.info("Getting a lock on identifier " + this.pid.getValue() + " for task id "
                     + this.taskid);
-
-            sysMetaMap.lock(this.pid);
+            lock = hzClient.getLock(this.pid.getValue());
+            lock.lock();
+            isLocked = true;
+            //sysMetaMap.lock(this.pid);
             SystemMetadata sysmeta = sysMetaMap.get(this.pid);
             log.info("Lock acquired for identifier " + this.pid.getValue());
 
@@ -344,8 +350,9 @@ public class MNReplicationTask implements Serializable, Callable<String> {
             log.error(e.getMessage(), e);
             e.printStackTrace();
         } finally {
-
-            sysMetaMap.unlock(this.pid);
+            if (isLocked) {
+                lock.unlock();
+            }
             log.debug("Finally completed");
         }
 
