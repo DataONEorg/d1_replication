@@ -562,8 +562,8 @@ public class ReplicationManager implements
    */
   public void entryAdded(EntryEvent<Identifier, SystemMetadata> event) {
     
-    Lock lock = this.hzClient.getLock(event.getKey()); // an explicit lock on the Identifier
-
+    Lock lock = this.hzClient.getLock(event.getKey().getValue()); // an explicit lock on the Identifier
+    boolean isLocked = false;
     try {
       
       log.info("Received entry added event on the " +
@@ -571,7 +571,7 @@ public class ReplicationManager implements
       
       // lock the pid and handle the event. If it's already pending, do nothing  
       lock.lock();
-
+      isLocked = true;
       log.info("Locked entryAdded on the " +
         this.systemMetadata.getName() + " map. " + event.getKey().getValue());
 
@@ -630,7 +630,9 @@ public class ReplicationManager implements
       // TODO Auto-generated catch block
       e.printStackTrace();    
     } finally {
-      lock.unlock();
+      if (isLocked) {
+        lock.unlock();
+      }
       
     }
     
@@ -677,8 +679,8 @@ public class ReplicationManager implements
    */
   public void entryUpdated(EntryEvent<Identifier, SystemMetadata> event) {
     
-    Lock lock = this.hzClient.getLock(event.getKey()); // an explicit lock on the Identifier
-
+    Lock lock = this.hzClient.getLock(event.getKey().getValue()); // an explicit lock on the Identifier
+    boolean isLocked = false;
     try {
       
       log.info("Received entry updated event on the " +
@@ -687,7 +689,7 @@ public class ReplicationManager implements
       // lock the pid and handle the event. If it's already pending, do nothing
       log.info("Getting a lock on identifier " + event.getKey().getValue());
       lock.lock();
-
+      isLocked = true;
       // also need to check the current replicationTasks
       boolean no_task_with_pid = true;
 
@@ -754,7 +756,9 @@ public class ReplicationManager implements
       e.printStackTrace();
     
     } finally {
-      lock.unlock();
+      if (isLocked) {
+        lock.unlock();
+      }
       
     }
     
