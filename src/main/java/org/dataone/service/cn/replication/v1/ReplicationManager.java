@@ -632,6 +632,7 @@ public class ReplicationManager implements
     } finally {
       if (isLocked) {
         lock.unlock();
+        log.debug("Unlocked identifier " + event.getKey().getValue());
       }
       
     }
@@ -727,7 +728,6 @@ public class ReplicationManager implements
           log.info("Calling createAndQueueTasks for identifier: " +
               event.getKey().getValue());
           this.createAndQueueTasks(event.getKey());
-          this.systemMetadata.unlock(event.getKey());
         }
       }
       
@@ -758,6 +758,8 @@ public class ReplicationManager implements
     } finally {
       if (isLocked) {
         lock.unlock();
+        log.debug("Unlocked identifier " + event.getKey().getValue());
+
       }
       
     }
