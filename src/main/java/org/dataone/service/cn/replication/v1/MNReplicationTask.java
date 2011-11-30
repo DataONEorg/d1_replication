@@ -314,8 +314,6 @@ public class MNReplicationTask implements Serializable, Callable<String> {
             log.info("Calling MNreplication.replicate() at targetNode id " + targetMN.getNodeBaseServiceUrl());
             targetMN.replicate(session, sysmeta, this.originatingNode);
 
-            sysMetaMap.unlock(this.pid);
-
         } catch (NotImplemented e) {
             // TODO Auto-generated catch block
             log.error(e.getMessage(), e);
@@ -345,15 +343,19 @@ public class MNReplicationTask implements Serializable, Callable<String> {
             // TODO Auto-generated catch block
             log.error(e.getMessage(), e);
             e.printStackTrace();
+            
         } catch (Exception e) {
             // TODO Auto-generated catch block
             log.error(e.getMessage(), e);
             e.printStackTrace();
+            
         } finally {
             if (isLocked) {
                 lock.unlock();
+                log.debug("Unlocked identifier " + this.pid.getValue());
+
             }
-            log.debug("Finally completed");
+            log.debug("Task completed for identifier " + this.pid.getValue());
         }
 
 
