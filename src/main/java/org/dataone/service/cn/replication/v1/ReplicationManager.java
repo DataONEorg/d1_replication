@@ -34,11 +34,15 @@ import com.hazelcast.impl.base.RuntimeInterruptedException;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 
 import org.apache.commons.logging.Log;
@@ -126,6 +130,11 @@ public class ReplicationManager implements
   
   /* The Hazelcast distributed replication tasks queue*/
   private IQueue<MNReplicationTask> replicationTasks;
+
+  /* The timeout period for tasks submitted to the executor service 
+   * to complete the call to MN.replicate()
+   */
+  private long timeout = 30L;
   
   /**
    * Private Constructor - singleton pattern
@@ -376,34 +385,7 @@ public class ReplicationManager implements
 
         // a replica doesn't exist. add it
         if ( replicable ) {
-            List<Replica> list = sysMeta.getReplicaList();
-
-            if ( list != null && !list.isEmpty() ) {
-                for (Replica replica : list) {
-                    NodeReference replicaNode = replica.getReplicaMemberNode();
-                    if ( replicaNode.getValue().equals(targetNode.getIdentifier().getValue()) ) {
-                      replica.setReplicationStatus(ReplicationStatus.QUEUED);
-                      log.info("Set the replication status for " + replicaNode.getValue() +
-                              " to " + ReplicationStatus.QUEUED);
-                      replicaAdded = true;
-                      break;
-                      
-                    }
-                }
-            }
-              
-            if ( !replicaAdded ) {
-                Replica newReplica = new Replica();
-                newReplica.setReplicaMemberNode(targetNode.getIdentifier());
-                newReplica.setReplicationStatus(ReplicationStatus.QUEUED);
-                newReplica.setReplicaVerified(Calendar.getInstance().getTime());
-                sysMeta.addReplica(newReplica);
-                log.info("No replica listed for " + targetNode.getIdentifier().getValue() +
-                        ". Added a new replica item to identifier " + pid.getValue());
-
-              
-            }
-
+            replicaAdded = addReplica(pid, targetNode, ReplicationStatus.QUEUED, sysMeta);
         
             sysMeta.setSerialVersion(sysMeta.getSerialVersion().add(BigInteger.ONE));
             sysMeta.setDateSysMetadataModified(Calendar.getInstance().getTime());
@@ -416,8 +398,8 @@ public class ReplicationManager implements
             // add the task to the task list
             log.info("Adding a new MNreplicationTask to the queue where " +
               "pid = "                    + pid.getValue() + 
-              ", originatingNode name = " + authoritativeNode.getName() +
-              ", targetNode name = "      + targetNode.getName());
+              ", originatingNode = " + authoritativeNode.getIdentifier().getValue() +
+              ", targetNode = "      + targetNode.getIdentifier().getValue());
             
             MNReplicationTask task = new MNReplicationTask(
                                 taskid.toString(),
@@ -447,6 +429,52 @@ public class ReplicationManager implements
     
     return taskCount;
     
+  }
+
+  /*
+   * Add a replica entry to the given system metadata, or update an existing entry
+   * 
+   * @param pid  the identifier of the object
+   * @param targetNode  the target replica node
+   * @param sysMeta
+   * @return
+   */
+  private boolean addReplica(Identifier pid, Node targetNode,
+      ReplicationStatus replicaStatus, SystemMetadata sysMeta) {
+      
+      boolean replicaAdded = false;
+      List<Replica> list = sysMeta.getReplicaList();
+      
+      // only if the replica list is populated
+      if ( list != null && !list.isEmpty() ) {
+          for (Replica replica : list) {
+              NodeReference replicaNode = replica.getReplicaMemberNode();
+              // update the existing replica
+              if ( replicaNode.getValue().equals(targetNode.getIdentifier().getValue()) ) {
+                replica.setReplicationStatus(replicaStatus);
+                log.info("Set the replication status for " + replicaNode.getValue() +
+                        " to " + replicaStatus.xmlValue());
+                replicaAdded = true;
+                break;
+                
+              }
+          }
+      }
+      
+      // if the replica list doesn't exist
+      if ( !replicaAdded ) {
+          Replica newReplica = new Replica();
+          newReplica.setReplicaMemberNode(targetNode.getIdentifier());
+          newReplica.setReplicationStatus(replicaStatus);
+          newReplica.setReplicaVerified(Calendar.getInstance().getTime());
+          sysMeta.addReplica(newReplica);
+          log.info("No replica listed for " + targetNode.getIdentifier().getValue() +
+                  ". Added a new replica item to identifier " + pid.getValue());
+      
+        
+      }      
+      return replicaAdded;
+      
   }
   
   /**
@@ -500,7 +528,7 @@ public class ReplicationManager implements
     // When a task is added to the queue, attempt to handle the task. If 
     // successful, execute the task.    
     try {
-      task = this.replicationTasks.poll(3, TimeUnit.SECONDS);
+      task = this.replicationTasks.poll(3L, TimeUnit.SECONDS);
       
       if ( task != null ) {
         log.info("Submitting replication task id " + task.getTaskid() +
@@ -508,23 +536,59 @@ public class ReplicationManager implements
         
         // TODO: handle the case when a CN drops and the MNReplicationTask.call()
         // has not been made.
+        
         // submit to the processing cluster, not the storage cluster
+        Collection<MNReplicationTask> tasks = new ArrayList<MNReplicationTask>();
         ExecutorService executorService = this.hzMember.getExecutorService();
-        Future<String> replicationTask = executorService.submit(task);
+        List<Future<String>> futuresList = 
+            executorService.invokeAll(tasks, timeout, TimeUnit.SECONDS);
+        //Future<String> replicationTask = executorService.submit(task);
         
         // check for completion
-        while ( !replicationTask.isDone() ) {
-          
-          if ( replicationTask.isCancelled() ) {
-            log.info("Replication task id " + task.getTaskid() + 
-                     " was cancelled.");
-          }
-          
+        boolean isDone = false;
+        String result = null;
+        
+        while( !isDone ) {
+            
+            // there's really only one future in the list
+            for ( Future<String> future : futuresList) {
+                
+                try {
+                    result = future.get(1L, TimeUnit.SECONDS);                    
+                    
+                } catch (ExecutionException e) {
+                    String msg = e.getCause().getMessage();
+                    log.info("MNReplicationTask id " + task.getTaskid() +
+                        " threw an execution execption: " + msg);
+                    
+                } catch (TimeoutException e) {
+                    String msg = e.getMessage();
+                    log.info("Replication task id " + task.getTaskid() + 
+                            " timed out for identifier " + task.getPid().getValue() +
+                            " : " + msg);
+                    
+                } catch (InterruptedException e) {
+                    String msg = e.getMessage();
+                    log.info("Replication task id " + task.getTaskid() + 
+                            " was interrupted for identifier " + task.getPid().getValue() +
+                            " : " + msg);
+                }
+                
+                isDone = future.isDone();
+                
+                // handle canceled tasks (from the timeout period)
+                if ( future.isCancelled() ) {
+                    log.info("Replication task id " + task.getTaskid() + 
+                             " was cancelled for identifier " + task.getPid().getValue());
+                    
+                    // leave the Replica entry as QUEUED in system metadata
+                    // to be picked up later
+                }
+                                
+            }
+            
         }
-        
-        log.info("Replication task id " + task.getTaskid() + " completed.");
-        
-        //TODO: lock pid, update sysmeta to set ReplicationStatus.REQUESTED
+               
       }
     
     } catch (InterruptedException e) {
@@ -535,6 +599,7 @@ public class ReplicationManager implements
     } catch (RuntimeInterruptedException rie) {
         String message = "Hazelcast instance was lost due to cluster shutdown, " +
             rie.getMessage();
+        
     } catch (IllegalStateException ise) {
         String message = "Hazelcast instance was lost due to cluster shutdown, " +
             ise.getMessage();
