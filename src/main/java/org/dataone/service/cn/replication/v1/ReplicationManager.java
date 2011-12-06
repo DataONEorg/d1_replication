@@ -21,6 +21,8 @@
 package org.dataone.service.cn.replication.v1;
 
 import com.hazelcast.client.HazelcastClient;
+import com.hazelcast.config.ExecutorConfig;
+import com.hazelcast.core.DistributedTask;
 import com.hazelcast.core.EntryEvent;
 import com.hazelcast.core.EntryListener;
 import com.hazelcast.core.Hazelcast;
@@ -33,14 +35,20 @@ import com.hazelcast.impl.base.RuntimeInterruptedException;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
@@ -131,13 +139,16 @@ public class ReplicationManager implements
   /* The Hazelcast distributed replication tasks queue*/
   private IQueue<MNReplicationTask> replicationTasks;
 
+  /* The Replication task thread queue */
+  BlockingQueue<Runnable> taskThreadQueue;
+  
   /* The timeout period for tasks submitted to the executor service 
    * to complete the call to MN.replicate()
    */
   private long timeout = 30L;
   
   /**
-   * Private Constructor - singleton pattern
+   *  Constructor - singleton pattern
    */
   public ReplicationManager() {
     
@@ -186,6 +197,10 @@ public class ReplicationManager implements
         " map and the " + this.replicationTasks.getName() + " queue.");
     this.systemMetadata.addEntryListener(this, true);
     this.replicationTasks.addItemListener(this, true);
+    
+    // initialize the task thread queue
+    taskThreadQueue = new ArrayBlockingQueue<Runnable>(10000);
+
   }
 
   public void init() {
@@ -531,64 +546,87 @@ public class ReplicationManager implements
       task = this.replicationTasks.poll(3L, TimeUnit.SECONDS);
       
       if ( task != null ) {
-        log.info("Submitting replication task id " + task.getTaskid() +
-                 " for execution with object identifier: " + task.getPid().getValue());
-        
-        // TODO: handle the case when a CN drops and the MNReplicationTask.call()
-        // has not been made.
-        
-        // submit to the processing cluster, not the storage cluster
-        Collection<MNReplicationTask> tasks = new ArrayList<MNReplicationTask>();
-        ExecutorService executorService = this.hzMember.getExecutorService();
-        List<Future<String>> futuresList = 
-            executorService.invokeAll(tasks, timeout, TimeUnit.SECONDS);
-        //Future<String> replicationTask = executorService.submit(task);
-        
-        // check for completion
-        boolean isDone = false;
-        String result = null;
-        
-        while( !isDone ) {
+          log.info("Submitting replication task id " + task.getTaskid() +
+                   " for execution with object identifier: " + task.getPid().getValue());
+          
+          // TODO: handle the case when a CN drops and the MNReplicationTask.call()
+          // has not been made.
+          RejectedExecutionHandler handler = new RejectedReplicationTaskHandler();
+          ThreadPoolExecutor executor = 
+              new ThreadPoolExecutor(8, 8, 30, TimeUnit.SECONDS, taskThreadQueue, handler);
+          executor.allowCoreThreadTimeOut(true);
+          FutureTask<String> futureTask = new FutureTask<String>(task);
+          executor.execute(futureTask);
+          //ExecutorService executorService = 
+          //     this.hzMember.getExecutorService("ReplicationTasks");
+          //Future<?> future = executorService.submit(new DistributedTask(task));
+          log.debug("Task thread queue has "  + 
+              taskThreadQueue.remainingCapacity() + " slots available.");
+          log.debug("ExecutorService is shut down: " + executor.isShutdown());          
+          log.debug("ExecutorService allows core thread timeout: " + 
+              executor.allowsCoreThreadTimeOut());
+          log.debug("ExecutorService is currently executing " + 
+              executor.getActiveCount() + " tasks.");
+          log.debug("ExecutorService has executed " + 
+              executor.getCompletedTaskCount() + " tasks.");
+          log.debug("ExecutorService core pool size is " + 
+              executor.getCorePoolSize() + " threads.");
+          log.debug("ExecutorService currently has " + 
+              executor.getPoolSize() + " threads.");
+          log.debug("ExecutorService has max simultaneously executed " +
+              executor.getLargestPoolSize() + " threads.");
+          log.debug("ExecutorService has scheduled " +
+              executor.getTaskCount() + " tasks.");
+          
+          // check for completion
+          boolean isDone = false;
+          String result = null;
+          
+          while( !isDone ) {
+                              
+              try {
+                  result = (String) futureTask.get(30L, TimeUnit.SECONDS);  
+                  log.trace("Task result for identifier " + 
+                      task.getPid().getValue() + " is " + result );
+                  if ( result != null ) {
+                      log.debug("Task " + task.getTaskid() + " completed for identifier " +
+                          task.getPid().getValue());
+                      
+                  }
+                  
+              } catch (ExecutionException e) {
+                  String msg = e.getCause().getMessage();
+                  log.info("MNReplicationTask id " + task.getTaskid() +
+                      " threw an execution execption: " + msg);
+                  
+              } catch (TimeoutException e) {
+                  String msg = e.getMessage();
+                  log.info("Replication task id " + task.getTaskid() + 
+                          " timed out for identifier " + task.getPid().getValue() +
+                          " : " + msg);
+                  
+              } catch (InterruptedException e) {
+                  String msg = e.getMessage();
+                  log.info("Replication task id " + task.getTaskid() + 
+                          " was interrupted for identifier " + task.getPid().getValue() +
+                          " : " + msg);
+              }
+              
+              isDone = futureTask.isDone();
+              log.debug("Task " + task.getTaskid() + " is done for identifier " +
+                      task.getPid().getValue() + ": " + isDone);
+              
+              
+              // handle canceled tasks (from the timeout period)
+              if ( futureTask.isCancelled() ) {
+                  log.info("Replication task id " + task.getTaskid() + 
+                           " was cancelled for identifier " + task.getPid().getValue());
+                  
+                  // leave the Replica entry as QUEUED in system metadata
+                  // to be picked up later
+              }
+          }
             
-            // there's really only one future in the list
-            for ( Future<String> future : futuresList) {
-                
-                try {
-                    result = future.get(1L, TimeUnit.SECONDS);                    
-                    
-                } catch (ExecutionException e) {
-                    String msg = e.getCause().getMessage();
-                    log.info("MNReplicationTask id " + task.getTaskid() +
-                        " threw an execution execption: " + msg);
-                    
-                } catch (TimeoutException e) {
-                    String msg = e.getMessage();
-                    log.info("Replication task id " + task.getTaskid() + 
-                            " timed out for identifier " + task.getPid().getValue() +
-                            " : " + msg);
-                    
-                } catch (InterruptedException e) {
-                    String msg = e.getMessage();
-                    log.info("Replication task id " + task.getTaskid() + 
-                            " was interrupted for identifier " + task.getPid().getValue() +
-                            " : " + msg);
-                }
-                
-                isDone = future.isDone();
-                
-                // handle canceled tasks (from the timeout period)
-                if ( future.isCancelled() ) {
-                    log.info("Replication task id " + task.getTaskid() + 
-                             " was cancelled for identifier " + task.getPid().getValue());
-                    
-                    // leave the Replica entry as QUEUED in system metadata
-                    // to be picked up later
-                }
-                                
-            }
-            
-        }
-               
       }
     
     } catch (InterruptedException e) {
