@@ -62,25 +62,35 @@ import java.util.concurrent.locks.Lock;
  * @author cjones
  *
  */
-public class MNReplicationTask implements Serializable, Callable<String> {
+public class MNReplicationTask 
+    implements Serializable, Callable<String>, Runnable {
 
     /* Get a Log instance */
     public static Log log = LogFactory.getLog(MNReplicationTask.class);
+    
     /* The identifier of this task */
     private String taskid;
+    
     /* The identifier of the system metadata map event that precipitated this task */
     private String eventid;
+    
     /* The identifier of the object to replicate */
     private Identifier pid;
+    
     /* The target Node object */
     private NodeReference targetNode;
+    
     /* The originating Node object */
     private NodeReference originatingNode;
-
+    
     /* The subject of the target node, extracted from the Node object */
     private String targetNodeSubject;
+    
     /* The subject of the originating node, extracted from the Node object */
     private String originatingNodeSubject;
+    
+    /* The number of times the task has been retried */
+    private int retryCount;
 
 
     /**
@@ -360,5 +370,33 @@ public class MNReplicationTask implements Serializable, Callable<String> {
 
 
         return this.pid.getValue();
+    }
+
+    /**
+     * Implements the Runnable interface, but the task is actually called via
+     * the Callable interface.  This is needed as a placeholder to handle
+     * rejected tasks via the RejectedReplicationTaskHandler class.
+     */
+    public void run() {
+        log.debug("MNReplicationTask.run() called.");       
+        
+    }
+
+    /**
+     * Set the number of retries for this particular replication task
+     * 
+     * @param retryCount
+     */
+    public void setRetryCount(int retryCount) {
+        this.retryCount = retryCount;
+    }
+
+    /**
+     * Get the number of retries for this particular replication task;
+     * 
+     * @return retryCount  the number of retries for this replication task
+     */
+    public int getRetryCount() {
+        return this.retryCount;
     }
 }
