@@ -142,6 +142,12 @@ public class ReplicationManager implements
   /* The Replication task thread queue */
   BlockingQueue<Runnable> taskThreadQueue;
   
+  /* The handler instance for rejected tasks */
+  RejectedExecutionHandler handler;
+  
+  /* The thread pool executor instance for executing tasks */
+  ThreadPoolExecutor executor;
+  
   /* The timeout period for tasks submitted to the executor service 
    * to complete the call to MN.replicate()
    */
@@ -198,8 +204,13 @@ public class ReplicationManager implements
     this.systemMetadata.addEntryListener(this, true);
     this.replicationTasks.addItemListener(this, true);
     
-    // initialize the task thread queue
-    taskThreadQueue = new ArrayBlockingQueue<Runnable>(10000);
+    // initialize the task thread queue with 5 threads
+    taskThreadQueue = new ArrayBlockingQueue<Runnable>(5);
+    handler = new RejectedReplicationTaskHandler();
+    // create an Executor with 8 core, 8 max threads, 30s timeout
+    executor = 
+        new ThreadPoolExecutor(8, 8, 30, TimeUnit.SECONDS, taskThreadQueue, handler);
+    executor.allowCoreThreadTimeOut(true);
 
   }
 
@@ -551,10 +562,6 @@ public class ReplicationManager implements
           
           // TODO: handle the case when a CN drops and the MNReplicationTask.call()
           // has not been made.
-          RejectedExecutionHandler handler = new RejectedReplicationTaskHandler();
-          ThreadPoolExecutor executor = 
-              new ThreadPoolExecutor(8, 8, 30, TimeUnit.SECONDS, taskThreadQueue, handler);
-          executor.allowCoreThreadTimeOut(true);
           FutureTask<String> futureTask = new FutureTask<String>(task);
           executor.execute(futureTask);
           //ExecutorService executorService = 
@@ -585,7 +592,7 @@ public class ReplicationManager implements
           while( !isDone ) {
                               
               try {
-                  result = (String) futureTask.get(30L, TimeUnit.SECONDS);  
+                  result = (String) futureTask.get(5L, TimeUnit.SECONDS);  
                   log.trace("Task result for identifier " + 
                       task.getPid().getValue() + " is " + result );
                   if ( result != null ) {
@@ -598,18 +605,56 @@ public class ReplicationManager implements
                   String msg = e.getCause().getMessage();
                   log.info("MNReplicationTask id " + task.getTaskid() +
                       " threw an execution execption: " + msg);
+                  if ( task.getRetryCount() < 10 ) {
+                      task.setRetryCount(task.getRetryCount() + 1);
+                      this.replicationTasks.add(task);
+                      log.info("Retrying replication task id " + 
+                          task.getTaskid() + " for identifier " + 
+                          task.getPid().getValue());
+                      
+                  } else {
+                      log.info("Replication task id" + task.getTaskid() + 
+                          " failed, too many retries for identifier" + 
+                          task.getPid().getValue() + ". Not retrying.");
+                  }
                   
               } catch (TimeoutException e) {
                   String msg = e.getMessage();
                   log.info("Replication task id " + task.getTaskid() + 
                           " timed out for identifier " + task.getPid().getValue() +
                           " : " + msg);
+                  futureTask.cancel(true); // isDone() is now true
+                  if ( task.getRetryCount() < 10 ) {
+                      task.setRetryCount(task.getRetryCount() + 1);
+                      this.replicationTasks.add(task);
+                      log.info("Retrying replication task id " + 
+                          task.getTaskid() + " for identifier " + 
+                          task.getPid().getValue());
+                      
+                  } else {
+                      log.info("Replication task id" + task.getTaskid() + 
+                          " failed, too many retries for identifier" + 
+                          task.getPid().getValue() + ". Not retrying.");
+                  }
                   
               } catch (InterruptedException e) {
                   String msg = e.getMessage();
                   log.info("Replication task id " + task.getTaskid() + 
                           " was interrupted for identifier " + task.getPid().getValue() +
                           " : " + msg);
+                  if ( task.getRetryCount() < 10 ) {
+                      task.setRetryCount(task.getRetryCount() + 1);
+                      this.replicationTasks.add(task);
+                      log.info("Retrying replication task id " + 
+                          task.getTaskid() + " for identifier " + 
+                          task.getPid().getValue());
+                      
+                  } else {
+                      log.error("Replication task id" + task.getTaskid() + 
+                          " failed, too many retries for identifier" + 
+                          task.getPid().getValue() + ". Not retrying.");
+                  }
+
               }
               
               isDone = futureTask.isDone();
