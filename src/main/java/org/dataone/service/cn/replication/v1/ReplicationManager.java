@@ -352,12 +352,13 @@ public class ReplicationManager implements
         // for each replica in the replica list
         for (Replica replica : replicaList) {
           
-          // ensure that this node is not queued, requested, or completed
+          // ensure that this node is not queued, requested, failed, or completed
           NodeReference replicaNode = replica.getReplicaMemberNode();
           ReplicationStatus status = replica.getReplicationStatus();
           if (potentialNode.getValue().equals(replicaNode.getValue()) &&
              (status.equals(ReplicationStatus.QUEUED) ||
               status.equals(ReplicationStatus.REQUESTED) ||
+              status.equals(ReplicationStatus.FAILED) ||
               status.equals(ReplicationStatus.COMPLETED))){
             alreadyAdded = true;
             break;
@@ -592,7 +593,7 @@ public class ReplicationManager implements
           while( !isDone ) {
                               
               try {
-                  result = (String) futureTask.get(5L, TimeUnit.SECONDS);  
+                  result = (String) futureTask.get(30L, TimeUnit.SECONDS);  
                   log.trace("Task result for identifier " + 
                       task.getPid().getValue() + " is " + result );
                   if ( result != null ) {
