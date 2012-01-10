@@ -21,8 +21,6 @@
 package org.dataone.service.cn.replication.v1;
 
 import com.hazelcast.client.HazelcastClient;
-import com.hazelcast.config.ExecutorConfig;
-import com.hazelcast.core.DistributedTask;
 import com.hazelcast.core.EntryEvent;
 import com.hazelcast.core.EntryListener;
 import com.hazelcast.core.Hazelcast;
@@ -35,19 +33,15 @@ import com.hazelcast.impl.base.RuntimeInterruptedException;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Calendar;
-import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RejectedExecutionHandler;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -62,6 +56,7 @@ import org.dataone.service.exceptions.NotAuthorized;
 import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
+import org.dataone.service.exceptions.VersionMismatch;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.Node;
 import org.dataone.service.types.v1.NodeReference;
@@ -69,8 +64,12 @@ import org.dataone.service.types.v1.NodeType;
 import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationPolicy;
 import org.dataone.service.types.v1.ReplicationStatus;
+import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.SystemMetadata;
 import org.dataone.service.types.v1.Service;
+import org.dataone.client.CNode;
+import org.dataone.client.D1Client;
+import org.dataone.client.auth.CertificateManager;
 import org.dataone.cn.hazelcast.HazelcastClientInstance;
 
 /**
@@ -153,18 +152,14 @@ public class ReplicationManager implements
    */
   private long timeout = 30L;
   
+  /* A client reference to the coordinating node */
+  private CNode cn = null;
+    
   /**
    *  Constructor - singleton pattern
    */
   public ReplicationManager() {
     
-    // Get configuration properties on instantiation
-   // this.groupName =
-   //   Settings.getConfiguration().getString("dataone.hazelcast.group");
-   // this.groupPassword =
-   //   Settings.getConfiguration().getString("dataone.hazelcast.password");
-   // this.addressList =
-   //   Settings.getConfiguration().getString("dataone.hazelcast.clusterInstances");
     this.nodeMap = 
       Settings.getConfiguration().getString("dataone.hazelcast.nodes");
     this.systemMetadataMap = 
@@ -180,14 +175,8 @@ public class ReplicationManager implements
     this.shortListNumRows = 
       Settings.getConfiguration().getString("dataone.hazelcast.shortListNumRows");
     
-    // Become a Hazelcast cluster client using the replication structures
-    // String[] addresses = this.addressList.split(",");
-
-    //log.info("Becoming a DataONE Storage cluster hazelcast client where the group name " +
-    //   "is " + this.groupName + " and the cluster member IP addresses are " +
-    //    this.addressList + ".");
-
     this.hzClient = HazelcastClientInstance.getHazelcastClient();
+    
     // Also become a Hazelcast processing cluster member
     log.info("Becoming a DataONE Process cluster hazelcast member with the default instance.");
     
@@ -211,7 +200,7 @@ public class ReplicationManager implements
     executor = 
         new ThreadPoolExecutor(8, 8, 30, TimeUnit.SECONDS, taskThreadQueue, handler);
     executor.allowCoreThreadTimeOut(true);
-
+        
   }
 
   public void init() {
@@ -233,8 +222,8 @@ public class ReplicationManager implements
    * @throws NotFound
    */
   public int createAndQueueTasks(Identifier pid) 
-  throws ServiceFailure, NotImplemented, InvalidToken, NotAuthorized, 
-  InvalidRequest, NotFound {
+    throws ServiceFailure, NotImplemented, InvalidToken, NotAuthorized, 
+    InvalidRequest, NotFound {
 
     log.info("ReplicationManager.createAndQueueTasks called.");
     boolean allowed;
@@ -245,214 +234,264 @@ public class ReplicationManager implements
     List<NodeReference> potentialNodeList; // the MN subset of the nodes list
     Node targetNode = new Node();          // the target node for the replica
     Node authoritativeNode = new Node();     // the source node of the object
-    
+    SystemMetadata sysmeta;
+
+    // Get an CNode reference to communicate with
     try {
-      
-      // if replication isn't allowed, return
-      allowed = isAllowed(pid);
-      log.info("Replication is allowed for identifier " + pid.getValue());
-      
-      if ( !allowed ) {
-        log.info("Replication is not allowed for the object identified by " +
-            pid.getValue());
-        return 0;
+        log.debug("D1Client.CN_URL = " + 
+            Settings.getConfiguration().getProperty("D1Client.CN_URL"));
         
-      }
-
-      // get the system metadata for the pid
-      log.info("Getting the replica list for identifier " + pid.getValue());
-      
-      SystemMetadata sysmeta = this.systemMetadata.get(pid);
-      replicaList = sysmeta.getReplicaList();
-      if (replicaList == null) {
-          replicaList = new ArrayList<Replica>();
-      }
-      // List of Nodes for building MNReplicationTasks
-      log.info("Building a potential target node list for identifier " + pid.getValue());
-      nodeList = (Set<NodeReference>) this.nodes.keySet();
-      potentialNodeList = new ArrayList<NodeReference>(); // will be our short list
-      
-      // authoritative member node to replicate from
-      try {
-      authoritativeNode = this.nodes.get(sysmeta.getAuthoritativeMemberNode());
-      } catch (NullPointerException npe) {
-          throw new InvalidRequest("1080", "Object " + pid.getValue() + 
-                  " has no authoritative Member Node in its SystemMetadata");
-      }
-      
-      // build the potential list of target nodes
-      for(NodeReference nodeReference : nodeList) {
-        Node node = this.nodes.get(nodeReference);
+        this.cn = D1Client.getCN();
+        log.info("ReplicationManager D1Client base_url is: " + this.cn.getNodeBaseServiceUrl());
+    } catch (ServiceFailure e) {
         
-          // only add MNs as targets, excluding the authoritative MN and MNs that are not tagged to replicate
-          if ( (node.getType() == NodeType.MN) && node.isReplicate() &&
-              !node.getIdentifier().getValue().equals(authoritativeNode.getIdentifier().getValue())) {
-            potentialNodeList.add(node.getIdentifier());
-            
-          }
-      }
-
-      // parse the sysmeta.ReplicationPolicy
-      ReplicationPolicy replicationPolicy = sysmeta.getReplicationPolicy();
-      desiredReplicas = replicationPolicy.getNumberReplicas().intValue();
-
-      // get the preferred and blocked lists for prioritization
-      List<NodeReference> preferredList = 
-          replicationPolicy.getPreferredMemberNodeList();
-      List<NodeReference> blockedList = 
-        replicationPolicy.getBlockedMemberNodeList();
-
-      log.info("Removing blocked nodes from the potential replication list for " +
-        pid.getValue());
-      // remove blocked nodes from the potential nodelist
-      if ( blockedList != null && !blockedList.isEmpty() ) {
-        for (NodeReference blockedNode : blockedList) {
-          if ( potentialNodeList.contains(blockedNode) ) {
-            potentialNodeList.remove(blockedNode);
-            
-          }
-        }
-      }
-
-      log.info("Prioritizing preferred nodes in the potential replication list for " +
-        pid.getValue());
-
-      // prioritize preferred nodes in the potential node list
-      if ( preferredList != null && !preferredList.isEmpty() ) {
-        
-        // process preferred nodes backwards
-        for (int i = preferredList.size() - 1; i >= 0; i--) {
-          
-          NodeReference preferredNode = preferredList.get(i);
-          if ( potentialNodeList.contains( preferredNode) ) {
-            potentialNodeList.remove(preferredNode); // remove for reordering
-            potentialNodeList.add(0, preferredNode); // to the top of the list
-             
-          }
-        }
-      }
-       
-      log.info("Desired replicas for identifier " + pid.getValue() + " is " + desiredReplicas);
-      log.info("Potential target node list size for " + pid.getValue() + " is " + desiredReplicas);
-
-      // can't have more replicas than MNs
-      if ( desiredReplicas > potentialNodeList.size() ) {
-        desiredReplicas = potentialNodeList.size(); // yikes
-        log.info("Changed the desired replicas for identifier " + pid.getValue() +
-          " to the size of the potential target node list: "  + potentialNodeList.size());
+        // try again, then fail
+        try {
+            try {
+                Thread.sleep(5000L);
                 
-      }
-      
-      boolean alreadyAdded = false;
-
-      // for each node in the potential node list up to the desired replicas
-      for(int j = 0; j < desiredReplicas; j++) {
-
-        NodeReference potentialNode = potentialNodeList.get(j);
-        // for each replica in the replica list
-        for (Replica replica : replicaList) {
-          
-          // ensure that this node is not queued, requested, failed, or completed
-          NodeReference replicaNode = replica.getReplicaMemberNode();
-          ReplicationStatus status = replica.getReplicationStatus();
-          if (potentialNode.getValue().equals(replicaNode.getValue()) &&
-             (status.equals(ReplicationStatus.QUEUED) ||
-              status.equals(ReplicationStatus.REQUESTED) ||
-              status.equals(ReplicationStatus.FAILED) ||
-              status.equals(ReplicationStatus.COMPLETED))){
-            alreadyAdded = true;
-            break;
-            
-          }
-          log.info("A replication task for identifier " + pid.getValue() + 
-            " on node id " + replicaNode.getValue() +
-            " has already been added: " + alreadyAdded + ". The status is " +
-            "currently set to: " + status);
-          
-        }
-        // if the node doesn't already exist as a pending task for this pid
-        if ( !alreadyAdded ) {
-          targetNode = this.nodes.get(potentialNode);
+            } catch (InterruptedException e1) {
+                log.error("There was a problem getting a Coordinating Node reference.");
+                e1.printStackTrace();
                 
-        } else {
-            // skip on to the next one right? -rpw (otherwise targetnode is empty or is the last targetnode assigned)
-            continue;
-        }
-        
-        boolean replicaAdded = false;
-          
-        // update system metadata for the targetNode on this task
-        SystemMetadata sysMeta = this.systemMetadata.get(pid);
-
-        // may be more than one version of MNReplication
-        List<String> implementedVersions = new ArrayList<String>();
-        List<Service> origServices = authoritativeNode.getServices().getServiceList();
-        for (Service service : origServices) {
-            if(service.getName().equals("MNReplication") &&
-               service.getAvailable()) {
-                implementedVersions.add(service.getVersion());
             }
-        }
-        if (implementedVersions.isEmpty()) {
-            throw new InvalidRequest("1080","Authoritative Node:" + authoritativeNode.getIdentifier().getValue() + " MNReplication Service is not available or is missing version");
-        }
-
-        boolean replicable = false;
-
-        for (Service service : targetNode.getServices().getServiceList()) {
-            if(service.getName().equals("MNReplication") &&
-               implementedVersions.contains(service.getVersion()) &&
-               service.getAvailable()) {
-                replicable = true;
-            }
-        }
-        log.info("Based on evaluating the target node services, node id " +
-                targetNode.getIdentifier().getValue() + " is replicable: " + 
-                replicable);
-
-        // a replica doesn't exist. add it
-        if ( replicable ) {
-            replicaAdded = addReplica(pid, targetNode, ReplicationStatus.QUEUED, sysMeta);
+            this.cn = D1Client.getCN();
         
-            sysMeta.setSerialVersion(sysMeta.getSerialVersion().add(BigInteger.ONE));
-            sysMeta.setDateSysMetadataModified(Calendar.getInstance().getTime());
-            this.systemMetadata.put(pid, sysMeta);
+        } catch (ServiceFailure e1) {
+            log.error("There was a problem getting a Coordinating Node reference " +
+                " for the ReplicationManager. ");
+            //e1.printStackTrace();
+            throw e1;
             
-            log.info("Updated system metadata for identifier " + pid.getValue() + 
-                    " with queued replication status.");
-            
-            Long taskid = taskIdGenerator.newId();
-            // add the task to the task list
-            log.info("Adding a new MNreplicationTask to the queue where " +
-              "pid = "                    + pid.getValue() + 
-              ", originatingNode = " + authoritativeNode.getIdentifier().getValue() +
-              ", targetNode = "      + targetNode.getIdentifier().getValue());
-            
-            MNReplicationTask task = new MNReplicationTask(
-                                taskid.toString(),
-                                pid,
-                                authoritativeNode.getIdentifier(),
-                                targetNode.getIdentifier());
-            this.replicationTasks.add(task);
-            taskCount++;
-
         }
-        
-      }
-
-          
-
-      
-    } catch (InvalidRequest ir) {
-
-        ir.printStackTrace();
-
-    } catch (Exception e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
     }
+
+    // Set up the certificate location, create a null session
+    String clientCertificateLocation =
+            Settings.getConfiguration().getString("D1Client.certificate.directory")
+            + "/" + Settings.getConfiguration().getString("cn.nodeId");
+    CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
+    log.info("ReplicationManager is using an X509 certificate from " + clientCertificateLocation);
+    
+    Session session = null;
+
+    // if replication isn't allowed, return
+    allowed = isAllowed(pid);
+    log.info("Replication is allowed for identifier " + pid.getValue());
+    
+    if ( !allowed ) {
+      log.info("Replication is not allowed for the object identified by " +
+          pid.getValue());
+      return 0;
+      
+    }
+
+    // get the system metadata for the pid
+    log.info("Getting the replica list for identifier " + pid.getValue());
+    
+    sysmeta = this.systemMetadata.get(pid);
+    replicaList = sysmeta.getReplicaList();
+    if (replicaList == null) {
+        replicaList = new ArrayList<Replica>();
+    }
+    // List of Nodes for building MNReplicationTasks
+    log.info("Building a potential target node list for identifier " + pid.getValue());
+    nodeList = (Set<NodeReference>) this.nodes.keySet();
+    potentialNodeList = new ArrayList<NodeReference>(); // will be our short list
+    
+    // authoritative member node to replicate from
+    try {
+        authoritativeNode = this.nodes.get(sysmeta.getAuthoritativeMemberNode());
+        
+    } catch (NullPointerException npe) {
+        throw new InvalidRequest("1080", "Object " + pid.getValue() + 
+                " has no authoritative Member Node in its SystemMetadata");
+        
+    }
+    
+    // build the potential list of target nodes
+    for(NodeReference nodeReference : nodeList) {
+      Node node = this.nodes.get(nodeReference);
+      
+        // only add MNs as targets, excluding the authoritative MN and MNs that are not tagged to replicate
+        if ( (node.getType() == NodeType.MN) && node.isReplicate() &&
+            !node.getIdentifier().getValue().equals(authoritativeNode.getIdentifier().getValue())) {
+          potentialNodeList.add(node.getIdentifier());
+          
+        }
+    }
+
+    // parse the sysmeta.ReplicationPolicy
+    ReplicationPolicy replicationPolicy = sysmeta.getReplicationPolicy();
+    desiredReplicas = replicationPolicy.getNumberReplicas().intValue();
+
+    // get the preferred and blocked lists for prioritization
+    List<NodeReference> preferredList = 
+        replicationPolicy.getPreferredMemberNodeList();
+    List<NodeReference> blockedList = 
+      replicationPolicy.getBlockedMemberNodeList();
+
+    log.info("Removing blocked nodes from the potential replication list for " +
+      pid.getValue());
+    // remove blocked nodes from the potential nodelist
+    if ( blockedList != null && !blockedList.isEmpty() ) {
+      for (NodeReference blockedNode : blockedList) {
+        if ( potentialNodeList.contains(blockedNode) ) {
+          potentialNodeList.remove(blockedNode);
+          
+        }
+      }
+    }
+
+    log.info("Prioritizing preferred nodes in the potential replication list for " +
+      pid.getValue());
+
+    // prioritize preferred nodes in the potential node list
+    if ( preferredList != null && !preferredList.isEmpty() ) {
+      
+      // process preferred nodes backwards
+      for (int i = preferredList.size() - 1; i >= 0; i--) {
+        
+        NodeReference preferredNode = preferredList.get(i);
+        if ( potentialNodeList.contains( preferredNode) ) {
+          potentialNodeList.remove(preferredNode); // remove for reordering
+          potentialNodeList.add(0, preferredNode); // to the top of the list
+           
+        }
+      }
+    }
+     
+    log.info("Desired replicas for identifier " + pid.getValue() + " is " + desiredReplicas);
+    log.info("Potential target node list size for " + pid.getValue() + " is " + desiredReplicas);
+
+    // can't have more replicas than MNs
+    if ( desiredReplicas > potentialNodeList.size() ) {
+      desiredReplicas = potentialNodeList.size(); // yikes
+      log.info("Changed the desired replicas for identifier " + pid.getValue() +
+        " to the size of the potential target node list: "  + potentialNodeList.size());
+              
+    }
+    
+    boolean alreadyAdded = false;
+
+    // for each node in the potential node list up to the desired replicas
+    for(int j = 0; j < desiredReplicas; j++) {
+
+      NodeReference potentialNode = potentialNodeList.get(j);
+      // for each replica in the replica list
+      for (Replica replica : replicaList) {
+        
+        // ensure that this node is not queued, requested, failed, or completed
+        NodeReference replicaNode = replica.getReplicaMemberNode();
+        ReplicationStatus status = replica.getReplicationStatus();
+        if (potentialNode.getValue().equals(replicaNode.getValue()) &&
+           (status.equals(ReplicationStatus.QUEUED) ||
+            status.equals(ReplicationStatus.REQUESTED) ||
+            status.equals(ReplicationStatus.FAILED) ||
+            status.equals(ReplicationStatus.COMPLETED))){
+          alreadyAdded = true;
+          break;
+          
+        }
+        log.info("A replication task for identifier " + pid.getValue() + 
+          " on node id " + replicaNode.getValue() +
+          " has already been added: " + alreadyAdded + ". The status is " +
+          "currently set to: " + status);
+        
+      }
+      // if the node doesn't already exist as a pending task for this pid
+      if ( !alreadyAdded ) {
+        targetNode = this.nodes.get(potentialNode);
+              
+      } else {
+          // skip on to the next one right? -rpw (otherwise targetnode is empty or is the last targetnode assigned)
+          continue;
+      }
+      
+      boolean replicaAdded = false;
+        
+      // may be more than one version of MNReplication
+      List<String> implementedVersions = new ArrayList<String>();
+      List<Service> origServices = authoritativeNode.getServices().getServiceList();
+      for (Service service : origServices) {
+          if(service.getName().equals("MNReplication") &&
+             service.getAvailable()) {
+              implementedVersions.add(service.getVersion());
+          }
+      }
+      if (implementedVersions.isEmpty()) {
+          throw new InvalidRequest("1080","Authoritative Node:" + authoritativeNode.getIdentifier().getValue() + " MNReplication Service is not available or is missing version");
+      }
+
+      boolean replicable = false;
+
+      for (Service service : targetNode.getServices().getServiceList()) {
+          if(service.getName().equals("MNReplication") &&
+             implementedVersions.contains(service.getVersion()) &&
+             service.getAvailable()) {
+              replicable = true;
+          }
+      }
+      log.info("Based on evaluating the target node services, node id " +
+              targetNode.getIdentifier().getValue() + " is replicable: " + 
+              replicable);
+
+      // a replica doesn't exist. add it
+      if ( replicable ) {
+          Replica replicaMetadata = new Replica();
+          replicaMetadata.setReplicaMemberNode(targetNode.getIdentifier());
+          replicaMetadata.setReplicationStatus(ReplicationStatus.QUEUED);
+          replicaMetadata.setReplicaVerified(Calendar.getInstance().getTime());
+                  
+          try {
+              sysmeta = this.systemMetadata.get(pid); // refresh sysmeta to avoid VersionMismatch
+              this.cn.updateReplicationMetadata(session, pid, 
+                      replicaMetadata, sysmeta.getSerialVersion().longValue());
+          
+          } catch (VersionMismatch e) {
+              
+              // retry if the serialVersion is wrong
+              try {
+                  sysmeta = this.systemMetadata.get(pid); 
+                  this.cn.updateReplicationMetadata(session, pid, 
+                          replicaMetadata, sysmeta.getSerialVersion().longValue());
+                  
+              } catch (VersionMismatch e1) {
+                  String msg = "Couldn't get the correct serialVersion to update " + 
+                      "the replica metadata for identifier " + pid.getValue() +
+                      " and target node " + targetNode.getIdentifier().getValue();
+                  log.info(msg);
+                
+              }
+              
+          }
+          
+          
+          log.info("Updated system metadata for identifier " + pid.getValue() + 
+                  " with queued replication status.");
+          
+          Long taskid = taskIdGenerator.newId();
+          // add the task to the task list
+          log.info("Adding a new MNReplicationTask to the queue where " +
+            "pid = "                    + pid.getValue() + 
+            ", originatingNode = " + authoritativeNode.getIdentifier().getValue() +
+            ", targetNode = "      + targetNode.getIdentifier().getValue());
+          
+          MNReplicationTask task = new MNReplicationTask(
+                              taskid.toString(),
+                              pid,
+                              authoritativeNode.getIdentifier(),
+                              targetNode.getIdentifier());
+          this.replicationTasks.add(task);
+          taskCount++;
+
+      }
+      
+    }
+
+
     // return the number of replication tasks queued
-    log.info("Added " + taskCount + " MNreplicationTasks to the queue.");
+    log.info("Added " + taskCount + " MNReplicationTasks to the queue.");
     
     return taskCount;
     
@@ -567,6 +606,7 @@ public class ReplicationManager implements
           executor.execute(futureTask);
           //ExecutorService executorService = 
           //     this.hzMember.getExecutorService("ReplicationTasks");
+          //executorService.submit(futureTask);
           //Future<?> future = executorService.submit(new DistributedTask(task));
           log.debug("Task thread queue has "  + 
               taskThreadQueue.remainingCapacity() + " slots available.");
@@ -593,7 +633,7 @@ public class ReplicationManager implements
           while( !isDone ) {
                               
               try {
-                  result = (String) futureTask.get(30L, TimeUnit.SECONDS);  
+                  result = (String) futureTask.get(15L, TimeUnit.SECONDS);  
                   log.trace("Task result for identifier " + 
                       task.getPid().getValue() + " is " + result );
                   if ( result != null ) {
@@ -608,6 +648,7 @@ public class ReplicationManager implements
                       " threw an execution execption: " + msg);
                   if ( task.getRetryCount() < 10 ) {
                       task.setRetryCount(task.getRetryCount() + 1);
+                      futureTask.cancel(true);
                       this.replicationTasks.add(task);
                       log.info("Retrying replication task id " + 
                           task.getTaskid() + " for identifier " + 
@@ -625,18 +666,18 @@ public class ReplicationManager implements
                           " timed out for identifier " + task.getPid().getValue() +
                           " : " + msg);
                   futureTask.cancel(true); // isDone() is now true
-                  if ( task.getRetryCount() < 10 ) {
-                      task.setRetryCount(task.getRetryCount() + 1);
-                      this.replicationTasks.add(task);
-                      log.info("Retrying replication task id " + 
-                          task.getTaskid() + " for identifier " + 
-                          task.getPid().getValue());
-                      
-                  } else {
-                      log.info("Replication task id" + task.getTaskid() + 
-                          " failed, too many retries for identifier" + 
-                          task.getPid().getValue() + ". Not retrying.");
-                  }
+                  //if ( task.getRetryCount() < 10 ) {
+                  //    task.setRetryCount(task.getRetryCount() + 1);
+                  //    this.replicationTasks.add(task);
+                  //    log.info("Retrying replication task id " + 
+                  //        task.getTaskid() + " for identifier " + 
+                  //        task.getPid().getValue());
+                  //    
+                  //} else {
+                  //    log.info("Replication task id" + task.getTaskid() + 
+                  //        " failed, too many retries for identifier" + 
+                  //        task.getPid().getValue() + ". Not retrying.");
+                  //}
                   
               } catch (InterruptedException e) {
                   String msg = e.getMessage();
@@ -711,7 +752,7 @@ public class ReplicationManager implements
    */
   public void entryAdded(EntryEvent<Identifier, SystemMetadata> event) {
     
-    Lock lock = this.hzClient.getLock(event.getKey().getValue()); // an explicit lock on the Identifier
+    Lock lock = this.hzMember.getLock(event.getKey().getValue()); // an explicit lock on the Identifier
     boolean isLocked = false;
     try {
       
@@ -809,7 +850,6 @@ public class ReplicationManager implements
     return isAllowed;
   }
 
-
   /**
    * Implement the EntryListener interface, responding to entries being deleted from
    * the hzSystemMetadata map.
@@ -829,7 +869,7 @@ public class ReplicationManager implements
    */
   public void entryUpdated(EntryEvent<Identifier, SystemMetadata> event) {
     
-    Lock lock = this.hzClient.getLock(event.getKey().getValue()); // an explicit lock on the Identifier
+    Lock lock = this.hzMember.getLock(event.getKey().getValue()); // an explicit lock on the Identifier
     boolean isLocked = false;
     try {
       
