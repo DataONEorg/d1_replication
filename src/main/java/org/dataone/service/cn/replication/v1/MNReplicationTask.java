@@ -29,15 +29,21 @@ import java.util.concurrent.Callable;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.dataone.client.CNode;
+import org.dataone.client.D1Client;
 import org.dataone.client.MNode;
 import org.dataone.client.auth.CertificateManager;
 import org.dataone.configuration.Settings;
+import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.InsufficientResources;
 import org.dataone.service.exceptions.InvalidRequest;
+import org.dataone.service.exceptions.InvalidToken;
 import org.dataone.service.exceptions.NotAuthorized;
+import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.exceptions.UnsupportedType;
+import org.dataone.service.exceptions.VersionMismatch;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.Node;
 import org.dataone.service.types.v1.Replica;
@@ -49,6 +55,8 @@ import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.core.IMap;
 import org.dataone.cn.hazelcast.HazelcastClientInstance;
 import org.dataone.service.types.v1.NodeReference;
+
+import com.hazelcast.core.DistributedTask;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import java.util.concurrent.locks.Lock;
@@ -62,7 +70,7 @@ import java.util.concurrent.locks.Lock;
  * @author cjones
  *
  */
-public class MNReplicationTask 
+public class MNReplicationTask
     implements Serializable, Callable<String>, Runnable {
 
     /* Get a Log instance */
@@ -89,6 +97,12 @@ public class MNReplicationTask
     /* The subject of the originating node, extracted from the Node object */
     private String originatingNodeSubject;
     
+    /* A client reference to the target node */
+    private MNode targetMN;
+    
+    /* A client reference to the coordinating node */
+    private CNode cn;
+    
     /* The number of times the task has been retried */
     private int retryCount;
 
@@ -108,7 +122,6 @@ public class MNReplicationTask
      */
     public MNReplicationTask(String taskid, Identifier pid,
             NodeReference originatingNode, NodeReference targetNode) {
-
         this.taskid = taskid;
         this.pid = pid;
         this.originatingNode = originatingNode;
@@ -233,141 +246,106 @@ public class MNReplicationTask
      *
      * @return pid - the identifier of the replicated object upon success
      */
-    public String call() throws IllegalStateException {
-        /* The Hazelcast distributed system metadata map */
-        Lock lock = null;
-        boolean isLocked = false;
-        String nodeMap =
-                Settings.getConfiguration().getString("dataone.hazelcast.nodes");
-        HazelcastInstance hzMember = Hazelcast.getDefaultInstance();
-        IMap<NodeReference, Node> nodes = hzMember.getMap(nodeMap);
+    public String call()
+        throws InterruptedException {
         
-        log.info("MNReplicationTask.call() called for identifier " + this.pid.getValue());
-
-        String mnUrl = nodes.get(targetNode).getBaseURL();
+        // a flag for success on setting replication status
+        boolean success = false;
         
-        // Get an target MNode reference to communicate with
-        // TODO: need to figure out better way to handle versioning! -rpw
-        log.info("Getting the MNode reference for " + targetNode.getValue() + " with baseURL " + mnUrl);
-        MNode targetMN = new MNode(mnUrl);
+        // set up the certificate location
+        String clientCertificateLocation =
+                Settings.getConfiguration().getString("D1Client.certificate.directory")
+                + "/" + Settings.getConfiguration().getString("cn.nodeId");
+        CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
+        log.info("MNReplicationTask task id " + this.taskid + "is using an X509 certificate "
+                + "from " + clientCertificateLocation);
 
-        // Get the D1 Hazelcast configuration parameters
-        String hzSystemMetadata =
-                Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
-
-        HazelcastClient hzClient = HazelcastClientInstance.getHazelcastClient();
-        IMap<Identifier, SystemMetadata> sysMetaMap = hzClient.getMap(hzSystemMetadata);
-        log.info("syMetaMap size " + sysMetaMap.size());
-        // Initiate the MN to MN replication for this task
+        // session is null - certificate is used
+        Session session = null;
+                
+        // Get an CNode reference to communicate with
         try {
-            log.info("Getting a lock on identifier " + this.pid.getValue() + " for task id "
-                    + this.taskid);
-            lock = hzClient.getLock(this.pid.getValue());
-            lock.lock();
-            isLocked = true;
-            //sysMetaMap.lock(this.pid);
-            SystemMetadata sysmeta = sysMetaMap.get(this.pid);
-            log.info("Lock acquired for identifier " + this.pid.getValue());
-
-            log.info("Evaluating replica list for identifer " + this.pid.getValue());
-            List<Replica> replicaList = sysmeta.getReplicaList();
-            boolean replicaEntryExists = false;
-
-            // set the replica status for the correct replica
-            for (Replica replica : replicaList) {
-                log.debug("Found the replica " + replica.getReplicaMemberNode().getValue());
-                if (replica.getReplicaMemberNode().equals(this.targetNode)) {
-                    replica.setReplicationStatus(ReplicationStatus.REQUESTED);
-                    replicaEntryExists = true;
-                    log.info("Setting the replication status for identifier " + this.pid.getValue()
-                            + " and replica node " + replica.getReplicaMemberNode().getValue()
-                            + " to " + ReplicationStatus.REQUESTED.toString());
-                    break;
-
-                }
-
-            }
-
-            // no replica exists yet, make one
-            if (!replicaEntryExists || replicaList == null || replicaList.isEmpty()) {
-                Replica newReplica = new Replica();
-                newReplica.setReplicaMemberNode(this.targetNode);
-                newReplica.setReplicationStatus(ReplicationStatus.REQUESTED);
-                replicaList.add(newReplica);
-                log.info("Setting the replication status for identifier " + this.pid.getValue()
-                        + " and replica node " + newReplica.getReplicaMemberNode().getValue()
-                        + " to " + ReplicationStatus.REQUESTED);
-
-            }
-
-            // update the system metadata object
-            sysmeta.setSerialVersion(sysmeta.getSerialVersion().add(BigInteger.ONE));
-            sysmeta.setDateSysMetadataModified(Calendar.getInstance().getTime());
-            sysmeta.setReplicaList(replicaList);
-
-            // set up the certificate location
-            String clientCertificateLocation =
-                    Settings.getConfiguration().getString("D1Client.certificate.directory")
-                    + "/" + Settings.getConfiguration().getString("cn.nodeId");
-            CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
-            log.info("MNReplicationTask task id " + this.taskid + "is using an X509 certificate "
-                    + "from " + clientCertificateLocation);
-
-            // session is null - certificate is used
-            Session session = null;
-
-            log.info("Updated system metadata for identifier " + this.pid.getValue() + " during "
-                    + " MNreplicationTask id " + this.taskid);
-            // update the system metadata map
-            sysMetaMap.put(this.pid, sysmeta);
-            // call for the replication
-            log.info("Calling MNreplication.replicate() at targetNode id " + targetMN.getNodeBaseServiceUrl());
-            targetMN.replicate(session, sysmeta, this.originatingNode);
-
-        } catch (NotImplemented e) {
-            // TODO Auto-generated catch block
-            log.error(e.getMessage(), e);
-            e.printStackTrace();
-
+            this.cn = D1Client.getCN();
+        
         } catch (ServiceFailure e) {
-            // TODO Auto-generated catch block
-            log.error(e.getMessage(), e);
-            e.printStackTrace();
-
-        } catch (NotAuthorized e) {
-            // TODO Auto-generated catch block
-            log.error(e.getMessage(), e);
-            e.printStackTrace();
-
-        } catch (InvalidRequest e) {
-            // TODO Auto-generated catch block
-            log.error(e.getMessage(), e);
-            e.printStackTrace();
-
-        } catch (InsufficientResources e) {
-            // TODO Auto-generated catch block
-            log.error(e.getMessage(), e);
-            e.printStackTrace();
-
-        } catch (UnsupportedType e) {
-            // TODO Auto-generated catch block
-            log.error(e.getMessage(), e);
-            e.printStackTrace();
             
-        } catch (Exception e) {
-            // TODO Auto-generated catch block
-            log.error(e.getMessage(), e);
-            e.printStackTrace();
+            // try again, then fail
+            try {
+                Thread.sleep(5000L);
+                this.cn = D1Client.getCN();
             
-        } finally {
-            if (isLocked) {
-                lock.unlock();
-                log.debug("Unlocked identifier " + this.pid.getValue());
-
+            } catch (ServiceFailure e1) {
+                log.info("There was a problem getting a Coordinating Node reference " +
+                    " for MNReplicationTask id " + this.taskid + " and identifier " +
+                    this.pid.getValue());
+                e1.printStackTrace();
+                
             }
-            log.debug("Task completed for identifier " + this.pid.getValue());
         }
 
+        // Get an target MNode reference to communicate with
+        try {
+            this.targetMN = D1Client.getMN(targetNode);
+
+        } catch (ServiceFailure e) {
+            
+            try {
+                // wait 5 seconds and try again, else fail
+                Thread.sleep(5000L);
+                this.targetMN = D1Client.getMN(targetNode);
+            
+            } catch (ServiceFailure e1) {
+
+                try {
+                    success = cn.setReplicationStatus(session, pid, targetNode, ReplicationStatus.FAILED, e1);
+                    log.info("There was a problem calling replicate() on " +
+                            this.targetNode.getValue() + " for identifier " + 
+                            this.pid.getValue() + " during " + 
+                            " MNReplicationTask id " + this.taskid);
+
+                    e1.printStackTrace();
+                    
+                } catch (BaseException e2) {
+                    log.info("There was a problem setting the replication status for identifier " + 
+                            this.pid.getValue() + " during " + 
+                            " MNReplicationTask id " + this.taskid);
+
+                    e2.printStackTrace();
+                    
+                }
+            }
+        }
+
+        try {
+
+            // get the most recent system metadata for the pid
+            SystemMetadata sysmeta = cn.getSystemMetadata(session, pid);
+            
+            // call for the replication
+            log.info("Calling MNReplication.replicate() at targetNode id " + targetMN.getNodeBaseServiceUrl());
+            targetMN.replicate(session, sysmeta, this.originatingNode);
+            
+            // update the replication status
+            success = cn.setReplicationStatus(session, pid, targetNode, ReplicationStatus.REQUESTED, null);
+            log.info("Updated system metadata for identifier " + this.pid.getValue() + " during "
+                    + " MNReplicationTask id " + this.taskid);
+            
+        } catch (BaseException e) {
+            
+            try {
+                // update the failed status if communication fails in any way
+                success = cn.setReplicationStatus(session, pid, targetNode, ReplicationStatus.FAILED, e);
+                
+            } catch (BaseException e1) {
+                log.info("There was a problem setting the replication status for identifier " + 
+                        this.pid.getValue() + " during " + 
+                        " MNReplicationTask id " + this.taskid);
+
+                e1.printStackTrace();
+                                                
+            }
+            
+        }        
 
         return this.pid.getValue();
     }
