@@ -22,9 +22,6 @@
 package org.dataone.service.cn.replication.v1;
 
 import java.io.Serializable;
-import java.math.BigInteger;
-import java.util.Calendar;
-import java.util.List;
 import java.util.concurrent.Callable;
 
 import org.apache.commons.logging.Log;
@@ -35,31 +32,14 @@ import org.dataone.client.MNode;
 import org.dataone.client.auth.CertificateManager;
 import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.BaseException;
-import org.dataone.service.exceptions.InsufficientResources;
-import org.dataone.service.exceptions.InvalidRequest;
-import org.dataone.service.exceptions.InvalidToken;
-import org.dataone.service.exceptions.NotAuthorized;
-import org.dataone.service.exceptions.NotFound;
-import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
-import org.dataone.service.exceptions.UnsupportedType;
-import org.dataone.service.exceptions.VersionMismatch;
 import org.dataone.service.types.v1.Identifier;
-import org.dataone.service.types.v1.Node;
-import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.SystemMetadata;
 
-import com.hazelcast.client.HazelcastClient;
-import com.hazelcast.core.IMap;
-import org.dataone.cn.hazelcast.HazelcastClientInstance;
 import org.dataone.service.types.v1.NodeReference;
 
-import com.hazelcast.core.DistributedTask;
-import com.hazelcast.core.Hazelcast;
-import com.hazelcast.core.HazelcastInstance;
-import java.util.concurrent.locks.Lock;
 
 /**
  * A single replication task to be queued and executed by the Replication Service.
