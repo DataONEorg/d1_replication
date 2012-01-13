@@ -31,6 +31,7 @@ import com.hazelcast.core.IdGenerator;
 import com.hazelcast.core.ItemListener;
 import com.hazelcast.impl.base.RuntimeInterruptedException;
 
+import java.io.File;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -200,7 +201,13 @@ public class ReplicationManager implements
     executor = 
         new ThreadPoolExecutor(8, 8, 30, TimeUnit.SECONDS, taskThreadQueue, handler);
     executor.allowCoreThreadTimeOut(true);
-        
+
+    // Set up the certificate location, create a null session
+    String clientCertificateLocation =
+            Settings.getConfiguration().getString("D1Client.certificate.directory")
+            + File.separator + Settings.getConfiguration().getString("D1Client.certificate.filename");
+    CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
+    log.info("ReplicationManager is using an X509 certificate from " + clientCertificateLocation);
   }
 
   public void init() {
@@ -266,12 +273,7 @@ public class ReplicationManager implements
         }
     }
 
-    // Set up the certificate location, create a null session
-    String clientCertificateLocation =
-            Settings.getConfiguration().getString("D1Client.certificate.directory")
-            + "/" + Settings.getConfiguration().getString("cn.nodeId");
-    CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
-    log.info("ReplicationManager is using an X509 certificate from " + clientCertificateLocation);
+
     
     Session session = null;
 
