@@ -20,6 +20,7 @@
 
 package org.dataone.service.cn.replication.v1;
 
+import java.io.File;
 import java.io.Serializable;
 import java.util.Calendar;
 import java.util.ArrayList;
@@ -177,6 +178,13 @@ public class MNAuditTask implements Serializable, Callable<String> {
 
       // Get an target MNode reference to communicate with
       try {
+          // set up the certificate location
+          String clientCertificateLocation =
+              Settings.getConfiguration().getString("D1Client.certificate.directory")
+              + File.separator + Settings.getConfiguration().getString("D1Client.certificate.filename");
+          CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
+          log.debug("MNReplicationTask task id " + this.taskid + "is using an X509 certificate " +
+                  "from " + clientCertificateLocation);
           log.debug("Getting the MNode reference for " + 
                   auditTargetNode.getIdentifier().getValue());
           targetMN = D1Client.getMN(auditTargetNode.getIdentifier());
@@ -238,14 +246,6 @@ public class MNAuditTask implements Serializable, Callable<String> {
               // call for the checksum audit
               log.debug("Calling MNRead.getChecksum() at auditTargetNode id " + 
                         targetMN.getNodeId());
-
-              // set up the certificate location
-              String clientCertificateLocation = 
-                  Settings.getConfiguration().getString("D1Client.certificate.directory") +
-                  "/" +Settings.getConfiguration().getString("cn.nodeId");
-              CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
-              log.debug("MNReplicationTask task id " + this.taskid + "is using an X509 certificate " +
-                      "from " + clientCertificateLocation);
 
               // session is null - certificate is used
               Session session = null;

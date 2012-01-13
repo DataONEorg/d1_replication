@@ -23,6 +23,7 @@ package org.dataone.service.cn.replication.v1;
 
 import java.io.Serializable;
 import java.util.concurrent.Callable;
+import java.io.File;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -106,7 +107,13 @@ public class MNReplicationTask
         this.pid = pid;
         this.originatingNode = originatingNode;
         this.targetNode = targetNode;
-
+        // set up the certificate location
+        String clientCertificateLocation =
+                Settings.getConfiguration().getString("D1Client.certificate.directory")
+                + File.separator + Settings.getConfiguration().getString("D1Client.certificate.filename");
+        CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
+        log.info("MNReplicationTask task id " + this.taskid + "is using an X509 certificate "
+                + "from " + clientCertificateLocation);
     }
 
     /**
@@ -232,13 +239,6 @@ public class MNReplicationTask
         // a flag for success on setting replication status
         boolean success = false;
         
-        // set up the certificate location
-        String clientCertificateLocation =
-                Settings.getConfiguration().getString("D1Client.certificate.directory")
-                + "/" + Settings.getConfiguration().getString("cn.nodeId");
-        CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
-        log.info("MNReplicationTask task id " + this.taskid + "is using an X509 certificate "
-                + "from " + clientCertificateLocation);
 
         // session is null - certificate is used
         Session session = null;
