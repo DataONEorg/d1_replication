@@ -21,8 +21,6 @@
 package org.dataone.service.cn.replication.v1;
 
 import com.hazelcast.client.HazelcastClient;
-import com.hazelcast.core.EntryEvent;
-import com.hazelcast.core.EntryListener;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IMap;
@@ -32,7 +30,6 @@ import com.hazelcast.core.ItemListener;
 import com.hazelcast.impl.base.RuntimeInterruptedException;
 
 import java.io.File;
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
@@ -40,13 +37,11 @@ import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.locks.Lock;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -84,8 +79,7 @@ import org.dataone.cn.hazelcast.HazelcastClientInstance;
  * @author cjones
  *
  */
-public class ReplicationManager implements 
-  EntryListener<Identifier, SystemMetadata>, ItemListener<MNReplicationTask> {
+public class ReplicationManager implements ItemListener<MNReplicationTask> {
 
   /* Get a Log instance */
   public static Log log = LogFactory.getLog(ReplicationManager.class);
@@ -118,6 +112,9 @@ public class ReplicationManager implements
   /* The name of the replication tasks queue */
   private String tasksQueue;
     
+  /* The name of the replication events queue */
+  private String eventsQueue;
+    
   /* The Hazelcast distributed task id generator namespace */
   private String taskIds;
 
@@ -139,14 +136,20 @@ public class ReplicationManager implements
   /* The Hazelcast distributed replication tasks queue*/
   private IQueue<MNReplicationTask> replicationTasks;
 
+  /* The Hazelcast distributed replication events queue*/
+  private IQueue<Identifier> replicationEvents;
+
   /* The Replication task thread queue */
-  BlockingQueue<Runnable> taskThreadQueue;
+  private BlockingQueue<Runnable> taskThreadQueue;
   
   /* The handler instance for rejected tasks */
-  RejectedExecutionHandler handler;
+  private RejectedExecutionHandler handler;
   
   /* The thread pool executor instance for executing tasks */
-  ThreadPoolExecutor executor;
+  private ThreadPoolExecutor executor;
+  
+  /* The event listener used to manage incoming map and queue changes */
+  private ReplicationEventListener listener;
   
   /* The timeout period for tasks submitted to the executor service 
    * to complete the call to MN.replicate()
@@ -167,6 +170,8 @@ public class ReplicationManager implements
       Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
     this.tasksQueue = 
       Settings.getConfiguration().getString("dataone.hazelcast.replicationQueuedTasks");
+    this.eventsQueue = 
+        Settings.getConfiguration().getString("dataone.hazelcast.replicationQueuedEvents");
     this.taskIds = 
       Settings.getConfiguration().getString("dataone.hazelcast.tasksIdGenerator");
     this.hzAuditString = 
@@ -176,23 +181,27 @@ public class ReplicationManager implements
     this.shortListNumRows = 
       Settings.getConfiguration().getString("dataone.hazelcast.shortListNumRows");
     
+    // Connect to the Hazelcast storage cluster
     this.hzClient = HazelcastClientInstance.getHazelcastClient();
     
-    // Also become a Hazelcast processing cluster member
-    log.info("Becoming a DataONE Process cluster hazelcast member with the default instance.");
-    
+    // Connect to the Hazelcast process cluster
+    log.info("Becoming a DataONE Process cluster hazelcast member with the default instance.");    
     this.hzMember = Hazelcast.getDefaultInstance();
 
+    // get references to cluster structures
     this.nodes = this.hzMember.getMap(nodeMap);
     this.systemMetadata = this.hzClient.getMap(systemMetadataMap);
     this.replicationTasks = this.hzMember.getQueue(tasksQueue);
     this.taskIdGenerator = this.hzMember.getIdGenerator(taskIds);
-    // monitor the replication structures
-    
-    log.info("Adding listeners to the " + this.systemMetadata.getName() +
-        " map and the " + this.replicationTasks.getName() + " queue.");
-    this.systemMetadata.addEntryListener(this, true);
+
+    // monitor the replication structures    
+    this.listener = new ReplicationEventListener();    
+    this.systemMetadata.addEntryListener(listener, true);
+    log.info("Added a listener to the " + this.systemMetadata.getName() + " map.");    
+    this.replicationEvents.addItemListener(listener, true);
+    log.info("Added a listener to the " + this.replicationEvents.getName() + " queue.");    
     this.replicationTasks.addItemListener(this, true);
+    log.info("Added a listener to the " + this.replicationTasks.getName() + " queue.");    
     
     // initialize the task thread queue with 5 threads
     taskThreadQueue = new ArrayBlockingQueue<Runnable>(5);
@@ -208,6 +217,7 @@ public class ReplicationManager implements
             + File.separator + Settings.getConfiguration().getString("D1Client.certificate.filename");
     CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
     log.info("ReplicationManager is using an X509 certificate from " + clientCertificateLocation);
+    
   }
 
   public void init() {
@@ -240,8 +250,9 @@ public class ReplicationManager implements
     Set<NodeReference> nodeList;           // the full nodes list
     List<NodeReference> potentialNodeList; // the MN subset of the nodes list
     Node targetNode = new Node();          // the target node for the replica
-    Node authoritativeNode = new Node();     // the source node of the object
+    Node authoritativeNode = new Node();   // the source node of the object
     SystemMetadata sysmeta;
+    Session session = null;
 
     // Get an CNode reference to communicate with
     try {
@@ -272,11 +283,7 @@ public class ReplicationManager implements
             
         }
     }
-
-
     
-    Session session = null;
-
     // if replication isn't allowed, return
     allowed = isAllowed(pid);
     log.info("Replication is allowed for identifier " + pid.getValue());
@@ -288,6 +295,29 @@ public class ReplicationManager implements
       
     }
 
+    boolean no_task_with_pid = true;
+
+    // check if there are pending tasks or tasks recently put into the task queue
+    if ( !isPending(pid) ) {
+        log.debug("Replication is not pending for identifier " + pid.getValue());
+        // check for already queued tasks for this pid
+        for (MNReplicationTask task : replicationTasks) {
+            // if the task's pid is equal to the event's pid
+            if (task.getPid().getValue().equals(pid.getValue())) {
+                no_task_with_pid = false;
+                log.debug("An MNReplicationTask is already queued for identifier " + pid.getValue());
+                break;
+                
+            }
+        }
+        if ( !no_task_with_pid ) {
+            log.info("A replication task for the object identified by " +
+                pid.getValue() + " has already been queued.");
+            return 0;
+            
+        }
+    }
+
     // get the system metadata for the pid
     log.info("Getting the replica list for identifier " + pid.getValue());
     
@@ -295,6 +325,7 @@ public class ReplicationManager implements
     replicaList = sysmeta.getReplicaList();
     if (replicaList == null) {
         replicaList = new ArrayList<Replica>();
+        
     }
     // List of Nodes for building MNReplicationTasks
     log.info("Building a potential target node list for identifier " + pid.getValue());
@@ -467,15 +498,14 @@ public class ReplicationManager implements
               }
               
           }
-          
-          
+                    
           log.info("Updated system metadata for identifier " + pid.getValue() + 
                   " with queued replication status.");
           
           Long taskid = taskIdGenerator.newId();
           // add the task to the task list
           log.info("Adding a new MNReplicationTask to the queue where " +
-            "pid = "                    + pid.getValue() + 
+            "pid = "               + pid.getValue() + 
             ", originatingNode = " + authoritativeNode.getIdentifier().getValue() +
             ", targetNode = "      + targetNode.getIdentifier().getValue());
           
@@ -747,91 +777,6 @@ public class ReplicationManager implements
   }
   
   /**
-   * Implement the EntryListener interface, responding to entries being added to
-   * the hzSystemMetadata map.
-   * 
-   * @param event - the entry event being added to the map
-   */
-  public void entryAdded(EntryEvent<Identifier, SystemMetadata> event) {
-    
-    Lock lock = this.hzMember.getLock(event.getKey().getValue()); // an explicit lock on the Identifier
-    boolean isLocked = false;
-    try {
-      
-      log.info("Received entry added event on the " +
-        this.systemMetadata.getName() + " map. Evaluating it for MN replication task. " + event.getKey().getValue());
-      
-      // lock the pid and handle the event. If it's already pending, do nothing  
-      lock.lock();
-      isLocked = true;
-      log.info("Locked entryAdded on the " +
-        this.systemMetadata.getName() + " map. " + event.getKey().getValue());
-
-      // also need to check the current replicationTasks
-      boolean no_task_with_pid = true;
-
-      // check if replication is allowed
-      boolean allowed = isAllowed(event.getKey());
-      
-      if ( allowed ) {
-        // check if there are pending tasks
-        boolean is_pending = isPending(event.getKey());
-        
-        // for each MNReplicationTask
-        for (MNReplicationTask task : replicationTasks) {
-          // if the task's pid is equal to the event's pid
-          if (task.getPid().getValue().equals(event.getKey().getValue())) {
-            no_task_with_pid = false;
-            break;
-
-          }
-        }
-        // if the pid is locked and not taken by a pending task
-        if (!is_pending && no_task_with_pid) {
-          log.info("Calling createAndQueueTasks for identifier: " +
-              event.getKey().getValue());
-          this.createAndQueueTasks(event.getKey());
-
-        }
-      }
-      
-    } catch (ServiceFailure e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-    
-    } catch (NotImplemented e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-    
-    } catch (InvalidToken e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-    
-    } catch (NotAuthorized e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-    
-    } catch (InvalidRequest e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-    
-    } catch (NotFound e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-    } catch (Exception e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();    
-    } finally {
-      if (isLocked) {
-        lock.unlock();
-        log.debug("Unlocked identifier " + event.getKey().getValue());
-      }
-      
-    }
-    
-  }
-  
-  /**
    * Check if replication is allowed for the given pid
    * @param pid - the identifier of the object to check
    * @return
@@ -850,122 +795,6 @@ public class ReplicationManager implements
         }
         
     return isAllowed;
-  }
-
-  /**
-   * Implement the EntryListener interface, responding to entries being deleted from
-   * the hzSystemMetadata map.
-   * 
-   * @param event - the entry event being deleted from the map
-   */
-  public void entryRemoved(EntryEvent<Identifier, SystemMetadata> event) {
-    // we don't remove replicas (do we?) 
-    
-  }
-  
-  /**
-   * Implement the EntryListener interface, responding to entries being updated in
-   * the hzSystemMetadata map.
-   * 
-   * @param event - the entry event being updated in the map
-   */
-  public void entryUpdated(EntryEvent<Identifier, SystemMetadata> event) {
-    
-    Lock lock = this.hzMember.getLock(event.getKey().getValue()); // an explicit lock on the Identifier
-    boolean isLocked = false;
-    try {
-      
-      log.info("Received entry updated event on the " +
-        this.systemMetadata.getName() + " map. Evaluating it for MN replication tasks.");
-
-      // lock the pid and handle the event. If it's already pending, do nothing
-      log.info("Getting a lock on identifier " + event.getKey().getValue());
-      lock.lock();
-      isLocked = true;
-      // also need to check the current replicationTasks
-      boolean no_task_with_pid = true;
-
-      // check if replication is allowed
-      log.info("Checking if replication is allowed for identifier " + 
-        event.getKey().getValue());
-      
-      boolean allowed = isAllowed(event.getKey());
-      
-      log.info("Replication is allowed: " + allowed);
-
-      if ( allowed ) {
-        // check if there are pending tasks
-        log.info("Checking if a replication task is already pending for identifier " + 
-          event.getKey().getValue());
-        
-        boolean is_pending = isPending(event.getKey());        
-        log.info("Task is already pending for identifier " + is_pending);
-
-                // for each MNReplicationTask
-        log.info("Searching for queued replication tasks for identifier " +
-          event.getKey().getValue());
-        
-        for (MNReplicationTask task : replicationTasks) {
-          // if the task's pid is equal to the event's pid
-          if (task.getPid().getValue().equals(event.getKey().getValue())) {
-            no_task_with_pid = false;
-            log.info("Queued task exists for identifier " + event.getKey().getValue() +
-              ": " + no_task_with_pid);
-            break;
-          }
-        }
-        // if the pid is locked and not taken by a pending task
-        if (!is_pending && no_task_with_pid) {
-          log.info("Calling createAndQueueTasks for identifier: " +
-              event.getKey().getValue());
-          this.createAndQueueTasks(event.getKey());
-        }
-      }
-      
-    } catch (ServiceFailure e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-    
-    } catch (NotImplemented e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-    
-    } catch (InvalidToken e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-    
-    } catch (NotAuthorized e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-    
-    } catch (InvalidRequest e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-    
-    } catch (NotFound e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-    
-    } finally {
-      if (isLocked) {
-        lock.unlock();
-        log.debug("Unlocked identifier " + event.getKey().getValue());
-
-      }
-      
-    }
-    
-  }
-  
-  /**
-   * Implement the EntryListener interface, responding to entries being evicted from
-   * the hzSystemMetadata map.
-   * 
-   * @param event - the entry event being evicted from the map
-   */
-  public void entryEvicted(EntryEvent<Identifier, SystemMetadata> event) {
-    // nothing to do, entry remains in backing store
-    
   }
 
   /*
