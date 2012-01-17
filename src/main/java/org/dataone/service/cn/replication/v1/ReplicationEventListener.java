@@ -113,8 +113,13 @@ public class ReplicationEventListener
         log.info("Item added event received on the hzReplicationEvents queue for " 
             + identifier.getValue());
         try {
-            // evaluate the object's replication policy for potential task creation
-            this.replicationManager.createAndQueueTasks(identifier);
+            // poll the queue to pop the most recent event off of the queue
+            Identifier pid = this.replicationEvents.poll(3L, TimeUnit.SECONDS);
+            if ( pid != null ) {                
+                // evaluate the object's replication policy for potential task creation
+                this.replicationManager.createAndQueueTasks(identifier);
+                
+            }
             
         } catch (BaseException e) {
             log.error("There was a problem handling task creation for " + 
@@ -122,6 +127,9 @@ public class ReplicationEventListener
                 e.getMessage());
             e.printStackTrace();
             
+        } catch (InterruptedException e) {
+            log.debug("Plooing of the hzReplicationEvents queue was interrupted.");
+
         }       
     }
 
