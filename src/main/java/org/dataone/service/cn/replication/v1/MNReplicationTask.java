@@ -17,7 +17,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  * 
- * $Id: $
+ * $Id$
  */
 package org.dataone.service.cn.replication.v1;
 
