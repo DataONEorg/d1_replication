@@ -28,9 +28,6 @@ import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.SystemMetadata;
-import org.springframework.beans.BeansException;
-import org.springframework.beans.factory.xml.XmlBeanFactory;
-import org.springframework.core.io.ClassPathResource;
 
 import com.hazelcast.core.EntryEvent;
 import com.hazelcast.core.EntryListener;
@@ -41,6 +38,7 @@ import com.hazelcast.core.IMap;
 import com.hazelcast.core.ItemListener;
 import com.hazelcast.client.HazelcastClient;
 import org.dataone.cn.hazelcast.HazelcastClientInstance;
+
 /**
  * An event listener used to manage change events on the hzSystemMetadata map.
  * The listener queues Identifiers into the hzReplicationEvents queue when the 
@@ -71,8 +69,10 @@ public class ReplicationEventListener
 
     /* The name of the system metadata map */
     private String systemMetadataMap;
+    
     /* The Hazelcast distributed system metadata map */
     private IMap<Identifier, SystemMetadata> systemMetadata;
+    
     /* The ReplicationManager instance */
     ReplicationManager replicationManager;
     
@@ -87,18 +87,18 @@ public class ReplicationEventListener
      * to manage hzSystemMetadata map events 
      */
     public ReplicationEventListener() {
-        // Connect to the Hazelcast storage cluster
+        // connect to both the process and storage cluster
         this.hzClient = HazelcastClientInstance.getHazelcastClient();
-            // connect to both the process cluster
-            this.hzMember = Hazelcast.getDefaultInstance();
+        this.hzMember = Hazelcast.getDefaultInstance();
         this.eventsQueue =
             Settings.getConfiguration().getString("dataone.hazelcast.replicationQueuedEvents");
-            // get references to the events queue
+        // get references to the system metadata map and events queue
         this.systemMetadataMap =
             Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
         this.systemMetadata = this.hzClient.getMap(systemMetadataMap);
         this.replicationEvents = this.hzMember.getQueue(eventsQueue);
 
+        // listen for changes on both structures
         this.systemMetadata.addEntryListener(this, true);
         log.info("Added a listener to the " + this.systemMetadata.getName() + " map.");
         this.replicationEvents.addItemListener(this, true);
@@ -106,9 +106,15 @@ public class ReplicationEventListener
         
       
     }
+    
+    /**
+     * Initialize the bean object
+     */
     public void init() {
         log.info("initialization");
+        
     }
+    
     /**
      * Listen for item added events on the hzReplicationEvents queue.  Call 
      * the replicationManager to evaluate the replication policy for the identifier
@@ -292,12 +298,24 @@ public class ReplicationEventListener
         }                
     }
 
+    /**
+     * Get a reference to the ReplicationManager instance
+     * 
+     * @return replicationManager - the singleton instance of the ReplicationManager
+     */
     public ReplicationManager getReplicationManager() {
         return replicationManager;
+        
     }
 
+    /**
+     * Set the ReplicationManager instance
+     * 
+     * param replicationManager - the singleton instance of the ReplicationManager
+     */
     public void setReplicationManager(ReplicationManager replicationManager) {
         this.replicationManager = replicationManager;
+        
     }
 
 
