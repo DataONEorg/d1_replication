@@ -37,8 +37,10 @@ import com.hazelcast.core.EntryListener;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IQueue;
+import com.hazelcast.core.IMap;
 import com.hazelcast.core.ItemListener;
-
+import com.hazelcast.client.HazelcastClient;
+import org.dataone.cn.hazelcast.HazelcastClientInstance;
 /**
  * An event listener used to manage change events on the hzSystemMetadata map.
  * The listener queues Identifiers into the hzReplicationEvents queue when the 
@@ -58,15 +60,19 @@ public class ReplicationEventListener
     /* Get a Log instance */
     public static Log log = LogFactory.getLog(ReplicationEventListener.class);
 
+    /* The instance of the Hazelcast storage cluster client */
+    private HazelcastClient hzClient;
+
     /* the instance of the Hazelcast processing cluster member */
     private HazelcastInstance hzMember;
             
     /* The name of the replication events queue */
     private String eventsQueue;
 
-    /* The relative path to the process daemon application context file in its jar */
-    private String applicationContextFilePath;
-
+    /* The name of the system metadata map */
+    private String systemMetadataMap;
+    /* The Hazelcast distributed system metadata map */
+    private IMap<Identifier, SystemMetadata> systemMetadata;
     /* The ReplicationManager instance */
     ReplicationManager replicationManager;
     
@@ -81,30 +87,28 @@ public class ReplicationEventListener
      * to manage hzSystemMetadata map events 
      */
     public ReplicationEventListener() {
-        
-        // connect to both the process cluster
-        this.hzMember = Hazelcast.getDefaultInstance();
-
-        // get references to the events queue
-        this.eventsQueue = 
+        // Connect to the Hazelcast storage cluster
+        this.hzClient = HazelcastClientInstance.getHazelcastClient();
+            // connect to both the process cluster
+            this.hzMember = Hazelcast.getDefaultInstance();
+        this.eventsQueue =
             Settings.getConfiguration().getString("dataone.hazelcast.replicationQueuedEvents");
-        this.applicationContextFilePath = 
-            Settings.getConfiguration().getString("dataone.processing.applicationContextPath");
+            // get references to the events queue
+        this.systemMetadataMap =
+            Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
+        this.systemMetadata = this.hzClient.getMap(systemMetadataMap);
         this.replicationEvents = this.hzMember.getQueue(eventsQueue);
 
-        // get a reference to the ReplicationManager singleton instance
-        try {
-            ClassPathResource resource = new ClassPathResource(this.applicationContextFilePath);
-            XmlBeanFactory beanFactory = new XmlBeanFactory(resource);
-            this.replicationManager = (ReplicationManager) beanFactory.getBean("replicationManager");
-            
-        } catch (BeansException e) {
-            log.error("Couldn't get the ReplicationManager instance" + e.getMessage());
-            e.printStackTrace();
-            
-        }        
+        this.systemMetadata.addEntryListener(this, true);
+        log.info("Added a listener to the " + this.systemMetadata.getName() + " map.");
+        this.replicationEvents.addItemListener(this, true);
+        log.info("Added a listener to the " + this.replicationEvents.getName() + " queue.");
+        
+      
     }
-
+    public void init() {
+        log.info("initialization");
+    }
     /**
      * Listen for item added events on the hzReplicationEvents queue.  Call 
      * the replicationManager to evaluate the replication policy for the identifier
@@ -286,6 +290,14 @@ public class ReplicationEventListener
                 
             }
         }                
+    }
+
+    public ReplicationManager getReplicationManager() {
+        return replicationManager;
+    }
+
+    public void setReplicationManager(ReplicationManager replicationManager) {
+        this.replicationManager = replicationManager;
     }
 
 
