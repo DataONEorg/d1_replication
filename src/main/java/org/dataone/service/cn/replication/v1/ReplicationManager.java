@@ -67,6 +67,7 @@ import org.dataone.client.CNode;
 import org.dataone.client.D1Client;
 import org.dataone.client.auth.CertificateManager;
 import org.dataone.cn.hazelcast.HazelcastClientInstance;
+import org.dataone.service.cn.v1.CNReplication;
 
 /**
  * A DataONE Coordinating Node implementation which
@@ -136,9 +137,6 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
   /* The Hazelcast distributed replication tasks queue*/
   private IQueue<MNReplicationTask> replicationTasks;
 
-  /* The Hazelcast distributed replication events queue*/
-  private IQueue<Identifier> replicationEvents;
-
   /* The Replication task thread queue */
   private BlockingQueue<Runnable> taskThreadQueue;
   
@@ -157,7 +155,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
   private long timeout = 30L;
   
   /* A client reference to the coordinating node */
-  private CNode cn = null;
+  private CNReplication cnReplication = null;
     
   /**
    *  Constructor - singleton pattern
@@ -170,8 +168,6 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
       Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
     this.tasksQueue = 
       Settings.getConfiguration().getString("dataone.hazelcast.replicationQueuedTasks");
-    this.eventsQueue = 
-        Settings.getConfiguration().getString("dataone.hazelcast.replicationQueuedEvents");
     this.taskIds = 
       Settings.getConfiguration().getString("dataone.hazelcast.tasksIdGenerator");
     this.hzAuditString = 
@@ -195,11 +191,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
     this.taskIdGenerator = this.hzMember.getIdGenerator(taskIds);
 
     // monitor the replication structures    
-    this.listener = new ReplicationEventListener();    
-    this.systemMetadata.addEntryListener(listener, true);
-    log.info("Added a listener to the " + this.systemMetadata.getName() + " map.");    
-    this.replicationEvents.addItemListener(listener, true);
-    log.info("Added a listener to the " + this.replicationEvents.getName() + " queue.");    
+
     this.replicationTasks.addItemListener(this, true);
     log.info("Added a listener to the " + this.replicationTasks.getName() + " queue.");    
     
@@ -222,6 +214,37 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
 
   public void init() {
       log.info("initialization");
+      CNode cnode = null;
+    // Get an CNode reference to communicate with
+    try {
+        log.debug("D1Client.CN_URL = " +
+            Settings.getConfiguration().getProperty("D1Client.CN_URL"));
+
+        cnode = D1Client.getCN();
+        log.info("ReplicationManager D1Client base_url is: " + cnode.getNodeBaseServiceUrl());
+    } catch (ServiceFailure e) {
+
+        // try again, then fail
+        try {
+            try {
+                Thread.sleep(5000L);
+
+            } catch (InterruptedException e1) {
+                log.error("There was a problem getting a Coordinating Node reference.");
+                e1.printStackTrace();
+
+            }
+            cnode = D1Client.getCN();
+
+        } catch (ServiceFailure e1) {
+            log.error("There was a problem getting a Coordinating Node reference " +
+                " for the ReplicationManager. ");
+            e1.printStackTrace();
+            throw new RuntimeException(e1);
+
+        }
+    }
+    this.cnReplication = cnode;
   }
   /**
    * Create replication tasks given the identifier of an object
@@ -254,35 +277,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
     SystemMetadata sysmeta;
     Session session = null;
 
-    // Get an CNode reference to communicate with
-    try {
-        log.debug("D1Client.CN_URL = " + 
-            Settings.getConfiguration().getProperty("D1Client.CN_URL"));
-        
-        this.cn = D1Client.getCN();
-        log.info("ReplicationManager D1Client base_url is: " + this.cn.getNodeBaseServiceUrl());
-    } catch (ServiceFailure e) {
-        
-        // try again, then fail
-        try {
-            try {
-                Thread.sleep(5000L);
-                
-            } catch (InterruptedException e1) {
-                log.error("There was a problem getting a Coordinating Node reference.");
-                e1.printStackTrace();
-                
-            }
-            this.cn = D1Client.getCN();
-        
-        } catch (ServiceFailure e1) {
-            log.error("There was a problem getting a Coordinating Node reference " +
-                " for the ReplicationManager. ");
-            //e1.printStackTrace();
-            throw e1;
-            
-        }
-    }
+
     
     // if replication isn't allowed, return
     allowed = isAllowed(pid);
@@ -478,7 +473,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                   
           try {
               sysmeta = this.systemMetadata.get(pid); // refresh sysmeta to avoid VersionMismatch
-              this.cn.updateReplicationMetadata(session, pid, 
+              this.cnReplication.updateReplicationMetadata(session, pid,
                       replicaMetadata, sysmeta.getSerialVersion().longValue());
           
           } catch (VersionMismatch e) {
@@ -486,7 +481,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
               // retry if the serialVersion is wrong
               try {
                   sysmeta = this.systemMetadata.get(pid); 
-                  this.cn.updateReplicationMetadata(session, pid, 
+                  this.cnReplication.updateReplicationMetadata(session, pid,
                           replicaMetadata, sysmeta.getSerialVersion().longValue());
                   
               } catch (VersionMismatch e1) {
@@ -821,5 +816,9 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
 
     return is_pending;
   }
+
+    public void setCnReplication(CNReplication cnReplication) {
+        this.cnReplication = cnReplication;
+    }
   
 }

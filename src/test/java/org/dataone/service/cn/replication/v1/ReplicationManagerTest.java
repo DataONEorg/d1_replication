@@ -19,6 +19,7 @@
  */
 package org.dataone.service.cn.replication.v1;
 
+import org.dataone.service.cn.v1.CNReplication;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -296,7 +297,8 @@ public class ReplicationManagerTest {
 
         // create the ReplicationManager
         replicationManager = new ReplicationManager();
-
+        CNReplication cnReplication = new CNReplicationImpl();
+        replicationManager.setCnReplication(cnReplication);
         nodes = hzMember.getMap(nodeMapName);
         sysMetaMap = hzMember.getMap(systemMetadataMapName);
         sysMetaMap.putAsync(sysmeta.getIdentifier(), sysmeta);
