@@ -298,6 +298,8 @@ public class ReplicationManagerTest {
         // create the ReplicationManager
         replicationManager = new ReplicationManager();
         CNReplication cnReplication = new CNReplicationImpl();
+        // inject a mock CNReplication Class so that we don't need a
+        // CN running on a remote server somewhere in order to unit test
         replicationManager.setCnReplication(cnReplication);
         nodes = hzMember.getMap(nodeMapName);
         sysMetaMap = hzMember.getMap(systemMetadataMapName);
