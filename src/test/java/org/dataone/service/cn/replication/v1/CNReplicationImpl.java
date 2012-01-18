@@ -23,7 +23,9 @@ import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.Subject;
 
 /**
- *
+ * Mock Class that acts as an implementation of CNReplication so that we don't need
+ * an accessible CN running on a remote server somewhere in order to unit test
+ * 
  * @author waltz
  */
 public class CNReplicationImpl implements CNReplication {
