@@ -523,52 +523,6 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
     return taskCount;
     
   }
-
-  /*
-   * Add a replica entry to the given system metadata, or update an existing entry
-   * 
-   * @param pid  the identifier of the object
-   * @param targetNode  the target replica node
-   * @param sysMeta
-   * @return
-   */
-  private boolean addReplica(Identifier pid, Node targetNode,
-      ReplicationStatus replicaStatus, SystemMetadata sysMeta) {
-      
-      boolean replicaAdded = false;
-      List<Replica> list = sysMeta.getReplicaList();
-      
-      // only if the replica list is populated
-      if ( list != null && !list.isEmpty() ) {
-          for (Replica replica : list) {
-              NodeReference replicaNode = replica.getReplicaMemberNode();
-              // update the existing replica
-              if ( replicaNode.getValue().equals(targetNode.getIdentifier().getValue()) ) {
-                replica.setReplicationStatus(replicaStatus);
-                log.info("Set the replication status for " + replicaNode.getValue() +
-                        " to " + replicaStatus.xmlValue());
-                replicaAdded = true;
-                break;
-                
-              }
-          }
-      }
-      
-      // if the replica list doesn't exist
-      if ( !replicaAdded ) {
-          Replica newReplica = new Replica();
-          newReplica.setReplicaMemberNode(targetNode.getIdentifier());
-          newReplica.setReplicationStatus(replicaStatus);
-          newReplica.setReplicaVerified(Calendar.getInstance().getTime());
-          sysMeta.addReplica(newReplica);
-          log.info("No replica listed for " + targetNode.getIdentifier().getValue() +
-                  ". Added a new replica item to identifier " + pid.getValue());
-      
-        
-      }      
-      return replicaAdded;
-      
-  }
   
   /**
    * Regular replication sweep over all of the objects on MNs
