@@ -29,7 +29,7 @@ import org.dataone.service.types.v1.Subject;
 public class CNReplicationImpl implements CNReplication {
 
     @Override
-    public boolean setReplicationStatus(Session session, Identifier pid, NodeReference nodeRef, ReplicationStatus status, BaseException failure) throws ServiceFailure, NotImplemented, InvalidToken, NotAuthorized, InvalidRequest, NotFound, VersionMismatch {
+    public boolean setReplicationStatus(Session session, Identifier pid, NodeReference nodeRef, ReplicationStatus status, BaseException failure) throws ServiceFailure, NotImplemented, InvalidToken, NotAuthorized, InvalidRequest, NotFound {
         return true;
     }
 
