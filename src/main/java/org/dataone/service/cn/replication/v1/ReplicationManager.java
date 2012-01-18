@@ -462,7 +462,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
       }
       log.info("Based on evaluating the target node services, node id " +
               targetNode.getIdentifier().getValue() + " is replicable: " + 
-              replicable);
+              replicable + " (during evaluation for " + pid.getValue() + ")");
 
       // a replica doesn't exist. add it
       if ( replicable ) {
@@ -495,7 +495,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
           }
                     
           log.info("Updated system metadata for identifier " + pid.getValue() + 
-                  " with queued replication status.");
+                  " with QUEUED replication status.");
           
           Long taskid = taskIdGenerator.newId();
           // add the task to the task list
@@ -518,7 +518,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
 
 
     // return the number of replication tasks queued
-    log.info("Added " + taskCount + " MNReplicationTasks to the queue.");
+    log.info("Added " + taskCount + " MNReplicationTasks to the queue for " + pid.getValue());
     
     return taskCount;
     
@@ -672,7 +672,8 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
               } catch (ExecutionException e) {
                   String msg = e.getCause().getMessage();
                   log.info("MNReplicationTask id " + task.getTaskid() +
-                      " threw an execution execption: " + msg);
+                      " threw an execution execptionf or identifier " +
+                          task.getPid().getValue() + ": " + msg);
                   if ( task.getRetryCount() < 10 ) {
                       task.setRetryCount(task.getRetryCount() + 1);
                       futureTask.cancel(true);
