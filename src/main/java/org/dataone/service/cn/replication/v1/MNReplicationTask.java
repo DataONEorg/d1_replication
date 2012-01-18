@@ -113,7 +113,7 @@ public class MNReplicationTask
                 + File.separator + Settings.getConfiguration().getString("D1Client.certificate.filename");
         CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
         log.info("MNReplicationTask task id " + this.taskid + "is using an X509 certificate "
-                + "from " + clientCertificateLocation);
+                + "from " + clientCertificateLocation + " for identifier " + this.pid.getValue());
     }
 
     /**
@@ -302,7 +302,9 @@ public class MNReplicationTask
             SystemMetadata sysmeta = cn.getSystemMetadata(session, pid);
             
             // call for the replication
-            log.info("Calling MNReplication.replicate() at targetNode id " + targetMN.getNodeBaseServiceUrl());
+            log.info("Calling MNReplication.replicate() at targetNode id " + 
+                    targetMN.getNodeBaseServiceUrl() + " for identifier " + 
+                    this.pid.getValue());
             targetMN.replicate(session, sysmeta, this.originatingNode);
             
             // update the replication status
