@@ -309,8 +309,8 @@ public class MNReplicationTask
             
             // update the replication status
             success = cn.setReplicationStatus(session, pid, targetNode, ReplicationStatus.REQUESTED, null);
-            log.info("Updated system metadata for identifier " + this.pid.getValue() + " during "
-                    + " MNReplicationTask id " + this.taskid);
+            log.info("Updated replica status for identifier " + this.pid.getValue() + " during "
+                    + " MNReplicationTask id " + this.taskid + " to REQUESTED.");
             
         } catch (BaseException e) {
             
