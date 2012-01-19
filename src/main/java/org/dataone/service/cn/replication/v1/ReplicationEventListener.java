@@ -175,7 +175,7 @@ public class ReplicationEventListener
                log.info("Locked " + lockString);               
                queueEvent(event.getKey());
                lock.unlock();
-               log.debug("Unlocked " + lockString);
+               log.info("Unlocked " + lockString);
                isLocked = false;
                
             } else {
@@ -197,7 +197,7 @@ public class ReplicationEventListener
         } finally {
             if (isLocked) {
               lock.unlock();
-              log.debug("Unlocked " + lockString);
+              log.info("Unlocked " + lockString);
               
             }           
         }          
@@ -238,9 +238,11 @@ public class ReplicationEventListener
             lock = this.hzMember.getLock(lockString);
             isLocked = lock.tryLock(500L, TimeUnit.MILLISECONDS);
             if (isLocked) {
-               log.info("Locked " + event.getKey().getValue());
-               
+               log.info("Locked " + lockString);               
                queueEvent(event.getKey());
+               lock.unlock();
+               log.info("Unlocked " + lockString);
+               isLocked = false;
                
             } else {
                 log.info("Didn't get lock for identifier " + event.getKey().getValue());
@@ -261,7 +263,7 @@ public class ReplicationEventListener
         } finally {
             if (isLocked) {
               lock.unlock();
-              log.debug("Unlocked " + lockString);
+              log.info("Unlocked " + lockString);
               
             }           
         }                
