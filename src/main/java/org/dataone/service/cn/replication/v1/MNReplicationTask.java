@@ -321,11 +321,14 @@ public class MNReplicationTask
                        
             try {
                 log.info("The call to MN.replicate() failed for " + pid.getValue() +
-                    " on " + this.targetMN.getNodeId() + ". Trying again in 5 seconds.");
+                    " on " + this.targetNode.getValue() + ". Trying again in 5 seconds.");
                 this.retryCount++;
                 Thread.sleep(5000L);
                 // get the most recent system metadata for the pid
                 sysmeta = cn.getSystemMetadata(session, pid);
+                log.info("Calling MNReplication.replicate() at targetNode id " + 
+                        targetMN.getNodeBaseServiceUrl() + " for identifier " + 
+                        this.pid.getValue());
                 targetMN.replicate(session, sysmeta, this.originatingNode);
                 
                 // update the replication status 
@@ -337,7 +340,7 @@ public class MNReplicationTask
                 try {
                     success = cn.setReplicationStatus(session, pid, targetNode, ReplicationStatus.FAILED, e);
                     log.info("The call to MN.replicate() failed for " + pid.getValue() +
-                            " on " + this.targetMN.getNodeId());
+                            " on " + this.targetNode.getValue());
                     
                 } catch (BaseException e2) {
                     log.info("There was a problem setting the replication status for identifier " + 
