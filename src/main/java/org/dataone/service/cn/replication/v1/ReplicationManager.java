@@ -37,7 +37,8 @@ import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.FutureTask;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -94,15 +95,6 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
   /* The instance of the IdGenerator created by Hazelcast used 
      to generate "task-ids" */
   private IdGenerator taskIdGenerator;
-  
-  /* The name of the DataONE Hazelcast cluster group */
-  private String groupName;
-
-  /* The name of the DataONE Hazelcast cluster password */
-  private String groupPassword;
-  
-  /* The name of the DataONE Hazelcast cluster IP addresses */
-  private String addressList;
   
   /* The name of the node map */
   private String nodeMap;
@@ -195,14 +187,6 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
     this.replicationTasks.addItemListener(this, true);
     log.info("Added a listener to the " + this.replicationTasks.getName() + " queue.");    
     
-    // initialize the task thread queue with 5 threads
-    taskThreadQueue = new ArrayBlockingQueue<Runnable>(5);
-    handler = new RejectedReplicationTaskHandler();
-    // create an Executor with 8 core, 8 max threads, 30s timeout
-    executor = 
-        new ThreadPoolExecutor(8, 8, 30, TimeUnit.SECONDS, taskThreadQueue, handler);
-    executor.allowCoreThreadTimeOut(true);
-
     // Set up the certificate location, create a null session
     String clientCertificateLocation =
             Settings.getConfiguration().getString("D1Client.certificate.directory")
@@ -435,9 +419,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
           // skip on to the next one right? -rpw (otherwise targetnode is empty or is the last targetnode assigned)
           continue;
       }
-      
-      boolean replicaAdded = false;
-        
+              
       // may be more than one version of MNReplication
       List<String> implementedVersions = new ArrayList<String>();
       List<Service> origServices = authoritativeNode.getServices().getServiceList();
@@ -582,30 +564,9 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                    " for execution with object identifier: " + task.getPid().getValue());
           
           // TODO: handle the case when a CN drops and the MNReplicationTask.call()
-          // has not been made.
-          FutureTask<String> futureTask = new FutureTask<String>(task);
-          executor.execute(futureTask);
-          //ExecutorService executorService = 
-          //     this.hzMember.getExecutorService("ReplicationTasks");
-          //executorService.submit(futureTask);
-          //Future<?> future = executorService.submit(new DistributedTask(task));
-          log.debug("Task thread queue has "  + 
-              taskThreadQueue.remainingCapacity() + " slots available.");
-          log.debug("ExecutorService is shut down: " + executor.isShutdown());          
-          log.debug("ExecutorService allows core thread timeout: " + 
-              executor.allowsCoreThreadTimeOut());
-          log.debug("ExecutorService is currently executing " + 
-              executor.getActiveCount() + " tasks.");
-          log.debug("ExecutorService has executed " + 
-              executor.getCompletedTaskCount() + " tasks.");
-          log.debug("ExecutorService core pool size is " + 
-              executor.getCorePoolSize() + " threads.");
-          log.debug("ExecutorService currently has " + 
-              executor.getPoolSize() + " threads.");
-          log.debug("ExecutorService has max simultaneously executed " +
-              executor.getLargestPoolSize() + " threads.");
-          log.debug("ExecutorService has scheduled " +
-              executor.getTaskCount() + " tasks.");
+          ExecutorService executorService = 
+               this.hzMember.getExecutorService("ReplicationTasks");
+          Future<String> future = executorService.submit(task);
           
           // check for completion
           boolean isDone = false;
@@ -614,7 +575,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
           while( !isDone ) {
                               
               try {
-                  result = (String) futureTask.get(15L, TimeUnit.SECONDS);  
+                  result = (String) future.get(5L, TimeUnit.SECONDS);  
                   log.trace("Task result for identifier " + 
                       task.getPid().getValue() + " is " + result );
                   if ( result != null ) {
@@ -630,7 +591,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                           task.getPid().getValue() + ": " + msg);
                   if ( task.getRetryCount() < 10 ) {
                       task.setRetryCount(task.getRetryCount() + 1);
-                      futureTask.cancel(true);
+                      future.cancel(true);
                       this.replicationTasks.add(task);
                       log.info("Retrying replication task id " + 
                           task.getTaskid() + " for identifier " + 
@@ -647,19 +608,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                   log.info("Replication task id " + task.getTaskid() + 
                           " timed out for identifier " + task.getPid().getValue() +
                           " : " + msg);
-                  futureTask.cancel(true); // isDone() is now true
-                  //if ( task.getRetryCount() < 10 ) {
-                  //    task.setRetryCount(task.getRetryCount() + 1);
-                  //    this.replicationTasks.add(task);
-                  //    log.info("Retrying replication task id " + 
-                  //        task.getTaskid() + " for identifier " + 
-                  //        task.getPid().getValue());
-                  //    
-                  //} else {
-                  //    log.info("Replication task id" + task.getTaskid() + 
-                  //        " failed, too many retries for identifier" + 
-                  //        task.getPid().getValue() + ". Not retrying.");
-                  //}
+                  future.cancel(true); // isDone() is now true
                   
               } catch (InterruptedException e) {
                   String msg = e.getMessage();
@@ -681,13 +630,13 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
 
               }
               
-              isDone = futureTask.isDone();
+              isDone = future.isDone();
               log.debug("Task " + task.getTaskid() + " is done for identifier " +
                       task.getPid().getValue() + ": " + isDone);
               
               
               // handle canceled tasks (from the timeout period)
-              if ( futureTask.isCancelled() ) {
+              if ( future.isCancelled() ) {
                   log.info("Replication task id " + task.getTaskid() + 
                            " was cancelled for identifier " + task.getPid().getValue());
                   
