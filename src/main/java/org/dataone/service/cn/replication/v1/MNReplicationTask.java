@@ -33,6 +33,11 @@ import org.dataone.client.MNode;
 import org.dataone.client.auth.CertificateManager;
 import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.BaseException;
+import org.dataone.service.exceptions.InvalidRequest;
+import org.dataone.service.exceptions.InvalidToken;
+import org.dataone.service.exceptions.NotAuthorized;
+import org.dataone.service.exceptions.NotFound;
+import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.ReplicationStatus;
@@ -52,7 +57,7 @@ import org.dataone.service.types.v1.NodeReference;
  *
  */
 public class MNReplicationTask
-    implements Serializable, Callable<String>, Runnable {
+    implements Serializable, Callable<String> {
 
     /* Get a Log instance */
     public static Log log = LogFactory.getLog(MNReplicationTask.class);
@@ -233,13 +238,13 @@ public class MNReplicationTask
      *
      * @return pid - the identifier of the replicated object upon success
      */
-    public String call()
-        throws InterruptedException {
+    public String call() throws InterruptedException {
+
+        SystemMetadata sysmeta = null;
         
         // a flag for success on setting replication status
         boolean success = false;
         
-
         // session is null - certificate is used
         Session session = null;
                 
@@ -299,7 +304,7 @@ public class MNReplicationTask
         try {
 
             // get the most recent system metadata for the pid
-            SystemMetadata sysmeta = cn.getSystemMetadata(session, pid);
+            sysmeta = cn.getSystemMetadata(session, pid);
             
             // call for the replication
             log.info("Calling MNReplication.replicate() at targetNode id " + 
@@ -313,17 +318,34 @@ public class MNReplicationTask
                     + " MNReplicationTask id " + this.taskid + " to REQUESTED.");
             
         } catch (BaseException e) {
-            
+                       
             try {
-                // update the failed status if communication fails in any way
-                success = cn.setReplicationStatus(session, pid, targetNode, ReplicationStatus.FAILED, e);
+                log.info("The call to MN.replicate() failed for " + pid.getValue() +
+                    " on " + this.targetMN.getNodeId() + ". Trying again in 5 seconds.");
+                this.retryCount++;
+                Thread.sleep(5000L);
+                // get the most recent system metadata for the pid
+                sysmeta = cn.getSystemMetadata(session, pid);
+                targetMN.replicate(session, sysmeta, this.originatingNode);
+                
+                // update the replication status 
+                success = cn.setReplicationStatus(session, pid, targetNode, ReplicationStatus.REQUESTED, e);
                 
             } catch (BaseException e1) {
-                log.info("There was a problem setting the replication status for identifier " + 
-                        this.pid.getValue() + " during " + 
-                        " MNReplicationTask id " + this.taskid);
+                
+                // still couldn't call replicate() successfully. fail.
+                try {
+                    success = cn.setReplicationStatus(session, pid, targetNode, ReplicationStatus.FAILED, e);
+                    log.info("The call to MN.replicate() failed for " + pid.getValue() +
+                            " on " + this.targetMN.getNodeId());
+                    
+                } catch (BaseException e2) {
+                    log.info("There was a problem setting the replication status for identifier " + 
+                            this.pid.getValue() + " during " + 
+                            " MNReplicationTask id " + this.taskid);
 
-                e1.printStackTrace();
+                    e1.printStackTrace();
+                }
                                                 
             }
             
