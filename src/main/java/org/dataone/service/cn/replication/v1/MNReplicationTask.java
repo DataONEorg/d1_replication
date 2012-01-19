@@ -310,13 +310,8 @@ public class MNReplicationTask
             log.info("Calling MNReplication.replicate() at targetNode id " + 
                     targetMN.getNodeBaseServiceUrl() + " for identifier " + 
                     this.pid.getValue());
-            targetMN.replicate(session, sysmeta, this.originatingNode);
-            
-            // update the replication status
-            success = cn.setReplicationStatus(session, pid, targetNode, ReplicationStatus.REQUESTED, null);
-            log.info("Updated replica status for identifier " + this.pid.getValue() + " during "
-                    + " MNReplicationTask id " + this.taskid + " to REQUESTED.");
-            
+            success = targetMN.replicate(session, sysmeta, this.originatingNode);
+                        
         } catch (BaseException e) {
                        
             try {
@@ -330,20 +325,18 @@ public class MNReplicationTask
                         targetMN.getNodeBaseServiceUrl() + " for identifier " + 
                         this.pid.getValue());
                 targetMN.replicate(session, sysmeta, this.originatingNode);
-                
-                // update the replication status 
-                success = cn.setReplicationStatus(session, pid, targetNode, ReplicationStatus.REQUESTED, e);
-                
+                                
             } catch (BaseException e1) {
                 
                 // still couldn't call replicate() successfully. fail.
                 try {
-                    success = cn.setReplicationStatus(session, pid, targetNode, ReplicationStatus.FAILED, e);
+                    cn.setReplicationStatus(session, pid, targetNode, ReplicationStatus.FAILED, e);
                     log.info("The call to MN.replicate() failed for " + pid.getValue() +
                             " on " + this.targetNode.getValue());
                     
                 } catch (BaseException e2) {
-                    log.info("There was a problem setting the replication status for identifier " + 
+                    log.info("There was a problem setting the replication status to " +
+                            " FAILED for identifier " + 
                             this.pid.getValue() + " during " + 
                             " MNReplicationTask id " + this.taskid);
 
@@ -352,6 +345,20 @@ public class MNReplicationTask
                                                 
             }
             
+            // update the replication status
+            if ( success ) {
+                try {
+                    cn.setReplicationStatus(session, pid, targetNode, ReplicationStatus.REQUESTED, null);
+                    log.info("Updated replica status for identifier " + this.pid.getValue() + " during "
+                            + " MNReplicationTask id " + this.taskid + " to FAILED.");
+                    
+                } catch (BaseException e1) {
+                    log.info("There was a problem setting the replication status to " +
+                            " REQUESTED for identifier " + 
+                            this.pid.getValue() + " during " + 
+                            " MNReplicationTask id " + this.taskid);
+               }               
+            }            
         }        
 
         return this.pid.getValue();
