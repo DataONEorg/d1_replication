@@ -172,9 +172,11 @@ public class ReplicationEventListener
             lock = this.hzMember.getLock(lockString);
             isLocked = lock.tryLock(500L, TimeUnit.MILLISECONDS);
             if (isLocked) {
-               log.info("Locked " + event.getKey().getValue());
-               
+               log.info("Locked " + lockString);               
                queueEvent(event.getKey());
+               lock.unlock();
+               log.debug("Unlocked " + lockString);
+               isLocked = false;
                
             } else {
                 log.info("Didn't get lock for identifier " + event.getKey().getValue());
