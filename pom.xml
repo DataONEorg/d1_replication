@@ -53,8 +53,23 @@
                     </archive>
                 </configuration>
             </plugin>
-
         </plugins>
+		<resources>
+	      <resource>
+	        <directory>src/main/resources</directory>
+	        <filtering>true</filtering>
+	        <includes>
+	          <include>buildInfo/buildInfo.properties</include>
+	        </includes>
+	      </resource>
+	      <resource>
+	        <directory>src/main/resources</directory>
+	        <filtering>false</filtering>
+	        <includes>
+	          <include>**/*.*</include>
+	        </includes>
+	      </resource>
+		</resources>
     </build>
     <repositories>
         <repository>
