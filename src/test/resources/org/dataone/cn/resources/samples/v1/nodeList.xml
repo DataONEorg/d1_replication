@@ -1,83 +1,83 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <d1:nodeList xmlns:d1="http://ns.dataone.org/service/types/v1">
     <node replicate="true" synchronize="true" type="mn" state="up">
-        <identifier>sq1d</identifier>
+        <identifier>urn:node:sq1d</identifier>
         <name>squid</name>
         <description>this is a squid test</description>
         <baseURL>https://my.squid.test/mn</baseURL>
         <services>
-            <service name="MNRead" version="0.6.4" available="true"/>
-            <service name="MNCore" version="0.6.4" available="true"/>
-            <service name="MNAuthorization" version="0.6.4" available="true"/>
-            <service name="MNStorage" version="0.6.4" available="true"/>
-            <service name="MNReplication" version="0.6.4" available="true"/>
+            <service name="MNRead" version="1.0.0" available="true"/>
+            <service name="MNCore" version="1.0.0" available="true"/>
+            <service name="MNAuthorization" version="1.0.0" available="true"/>
+            <service name="MNStorage" version="1.0.0" available="true"/>
+            <service name="MNReplication" version="1.0.0" available="true"/>
         </services>
         <synchronization>
             <schedule hour="*" mday="*" min="0/3" mon="*" sec="10" wday="?" year="*"/>
             <lastHarvested>1900-01-01T00:00:00.000+00:00</lastHarvested>
             <lastCompleteHarvest>1900-01-01T00:00:00.000+00:00</lastCompleteHarvest>
         </synchronization>
-        <subject>cn=sq1d,dc=dataone,dc=org</subject>
+        <subject>cn=my.squid.test,dc=dataone,dc=org</subject>
         <contactSubject>cn=sq1d,dc=dataone,dc=org</contactSubject>
     </node>
     <node replicate="true" synchronize="true" type="mn" state="up">
-        <identifier>sqR1</identifier>
+        <identifier>urn:node:sqR1</identifier>
         <name>squirrel</name>
         <description>this is a squirrel test</description>
         <baseURL>https://my.squirrel.test/mn</baseURL>
         <services>
-            <service name="MNRead" version="0.6.4" available="true"/>
-            <service name="MNCore" version="0.6.4" available="true"/>
-            <service name="MNAuthorization" version="0.6.4" available="true"/>
-            <service name="MNStorage" version="0.6.4" available="true"/>
-            <service name="MNReplication" version="0.6.4" available="true"/>
+            <service name="MNRead" version="1.0.0" available="true"/>
+            <service name="MNCore" version="1.0.0" available="true"/>
+            <service name="MNAuthorization" version="1.0.0" available="true"/>
+            <service name="MNStorage" version="1.0.0" available="true"/>
+            <service name="MNReplication" version="1.0.0" available="true"/>
         </services>
         <synchronization>
             <schedule hour="*" mday="*" min="0/3" mon="*" sec="10" wday="?" year="*"/>
             <lastHarvested>2011-10-19T18:59:39.155+00:00</lastHarvested>
             <lastCompleteHarvest>1900-01-01T00:00:00.000+00:00</lastCompleteHarvest>
         </synchronization>
-        <subject>cn=sqR1,dc=dataone,dc=org</subject>
+        <subject>cn=my.squirrel.test,dc=dataone,dc=org</subject>
         <contactSubject>cn=sq1d,dc=dataone,dc=org</contactSubject>
     </node>
     <node replicate="true" synchronize="true" type="mn" state="up">
-        <identifier>sq4k</identifier>
+        <identifier>urn:node:sq4k</identifier>
         <name>squawk</name>
         <description>this is a squawk test</description>
         <baseURL>https://my.squawk.test/mn</baseURL>
         <services>
-            <service name="MNRead" version="0.6.4" available="true"/>
-            <service name="MNCore" version="0.6.4" available="true"/>
-            <service name="MNAuthorization" version="0.6.4" available="true"/>
-            <service name="MNStorage" version="0.6.4" available="true"/>
-            <service name="MNReplication" version="0.6.4" available="true"/>
+            <service name="MNRead" version="1.0.0" available="true"/>
+            <service name="MNCore" version="1.0.0" available="true"/>
+            <service name="MNAuthorization" version="1.0.0" available="true"/>
+            <service name="MNStorage" version="1.0.0" available="true"/>
+            <service name="MNReplication" version="1.0.0" available="true"/>
         </services>
         <synchronization>
             <schedule hour="*" mday="*" min="0/3" mon="*" sec="10" wday="?" year="*"/>
             <lastHarvested>2011-10-16T19:05:17.218+00:00</lastHarvested>
             <lastCompleteHarvest>1900-01-01T00:00:00.000+00:00</lastCompleteHarvest>
         </synchronization>
-        <subject>cn=sq4k,dc=dataone,dc=org</subject>
+        <subject>cn=my.squawk.test,dc=dataone,dc=org</subject>
         <contactSubject>cn=sq1d,dc=dataone,dc=org</contactSubject>
     </node>
     <node replicate="true" synchronize="true" type="mn" state="up">
-        <identifier>sqrm</identifier>
+        <identifier>urn:node:sqrm</identifier>
         <name>squirm</name>
         <description>this is a squirm test</description>
         <baseURL>https://my.squirm.test/mn</baseURL>
         <services>
-            <service name="MNRead" version="0.6.4" available="true"/>
-            <service name="MNCore" version="0.6.4" available="true"/>
-            <service name="MNAuthorization" version="0.6.4" available="true"/>
-            <service name="MNStorage" version="0.6.4" available="true"/>
-            <service name="MNReplication" version="0.6.4" available="true"/>
+            <service name="MNRead" version="1.0.0" available="true"/>
+            <service name="MNCore" version="1.0.0" available="true"/>
+            <service name="MNAuthorization" version="1.0.0" available="true"/>
+            <service name="MNStorage" version="1.0.0" available="true"/>
+            <service name="MNReplication" version="1.0.0" available="true"/>
         </services>
         <synchronization>
             <schedule hour="*" mday="*" min="0/3" mon="*" sec="10" wday="?" year="*"/>
             <lastHarvested>2011-10-15T01:03:08.387+00:00</lastHarvested>
             <lastCompleteHarvest>1900-01-01T00:00:00.000+00:00</lastCompleteHarvest>
         </synchronization>
-        <subject>cn=sqrm,dc=dataone,dc=org</subject>
+        <subject>cn=my.squirm.test,dc=dataone,dc=org</subject>
         <contactSubject>cn=sq1d,dc=dataone,dc=org</contactSubject>
     </node>
 
