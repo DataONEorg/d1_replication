@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!-- Apache Commons Configuration -->
 <configuration>
+  <properties fileName="node.properties"/>
   <properties fileName="replication.properties"/>
   <properties fileName="d1client.properties"/>
   <properties fileName="ldapService.properties"/>

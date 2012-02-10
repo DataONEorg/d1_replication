@@ -20,17 +20,17 @@
         </allow>
     </accessPolicy>
     <replicationPolicy replicationAllowed="true" numberReplicas="3">
-        <preferredMemberNode>sqR1</preferredMemberNode>
-        <preferredMemberNode>sq4k</preferredMemberNode>
-        <preferredMemberNode>sqrm</preferredMemberNode>
+        <preferredMemberNode>urn:node:sqR1</preferredMemberNode>
+        <preferredMemberNode>urn:node:sq4k</preferredMemberNode>
+        <preferredMemberNode>urn:node:sqrm</preferredMemberNode>
 <!--        <blockedMemberNode></blockedMemberNode> -->
     </replicationPolicy>
     <dateUploaded>2011-05-04T18:13:51.000-00:00</dateUploaded>
     <dateSysMetadataModified>2011-05-04T18:13:51.000-00:00</dateSysMetadataModified>
-    <originMemberNode>sq1d</originMemberNode>
-    <authoritativeMemberNode>sq1d</authoritativeMemberNode>
+    <originMemberNode>urn:node:sq1d</originMemberNode>
+    <authoritativeMemberNode>urn:node:sq1d</authoritativeMemberNode>
     <replica>
-        <replicaMemberNode>sq1d</replicaMemberNode>
+        <replicaMemberNode>urn:node:sq1d</replicaMemberNode>
         <replicationStatus>completed</replicationStatus>
         <replicaVerified>2011-05-04T18:13:51.000-00:00</replicaVerified>
     </replica>
