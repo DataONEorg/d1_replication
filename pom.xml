@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.dataone</groupId>
     <artifactId>d1_replication</artifactId>
-    <version>1.0.0-RC1</version>
+    <version>1.0.0-RC2-SNAPSHOT</version>
     <name>DataONE_Replication</name>
     <description>DataONE Coordinating Node replication manager</description>
     <url>http://dataone.org</url>
@@ -104,13 +104,13 @@
         <dependency>
             <groupId>org.dataone</groupId>
             <artifactId>d1_cn_noderegistry</artifactId>
-            <version>1.0.0-RC1</version>
+            <version>1.0.0-RC2-SNAPSHOT</version>
             <type>jar</type>
         </dependency>
         <dependency>
             <groupId>org.dataone</groupId>
             <artifactId>d1_cn_common</artifactId>
-            <version>1.0.0-RC1</version>
+            <version>1.0.0-RC2-SNAPSHOT</version>
             <type>jar</type>
         </dependency>
         <dependency>
@@ -143,7 +143,7 @@
         <dependency>
         	<groupId>org.dataone</groupId>
         	<artifactId>d1_libclient_java</artifactId>
-        	<version>1.0.1-RC2</version>
+        	<version>1.0.1-RC3-SNAPSHOT</version>
         	<type>jar</type>
         	<scope>compile</scope>
         </dependency>
