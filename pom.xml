@@ -10,8 +10,11 @@
     <description>DataONE Coordinating Node replication manager</description>
     <url>http://dataone.org</url>
     <properties>
-        <org.springframework.version>3.0.5.RELEASE</org.springframework.version>
-        <netbeans.hint.deploy.server>Tomcat60</netbeans.hint.deploy.server>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <spring.version>3.1.1.RELEASE</spring.version>
+        <hazelcast.version>1.9.4.6</hazelcast.version>
+        <d1_libclient_version>1.0.1-RC3-SNAPSHOT</d1_libclient_version>
+        <d1_cn_noderegistry_version>1.0.0-RC2-SNAPSHOT</d1_cn_noderegistry_version>
     </properties>
     <build>
         <plugins>
@@ -104,24 +107,18 @@
         <dependency>
             <groupId>org.dataone</groupId>
             <artifactId>d1_cn_noderegistry</artifactId>
-            <version>1.0.0-RC2-SNAPSHOT</version>
-            <type>jar</type>
-        </dependency>
-        <dependency>
-            <groupId>org.dataone</groupId>
-            <artifactId>d1_cn_common</artifactId>
-            <version>1.0.0-RC2-SNAPSHOT</version>
+            <version>${d1_cn_noderegistry_version}</version>
             <type>jar</type>
         </dependency>
         <dependency>
             <groupId>com.hazelcast</groupId>
             <artifactId>hazelcast</artifactId>
-            <version>1.9.4.6</version>
+            <version>${hazelcast.version}</version>
         </dependency>
         <dependency>
             <groupId>com.hazelcast</groupId>
             <artifactId>hazelcast-client</artifactId>
-            <version>1.9.4.6</version>
+            <version>${hazelcast.version}</version>
             <type>jar</type>
             <scope>compile</scope>
         </dependency>
@@ -132,28 +129,42 @@
             <type>jar</type>
             <scope>test</scope>
         </dependency>
-
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-core</artifactId>
+            <version>${spring.version}</version>
+            <type>jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+            <version>${spring.version}</version>
+            <type>jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+        	<groupId>org.springframework</groupId>
+        	<artifactId>spring-beans</artifactId>
+        	<version>${spring.version}</version>
+        	<type>jar</type>
+        	<scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-test</artifactId>
-            <version>${org.springframework.version}</version>
+            <version>${spring.version}</version>
             <type>jar</type>
             <scope>test</scope>
         </dependency>
         <dependency>
         	<groupId>org.dataone</groupId>
         	<artifactId>d1_libclient_java</artifactId>
-        	<version>1.0.1-RC3-SNAPSHOT</version>
+        	<version>${d1_libclient_version}</version>
         	<type>jar</type>
         	<scope>compile</scope>
         </dependency>
-        <dependency>
-        	<groupId>org.springframework</groupId>
-        	<artifactId>spring-beans</artifactId>
-        	<version>3.0.5.RELEASE</version>
-        	<type>jar</type>
-        	<scope>compile</scope>
-        </dependency>
+
     </dependencies>
     
      <scm>
