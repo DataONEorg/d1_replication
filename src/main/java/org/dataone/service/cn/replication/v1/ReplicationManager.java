@@ -252,7 +252,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
     log.info("ReplicationManager.createAndQueueTasks called.");
     boolean allowed;
     int taskCount = 0;
-    int desiredReplicas;
+    int desiredReplicas = 3;
     List<Replica> replicaList;             // the replica list for this pid
     Set<NodeReference> nodeList;           // the full nodes list
     List<NodeReference> potentialNodeList; // the MN subset of the nodes list
@@ -335,7 +335,12 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
 
     // parse the sysmeta.ReplicationPolicy
     ReplicationPolicy replicationPolicy = sysmeta.getReplicationPolicy();
-    desiredReplicas = replicationPolicy.getNumberReplicas().intValue();
+    
+    // set the desired replicas if present
+    if ( replicationPolicy.getNumberReplicas() != null ) {
+        desiredReplicas = replicationPolicy.getNumberReplicas().intValue();
+        
+    }
 
     // get the preferred and blocked lists for prioritization
     List<NodeReference> preferredList = 
