@@ -228,7 +228,7 @@ public class ReplicationEventListener
             event.getKey().getValue());
                     
         // a lock to coordinate event handling between the 3 CN ReplicationManager instances
-        String lockString = "replication-event-" + event.getKey().getValue();
+        String lockString = EVENT_PREFIX + event.getKey().getValue();
         Lock lock = null;
         boolean isLocked = false;
         
