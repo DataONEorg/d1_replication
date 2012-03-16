@@ -126,6 +126,7 @@ public class ReplicationEventListener
             // poll the queue to pop the most recent event off of the queue
             Identifier pid = this.replicationEvents.poll(3L, TimeUnit.SECONDS);
             if ( pid != null ) {                
+                log.info("Won the replication events queue poll for " + identifier.getValue());
                 // evaluate the object's replication policy for potential task creation
                 this.replicationManager.createAndQueueTasks(identifier);
                 
@@ -138,7 +139,7 @@ public class ReplicationEventListener
             e.printStackTrace();
             
         } catch (InterruptedException e) {
-            log.debug("Plooing of the hzReplicationEvents queue was interrupted.");
+            log.debug("Polling of the hzReplicationEvents queue was interrupted.");
 
         }       
     }
