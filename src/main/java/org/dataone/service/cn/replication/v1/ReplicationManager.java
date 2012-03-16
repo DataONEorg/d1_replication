@@ -566,7 +566,9 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
       
       if ( task != null ) {
           log.info("Submitting replication task id " + task.getTaskid() +
-                   " for execution with object identifier: " + task.getPid().getValue());
+                   " for execution with object identifier: " + 
+                   task.getPid().getValue() + " on replica node " +
+                   task.getTargetNode().getValue());
           
           // TODO: handle the case when a CN drops and the MNReplicationTask.call()
           ExecutorService executorService = 
@@ -592,7 +594,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
               } catch (ExecutionException e) {
                   String msg = e.getCause().getMessage();
                   log.info("MNReplicationTask id " + task.getTaskid() +
-                      " threw an execution execptionf or identifier " +
+                      " threw an execution execption on identifier " +
                           task.getPid().getValue() + ": " + msg);
                   if ( task.getRetryCount() < 10 ) {
                       task.setRetryCount(task.getRetryCount() + 1);
@@ -600,25 +602,31 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                       this.replicationTasks.add(task);
                       log.info("Retrying replication task id " + 
                           task.getTaskid() + " for identifier " + 
-                          task.getPid().getValue());
+                          task.getPid().getValue() + " on replica node " +
+                          task.getTargetNode().getValue());
                       
                   } else {
                       log.info("Replication task id" + task.getTaskid() + 
                           " failed, too many retries for identifier" + 
-                          task.getPid().getValue() + ". Not retrying.");
+                          task.getPid().getValue() + " on replica node " +
+                          task.getTargetNode().getValue() + ". Not retrying.");
                   }
                   
               } catch (TimeoutException e) {
                   String msg = e.getMessage();
                   log.info("Replication task id " + task.getTaskid() + 
-                          " timed out for identifier " + task.getPid().getValue() +
+                          " timed out for identifier " + task.getPid().getValue() + 
+                          " on replica node " +
+                          task.getTargetNode().getValue()+
                           " : " + msg);
                   future.cancel(true); // isDone() is now true
                   
               } catch (InterruptedException e) {
                   String msg = e.getMessage();
                   log.info("Replication task id " + task.getTaskid() + 
-                          " was interrupted for identifier " + task.getPid().getValue() +
+                          " was interrupted for identifier " + task.getPid().getValue() + 
+                          " on replica node " +
+                          task.getTargetNode().getValue() +
                           " : " + msg);
                   if ( task.getRetryCount() < 10 ) {
                       task.setRetryCount(task.getRetryCount() + 1);
@@ -630,14 +638,16 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                   } else {
                       log.error("Replication task id" + task.getTaskid() + 
                           " failed, too many retries for identifier" + 
-                          task.getPid().getValue() + ". Not retrying.");
+                          task.getPid().getValue() + " on replica node " +
+                          task.getTargetNode().getValue() + ". Not retrying.");
                   }
 
               }
               
               isDone = future.isDone();
               log.debug("Task " + task.getTaskid() + " is done for identifier " +
-                      task.getPid().getValue() + ": " + isDone);
+                      task.getPid().getValue() + " on replica node " +
+                      task.getTargetNode().getValue() + ": " + isDone);
               
               
               // handle canceled tasks (from the timeout period)
