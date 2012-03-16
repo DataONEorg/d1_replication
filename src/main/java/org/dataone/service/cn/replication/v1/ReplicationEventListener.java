@@ -236,7 +236,7 @@ public class ReplicationEventListener
           
             // lock the pid and queue the event. 
             lock = this.hzMember.getLock(lockString);
-            isLocked = lock.tryLock(500L, TimeUnit.MILLISECONDS);
+            isLocked = lock.tryLock(10L, TimeUnit.MILLISECONDS);
             if (isLocked) {
                log.info("Locked " + lockString);               
                queueEvent(event.getKey());
