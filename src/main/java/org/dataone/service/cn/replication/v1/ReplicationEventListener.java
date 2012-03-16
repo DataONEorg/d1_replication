@@ -170,7 +170,7 @@ public class ReplicationEventListener
           
             // lock the event string and queue the event. 
             lock = this.hzMember.getLock(lockString);
-            isLocked = lock.tryLock(500L, TimeUnit.MILLISECONDS);
+            isLocked = lock.tryLock(10L, TimeUnit.MILLISECONDS);
             if (isLocked) {
                log.info("Locked " + lockString);               
                queueEvent(event.getKey());
@@ -240,6 +240,7 @@ public class ReplicationEventListener
             if (isLocked) {
                log.info("Locked " + lockString);               
                queueEvent(event.getKey());
+               log.info("Locked " + lockString);               
                lock.unlock();
                log.info("Unlocked " + lockString);
                isLocked = false;
