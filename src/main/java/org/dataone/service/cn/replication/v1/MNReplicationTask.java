@@ -311,9 +311,8 @@ public class MNReplicationTask
             sysmeta = cn.getSystemMetadata(session, pid);
             
             // call for the replication
-            log.info("Calling MNReplication.replicate() at targetNode id " + 
-                    targetMN.getNodeBaseServiceUrl() + " for identifier " + 
-                    this.pid.getValue());
+            log.info("Task id " + this.getTaskid() + "calling replicate() at targetNode id " + 
+                    targetMN.getNodeId() + " for identifier " + this.pid.getValue());
             success = targetMN.replicate(session, sysmeta, this.originatingNode);
                         
         } catch (BaseException e) {
