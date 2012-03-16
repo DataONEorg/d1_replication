@@ -240,6 +240,10 @@ public class MNReplicationTask
      */
     public String call() throws InterruptedException {
 
+        log.info("Replication attempt # " + this.getRetryCount() + 
+            " for replication task " + this.getTaskid() + " for identifier " + 
+            this.getPid().getValue() + " on node " + this.getTargetNode().getValue());
+        
         SystemMetadata sysmeta = null;
         
         // a flag for success on setting replication status
@@ -282,7 +286,7 @@ public class MNReplicationTask
             } catch (ServiceFailure e1) {
 
                 try {
-                    success = cn.setReplicationStatus(session, pid, targetNode, ReplicationStatus.FAILED, e1);
+                    cn.setReplicationStatus(session, pid, targetNode, ReplicationStatus.FAILED, e1);
                     log.info("There was a problem calling replicate() on " +
                             this.targetNode.getValue() + " for identifier " + 
                             this.pid.getValue() + " during " + 
@@ -324,7 +328,7 @@ public class MNReplicationTask
                 log.info("Calling MNReplication.replicate() at targetNode id " + 
                         targetMN.getNodeBaseServiceUrl() + " for identifier " + 
                         this.pid.getValue());
-                targetMN.replicate(session, sysmeta, this.originatingNode);
+                success = targetMN.replicate(session, sysmeta, this.originatingNode);
                                 
             } catch (BaseException e1) {
                 
@@ -345,23 +349,32 @@ public class MNReplicationTask
                                                 
             }
             
-            // update the replication status
-            if ( success ) {
-                try {
-                    cn.setReplicationStatus(session, pid, targetNode, ReplicationStatus.REQUESTED, null);
-                    log.info("Updated replica status for identifier " + this.pid.getValue() + " during "
-                            + " MNReplicationTask id " + this.taskid + " to FAILED.");
-                    
-                } catch (BaseException e1) {
-                    log.info("There was a problem setting the replication status to " +
-                            " REQUESTED for identifier " + 
-                            this.pid.getValue() + " during " + 
-                            " MNReplicationTask id " + this.taskid);
-               }               
-            }            
         }        
+        
+        // update the replication status
+        ReplicationStatus status = null;
+        if ( success ) {
+            status = ReplicationStatus.REQUESTED;
+            
+        } else {
+            status = ReplicationStatus.FAILED;
 
-        return this.pid.getValue();
+        }
+
+        try {
+            cn.setReplicationStatus(session, pid, targetNode, status, null);
+            log.info("Updated replica status for identifier " + 
+                this.pid.getValue() + " on replica node " + 
+                this.targetNode.getValue() + " to " + status.toString());
+            
+        } catch (BaseException e1) {
+            log.info("There was a problem setting the replication status to " +
+                    " REQUESTED for identifier " + 
+                    this.pid.getValue() + " during " + 
+                    " MNReplicationTask id " + this.taskid);
+       }               
+
+       return this.pid.getValue();
     }
 
     /**
