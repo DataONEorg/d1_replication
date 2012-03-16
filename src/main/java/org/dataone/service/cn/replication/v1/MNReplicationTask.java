@@ -33,11 +33,6 @@ import org.dataone.client.MNode;
 import org.dataone.client.auth.CertificateManager;
 import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.BaseException;
-import org.dataone.service.exceptions.InvalidRequest;
-import org.dataone.service.exceptions.InvalidToken;
-import org.dataone.service.exceptions.NotAuthorized;
-import org.dataone.service.exceptions.NotFound;
-import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.ReplicationStatus;
@@ -275,14 +270,13 @@ public class MNReplicationTask
         // Get an target MNode reference to communicate with
         try {
             this.targetMN = D1Client.getMN(targetNode);
-
+       
         } catch (ServiceFailure e) {
             
             try {
                 // wait 5 seconds and try again, else fail
                 Thread.sleep(5000L);
                 this.targetMN = D1Client.getMN(targetNode);
-            
             } catch (ServiceFailure e1) {
 
                 try {
@@ -311,9 +305,9 @@ public class MNReplicationTask
             sysmeta = cn.getSystemMetadata(session, pid);
             
             // call for the replication
-            log.info("Task id " + this.getTaskid() + "calling replicate() at targetNode id " + 
-                    targetMN.getNodeId() + " for identifier " + this.pid.getValue());
-            success = targetMN.replicate(session, sysmeta, this.originatingNode);
+            log.info("Task id " + this.getTaskid() + " calling replicate() at targetNode id " + 
+                    this.targetNode.getValue() + " for identifier " + this.pid.getValue());
+            success = this.targetMN.replicate(session, sysmeta, this.originatingNode);
                         
         } catch (BaseException e) {
                        
@@ -324,9 +318,8 @@ public class MNReplicationTask
                 Thread.sleep(5000L);
                 // get the most recent system metadata for the pid
                 sysmeta = cn.getSystemMetadata(session, pid);
-                log.info("Calling MNReplication.replicate() at targetNode id " + 
-                        targetMN.getNodeBaseServiceUrl() + " for identifier " + 
-                        this.pid.getValue());
+                log.info("Task id " + this.getTaskid() + " calling replicate() at targetNode id " + 
+                        this.targetNode.getValue() + " for identifier " + this.pid.getValue());
                 success = targetMN.replicate(session, sysmeta, this.originatingNode);
                                 
             } catch (BaseException e1) {
