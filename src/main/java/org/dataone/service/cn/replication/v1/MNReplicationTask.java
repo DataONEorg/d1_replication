@@ -361,10 +361,10 @@ public class MNReplicationTask
         }
 
         try {
-            cn.setReplicationStatus(session, pid, targetNode, status, null);
-            log.info("Updated replica status for identifier " + 
-                this.pid.getValue() + " on replica node " + 
+            log.info( "Task" + this.getTaskid() + " updating replica status for identifier " + 
+                this.pid.getValue() + " on node " + 
                 this.targetNode.getValue() + " to " + status.toString());
+            cn.setReplicationStatus(session, pid, targetNode, status, null);
             
         } catch (BaseException e1) {
             log.info("There was a problem setting the replication status to " +
