@@ -128,7 +128,7 @@ public class ReplicationEventListener
             if ( pid != null ) {                
                 log.info("Won the replication events queue poll for " + identifier.getValue());
                 // evaluate the object's replication policy for potential task creation
-                this.replicationManager.createAndQueueTasks(identifier);
+                this.replicationManager.createAndQueueTasks(pid);
                 
             }
             
