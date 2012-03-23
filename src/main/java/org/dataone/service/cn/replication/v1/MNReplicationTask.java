@@ -233,11 +233,11 @@ public class MNReplicationTask
      *
      * @return pid - the identifier of the replicated object upon success
      */
-    public String call() throws InterruptedException {
+    public String call() {
 
-        log.info("Replication attempt # " + this.getRetryCount() + 
-            " for replication task " + this.getTaskid() + " for identifier " + 
-            this.getPid().getValue() + " on node " + this.getTargetNode().getValue());
+        log.info("Replication attempt # " + getRetryCount() + 
+            " for replication task " + getTaskid() + " for identifier " + 
+            getPid().getValue() + " on node " + getTargetNode().getValue());
         
         SystemMetadata sysmeta = null;
         
@@ -252,62 +252,82 @@ public class MNReplicationTask
             this.cn = D1Client.getCN();
         
         } catch (ServiceFailure e) {
-            
+            log.warn("Caught a ServiceFailure while getting a reference to the CN " +
+                "during replication task id " + getTaskid() + ", identifier " +
+                getPid().getValue() + ", target node " + getTargetNode().getValue());
             // try again, then fail
             try {
                 Thread.sleep(5000L);
                 this.cn = D1Client.getCN();
             
             } catch (ServiceFailure e1) {
-                log.info("There was a problem getting a Coordinating Node reference " +
-                    " for MNReplicationTask id " + this.taskid + " and identifier " +
-                    this.pid.getValue());
+                log.warn("Second ServiceFailure while getting a reference to the CN " +
+                    "during replication task id " + getTaskid() + ", identifier " +
+                    getPid().getValue() + ", target node " + getTargetNode().getValue());
                 e1.printStackTrace();
-                
+                this.cn = null;
+                success = false;
+
+            } catch (InterruptedException ie) {
+                log.error("Caught InterruptedException while getting a reference to the CN " +
+                    "during replication task id " + getTaskid() + ", identifier " +
+                    getPid().getValue() + ", target node " + getTargetNode().getValue());
+                ie.printStackTrace();
+                this.cn = null;
+                success = false;
+
             }
         }
 
         // Get an target MNode reference to communicate with
         try {
-            this.targetMN = D1Client.getMN(targetNode);
+            this.targetMN = D1Client.getMN(this.targetNode);
        
         } catch (ServiceFailure e) {
+            log.warn("Caught a ServiceFailure while getting a reference to the MN " +
+                    "during replication task id " + getTaskid() + ", identifier " +
+                    getPid().getValue() + ", target node " + getTargetNode().getValue());
             
             try {
                 // wait 5 seconds and try again, else fail
                 Thread.sleep(5000L);
-                this.targetMN = D1Client.getMN(targetNode);
+                this.targetMN = D1Client.getMN(this.targetNode);
+            
             } catch (ServiceFailure e1) {
 
-                try {
-                    cn.setReplicationStatus(session, pid, targetNode, ReplicationStatus.FAILED, e1);
-                    log.info("There was a problem calling replicate() on " +
-                            this.targetNode.getValue() + " for identifier " + 
-                            this.pid.getValue() + " during " + 
-                            " MNReplicationTask id " + this.taskid);
+                log.error("There was a problem calling replicate() on " +
+                        getTargetNode().getValue() + " for identifier " + 
+                        this.pid.getValue() + " during " + 
+                        " task id " + getTaskid());
+                e1.printStackTrace();
+                success = false;
+                                    
+            } catch (InterruptedException ie) {
+                log.error("Caught InterruptedException while getting a reference to the MN " +
+                        "during replication task id " + getTaskid() + ", identifier " +
+                        getPid().getValue() + ", target node " + getTargetNode().getValue());
+                ie.printStackTrace();
+                success = false;
 
-                    e1.printStackTrace();
-                    
-                } catch (BaseException e2) {
-                    log.info("There was a problem setting the replication status for identifier " + 
-                            this.pid.getValue() + " during " + 
-                            " MNReplicationTask id " + this.taskid);
-
-                    e2.printStackTrace();
-                    
-                }
             }
         }
 
         try {
 
-            // get the most recent system metadata for the pid
-            sysmeta = cn.getSystemMetadata(session, pid);
-            
-            // call for the replication
-            log.info("Task id " + this.getTaskid() + " calling replicate() at targetNode id " + 
-                    this.targetNode.getValue() + " for identifier " + this.pid.getValue());
-            success = this.targetMN.replicate(session, sysmeta, this.originatingNode);
+            if (this.cn != null ) {
+                // get the most recent system metadata for the pid
+                sysmeta = cn.getSystemMetadata(session, pid);
+                // call for the replication
+                success = this.targetMN.replicate(session, sysmeta, this.originatingNode);
+                log.info("Task id " + this.getTaskid() + " called replicate() at targetNode " + 
+                        this.targetNode.getValue() + ", identifier " + this.pid.getValue() +
+                        ". Success: " + success);
+               
+            } else {
+                log.error("Can't get system metadata: CNode object is null for " +
+                    " task id " + getTaskid() + ", identifier " + getPid().getValue() +
+                    ", target node " + getTargetNode().getValue());
+            }
                         
         } catch (BaseException e) {
                        
@@ -317,31 +337,46 @@ public class MNReplicationTask
                 this.retryCount++;
                 Thread.sleep(5000L);
                 // get the most recent system metadata for the pid
-                sysmeta = cn.getSystemMetadata(session, pid);
-                log.info("Task id " + this.getTaskid() + " calling replicate() at targetNode id " + 
-                        this.targetNode.getValue() + " for identifier " + this.pid.getValue());
-                success = targetMN.replicate(session, sysmeta, this.originatingNode);
-                                
+                if (this.cn != null ) {
+                    sysmeta = cn.getSystemMetadata(session, pid);
+                    success = targetMN.replicate(session, sysmeta, this.originatingNode);
+                    log.info("Task id " + this.getTaskid() + " called replicate() at targetNode " + 
+                            this.targetNode.getValue() + ", identifier " + this.pid.getValue() +
+                            ". Success: " + success);
+                    
+                } else {
+                    log.error("Can't get system metadata: CNode object is null for " +
+                        " task id " + getTaskid() + ", identifier " + getPid().getValue() +
+                        ", target node " + getTargetNode().getValue());
+                }
+                               
             } catch (BaseException e1) {
                 
                 // still couldn't call replicate() successfully. fail.
-                try {
-                    cn.setReplicationStatus(session, pid, targetNode, ReplicationStatus.FAILED, e);
-                    log.info("The call to MN.replicate() failed for " + pid.getValue() +
-                            " on " + this.targetNode.getValue());
-                    
-                } catch (BaseException e2) {
-                    log.info("There was a problem setting the replication status to " +
-                            " FAILED for identifier " + 
-                            this.pid.getValue() + " during " + 
-                            " MNReplicationTask id " + this.taskid);
-
-                    e1.printStackTrace();
-                }
+                log.error("There was a second problem calling replicate() on " +
+                        getTargetNode().getValue() + " for identifier " + 
+                        getPid().getValue() + " during " + 
+                        " task id " + getTaskid());
+                e1.printStackTrace();
+                success = false;
                                                 
+            } catch (InterruptedException ie) {
+                log.error("Caught InterruptedException while calling replicate() " +
+                    "during replication task id " + getTaskid() + ", identifier " +
+                    getPid().getValue() + ", target node " + getTargetNode().getValue());
+                ie.printStackTrace();
+                success = false;
+
             }
             
-        }        
+        } catch (Exception e) {
+            log.error("Unknown exception during replication task id " +
+                getTaskid() + ", identifier " + getPid().getValue() + 
+                ", target node " + getTargetNode().getValue() + ". Error message: " +
+                e.getMessage());
+            success = false;
+            
+        }
         
         // update the replication status
         ReplicationStatus status = null;
@@ -354,10 +389,19 @@ public class MNReplicationTask
         }
 
         try {
-            log.info( "Task" + this.getTaskid() + " updating replica status for identifier " + 
-                this.pid.getValue() + " on node " + 
-                this.targetNode.getValue() + " to " + status.toString());
-            cn.setReplicationStatus(session, pid, targetNode, status, null);
+            if (this.cn != null) {
+                cn.setReplicationStatus(session, pid, targetNode, status, null);
+                log.info( "Task" + this.getTaskid() + " updated replica status for identifier " + 
+                    this.pid.getValue() + " on node " + 
+                    this.targetNode.getValue() + " to " + status.toString());
+            } else {
+                log.info( "Task" + this.getTaskid() + 
+                    " can't update replica status for identifier " + 
+                    this.pid.getValue() + " on node " + 
+                    this.targetNode.getValue() + " to " + status.toString() +
+                    ". CNode reference is null.");
+                
+            }
             
         } catch (BaseException e1) {
             log.info("There was a problem setting the replication status to " +
