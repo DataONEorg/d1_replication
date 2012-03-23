@@ -35,6 +35,7 @@ import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IQueue;
 import com.hazelcast.core.IMap;
+import com.hazelcast.core.ISet;
 import com.hazelcast.core.ItemListener;
 import com.hazelcast.client.HazelcastClient;
 import org.dataone.cn.hazelcast.HazelcastClientInstance;
@@ -66,6 +67,9 @@ public class ReplicationEventListener
             
     /* The name of the replication events queue */
     private String eventsQueue;
+    
+    /* The name of the handled replication events set */
+    private String handledEvents;
 
     /* The name of the system metadata map */
     private String systemMetadataMap;
@@ -78,6 +82,9 @@ public class ReplicationEventListener
     
     /* The Hazelcast distributed replication events queue*/
     private IQueue<Identifier> replicationEvents;
+
+    /* The Hazelcast distributed handled replication events queue*/
+    private ISet<Identifier> handledReplicationEvents;
 
         
     /**
@@ -92,11 +99,14 @@ public class ReplicationEventListener
         this.hzMember = Hazelcast.getDefaultInstance();
         this.eventsQueue =
             Settings.getConfiguration().getString("dataone.hazelcast.replicationQueuedEvents");
+        this.handledEvents =
+            Settings.getConfiguration().getString("dataone.hazelcast.handledReplicationEvents");
         // get references to the system metadata map and events queue
         this.systemMetadataMap =
             Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
         this.systemMetadata = this.hzClient.getMap(systemMetadataMap);
         this.replicationEvents = this.hzMember.getQueue(eventsQueue);
+        this.handledReplicationEvents = this.hzMember.getSet(handledEvents);
 
         // listen for changes on both structures
         this.systemMetadata.addEntryListener(this, true);
@@ -120,21 +130,23 @@ public class ReplicationEventListener
      * the replicationManager to evaluate the replication policy for the identifier
      */
     public void itemAdded(Identifier identifier) {
-        log.info("Item added event received on the hzReplicationEvents queue for " 
+        log.info("Item added event received on the [end of] hzReplicationEvents queue for " 
             + identifier.getValue());
+        Identifier pid = null;
         try {
             // poll the queue to pop the most recent event off of the queue
-            Identifier pid = this.replicationEvents.poll(3L, TimeUnit.SECONDS);
-            if ( pid != null ) {                
-                log.info("Won the replication events queue poll for " + identifier.getValue());
+            pid = this.replicationEvents.poll(3L, TimeUnit.SECONDS);
+            if ( pid != null ) {    
+                log.info("Won the replication events queue poll [top of] for " + pid.getValue());
                 // evaluate the object's replication policy for potential task creation
+                handledReplicationEvents.add(pid);
                 this.replicationManager.createAndQueueTasks(pid);
-                
+                handledReplicationEvents.remove(pid);
             }
             
         } catch (BaseException e) {
             log.error("There was a problem handling task creation for " + 
-                identifier.getValue() + ". The error message was " +
+            		pid.getValue() + ". The error message was " +
                 e.getMessage());
             e.printStackTrace();
             
@@ -294,7 +306,8 @@ public class ReplicationEventListener
         log.info("The current number of potential replication events to be evaluated is: " 
             + this.replicationEvents.size());
         
-        if (!this.replicationEvents.contains(identifier)) {
+        // if it is not yet queued and not currently being handled, then we can add it
+        if (!this.replicationEvents.contains(identifier) && !this.handledReplicationEvents.contains(identifier)) {
             added = this.replicationEvents.offer(identifier);
             if (!added) {
                 log.info("Failed to add " + identifier + 
