@@ -696,17 +696,30 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
    * @return
    */
   public boolean isAllowed(Identifier pid) {
-    boolean isAllowed = false;
-    SystemMetadata sysmeta = this.systemMetadata.get(pid);
-    ReplicationPolicy policy = sysmeta.getReplicationPolicy();
+      
+      log.debug("ReplicationManager.isAllowed() called for " + pid.getValue());
+      boolean isAllowed = false;
+      SystemMetadata sysmeta = null;
+      ReplicationPolicy policy = null;
     
-        try {
-            isAllowed = policy.getReplicationAllowed().booleanValue();
-        
-        } catch (NullPointerException e) {
-            isAllowed = false;
-            
-        }
+      try {
+          sysmeta = this.systemMetadata.get(pid);
+          policy = sysmeta.getReplicationPolicy();
+          isAllowed = policy.getReplicationAllowed().booleanValue();
+      
+      } catch (NullPointerException e) {
+          log.error("NullPointerException caught in ReplicationManager.isAllowed() " + 
+                  "for identifier " + pid.getValue());
+          log.debug("ReplicationManager.isAllowed() = " + isAllowed + " for " + pid.getValue());
+          isAllowed = false;
+          
+      } catch (RuntimeException re) {
+          log.error("Runtime exception caught in ReplicationManager.isAllowed() " + 
+              "for identifier " + pid.getValue() + ". The error message was: " + 
+              re.getMessage());
+          log.debug("ReplicationManager.isAllowed() = " + isAllowed + " for " + pid.getValue());
+          isAllowed = false;
+      }
         
     return isAllowed;
   }
