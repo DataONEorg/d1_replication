@@ -112,7 +112,7 @@ public class MNReplicationTask
                 Settings.getConfiguration().getString("D1Client.certificate.directory")
                 + File.separator + Settings.getConfiguration().getString("D1Client.certificate.filename");
         CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
-        log.info("MNReplicationTask task id " + this.taskid + "is using an X509 certificate "
+        log.info("MNReplicationTask task id " + this.taskid + " is using an X509 certificate "
                 + "from " + clientCertificateLocation + " for identifier " + this.pid.getValue());
     }
 
