@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.dataone</groupId>
     <artifactId>d1_replication</artifactId>
-    <version>1.0.0-RC7-SNAPSHOT</version>
+    <version>1.0.0-RC7</version>
     <name>DataONE_Replication</name>
     <description>DataONE Coordinating Node replication manager</description>
     <url>http://dataone.org</url>
@@ -13,8 +13,8 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <spring.version>3.1.1.RELEASE</spring.version>
         <hazelcast.version>1.9.4.6</hazelcast.version>
-        <d1_libclient_version>1.0.1-RC7-SNAPSHOT</d1_libclient_version>
-        <d1_cn_noderegistry_version>1.0.0-RC6-SNAPSHOT</d1_cn_noderegistry_version>
+        <d1_libclient_version>1.0.1-RC6</d1_libclient_version>
+        <d1_cn_noderegistry_version>1.0.0-RC5</d1_cn_noderegistry_version>
     </properties>
     <build>
         <plugins>
