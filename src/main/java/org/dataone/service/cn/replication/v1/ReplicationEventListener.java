@@ -307,6 +307,10 @@ public class ReplicationEventListener
             + this.replicationEvents.size());
         
         // if it is not yet queued and not currently being handled, then we can add it
+        log.info("Replication event for " + identifier.getValue() + " has been handled: " +
+                this.handledReplicationEvents.contains(identifier));
+        log.info("Replication event for " + identifier.getValue() + " has been added  : " +
+                this.replicationEvents.contains(identifier));
         if (!this.replicationEvents.contains(identifier) && !this.handledReplicationEvents.contains(identifier)) {
             added = this.replicationEvents.offer(identifier);
             if (!added) {
