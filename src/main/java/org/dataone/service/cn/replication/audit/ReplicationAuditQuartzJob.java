@@ -9,26 +9,26 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 
 @DisallowConcurrentExecution
-public class ReplicaAuditTaskGeneratorJob implements Job {
+public class ReplicationAuditQuartzJob implements Job {
 
-    private static Logger logger = Logger.getLogger(ReplicaAuditTaskGeneratorJob.class.getName());
+    private static Logger logger = Logger.getLogger(ReplicationAuditQuartzJob.class.getName());
 
     private static ApplicationContext context;
-    private static ReplicaAuditTaskGenerator generator;
+    private static ReplicationAuditService generator;
 
-    public ReplicaAuditTaskGeneratorJob() {
+    public ReplicationAuditQuartzJob() {
     }
 
     public void execute(JobExecutionContext arg0) throws JobExecutionException {
         logger.info("executing replication audit task generation job...");
         setContext();
-        generator.generateAuditTasks();
+        generator.auditReplication();
     }
 
     private static void setContext() {
         if (context == null || generator == null) {
             context = new ClassPathXmlApplicationContext("replication-audit-context.xml");
-            generator = (ReplicaAuditTaskGenerator) context.getBean("replicaAuditTaskGenerator");
+            generator = (ReplicationAuditService) context.getBean("replicaAuditTaskGenerator");
         }
     }
 }

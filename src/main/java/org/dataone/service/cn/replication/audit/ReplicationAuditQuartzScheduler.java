@@ -17,10 +17,10 @@ import org.quartz.SimpleScheduleBuilder;
 import org.quartz.SimpleTrigger;
 import org.quartz.impl.StdSchedulerFactory;
 
-public class ReplicaAuditTaskGeneratorScheduler {
+public class ReplicationAuditQuartzScheduler {
 
-    private static Logger logger = Logger.getLogger(ReplicaAuditTaskGeneratorScheduler.class
-            .getName());
+    private static Logger logger = Logger
+            .getLogger(ReplicationAuditQuartzScheduler.class.getName());
 
     private static final String QUARTZ_TRIGGER = "replica-audit-trigger";
     private static final String QUARTZ_GROUP = "d1-cn-replica-audit";
@@ -39,9 +39,10 @@ public class ReplicaAuditTaskGeneratorScheduler {
             SchedulerFactory schedulerFactory = new StdSchedulerFactory(properties);
             scheduler = schedulerFactory.getScheduler();
 
-            JobDetail job = newJob(ReplicaAuditTaskGeneratorJob.class).withIdentity(QUARTZ_JOB,
+            JobDetail job = newJob(ReplicationAuditQuartzJob.class).withIdentity(QUARTZ_JOB,
                     QUARTZ_GROUP).build();
 
+            // TODO: NEED TO SCHEDULE BY TIME OF DAY TO SYNCH WITH OTHER CN
             SimpleTrigger trigger = newTrigger().withIdentity(QUARTZ_TRIGGER, QUARTZ_GROUP)//
                     .startNow() //
                     .withSchedule(SimpleScheduleBuilder.repeatHourlyForever(hours)) //
