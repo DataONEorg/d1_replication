@@ -592,7 +592,11 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                   }
                   
               } catch (ExecutionException e) {
-                  String msg = e.getCause().getMessage();
+                  String msg = "";
+                  if ( e.getCause() != null ) {
+                      msg = e.getCause().getMessage();
+                      
+                  }
                   log.info("MNReplicationTask id " + task.getTaskid() +
                       " threw an execution execption on identifier " +
                           task.getPid().getValue() + ": " + msg);
