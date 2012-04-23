@@ -102,6 +102,9 @@ public class ReplicationAuditTask implements Serializable, Callable<String> {
             String cnChecksumValue = sysMeta.getChecksum().getValue();
 
             for (Replica replica : sysMeta.getReplicaList()) {
+                
+                // TODO: Use hzNodes in processing cluster to read node list
+                // Replicas on CN node do not count towards total replica count.
                 MNode mn = getMNode(replica.getReplicaMemberNode());
                 if (mn == null) {
                     log.error("Cannot get MN: " + replica.getReplicaMemberNode().getValue()
@@ -116,8 +119,7 @@ public class ReplicationAuditTask implements Serializable, Callable<String> {
                             + replica.getReplicaMemberNode().getValue());
                     handleInvalidReplica(pid, sysMeta, replica);
                     queueToReplication = true;
-                }
-                if (mnChecksum.getValue().equals(cnChecksumValue)) {
+                } else if (mnChecksum.getValue().equals(cnChecksumValue)) {
                     validReplicaCount++;
                     replica.setReplicaVerified(new Date(System.currentTimeMillis()));
                     boolean success = updateReplica(pid, sysMeta, replica);

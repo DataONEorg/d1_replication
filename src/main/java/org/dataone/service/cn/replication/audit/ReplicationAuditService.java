@@ -18,6 +18,8 @@ import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.configuration.Settings;
 import org.dataone.service.types.v1.Identifier;
 import org.springframework.beans.support.PagedListHolder;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
 
 import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.core.IdGenerator;
@@ -29,7 +31,7 @@ public class ReplicationAuditService {
     private static final int taskChunkSize = 10;
     private static final long auditPeriod = 1000 * 60 * 60 * 24 * 14; // 14 days
 
-    private ReplicationAuditDao auditDao;
+    private ReplicationDao auditDao;
 
     private HazelcastClient processingClient;
 
@@ -56,6 +58,14 @@ public class ReplicationAuditService {
     private static Logger log = Logger.getLogger(ReplicationAuditService.class.getName());
 
     public ReplicationAuditService() {
+    }
+
+    public static void main(String[] args) {
+        ApplicationContext context = new ClassPathXmlApplicationContext(
+                "replication-audit-context.xml");
+        ReplicationAuditService service = (ReplicationAuditService) context
+                .getBean("replicationAuditService");
+        service.auditReplication();
     }
 
     public void auditReplication() {
@@ -85,7 +95,8 @@ public class ReplicationAuditService {
                 pidBatch.add(pid);
             }
             if (pidBatch.size() >= pidChunkSize) {
-                auditTaskBatch.add(new ReplicationAuditTask(String.valueOf(taskIdGenerator), pidBatch));
+                auditTaskBatch.add(new ReplicationAuditTask(String.valueOf(taskIdGenerator),
+                        pidBatch));
                 pidBatch.clear();
             }
             if (auditTaskBatch.size() >= taskChunkSize) {
@@ -188,7 +199,7 @@ public class ReplicationAuditService {
         }
     }
 
-    public void setAuditDao(ReplicationAuditDao auditDao) {
+    public void setAuditDao(ReplicationDao auditDao) {
         this.auditDao = auditDao;
     }
 }

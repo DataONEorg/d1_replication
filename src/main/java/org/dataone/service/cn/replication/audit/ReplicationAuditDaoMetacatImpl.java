@@ -10,12 +10,11 @@ import java.util.List;
 import javax.sql.DataSource;
 
 import org.dataone.service.types.v1.Identifier;
-import org.dataone.service.types.v1.Replica;
 import org.springframework.beans.support.PagedListHolder;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
-public class ReplicationAuditDaoMetacatImpl implements ReplicationAuditDao {
+public class ReplicationAuditDaoMetacatImpl implements ReplicationDao {
 
     private JdbcTemplate jdbcTemplate;
     private final DateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
@@ -55,10 +54,6 @@ public class ReplicationAuditDaoMetacatImpl implements ReplicationAuditDao {
 
     public PagedListHolder<Identifier> getStaleQueuedRelicas(int pageSize, int pageNumber) {
         return null;
-    }
-
-    public void updateReplica(Replica replica) {
-
     }
 
     private static final class IdentifierMapper implements RowMapper<Identifier> {

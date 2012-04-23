@@ -3,7 +3,6 @@ package org.dataone.service.cn.replication.audit;
 import java.util.Date;
 
 import org.dataone.service.types.v1.Identifier;
-import org.dataone.service.types.v1.Replica;
 import org.springframework.beans.support.PagedListHolder;
 
 /**
@@ -15,7 +14,7 @@ import org.springframework.beans.support.PagedListHolder;
  * @author sroseboo
  * 
  */
-public interface ReplicationAuditDao {
+public interface ReplicationDao {
 
     public PagedListHolder<Identifier> getReplicasByDate(Date auditDate, int pageSize,
             int pageNumber);
@@ -26,5 +25,4 @@ public interface ReplicationAuditDao {
 
     public PagedListHolder<Identifier> getStaleQueuedRelicas(int pageSize, int pageNumber);
 
-    public void updateReplica(Replica replica);
 }
