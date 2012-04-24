@@ -32,8 +32,11 @@ import com.hazelcast.impl.base.RuntimeInterruptedException;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
@@ -333,6 +336,9 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         }
     }
 
+    // prioritize replica targets by preferred/blocked lists and other performance metrics
+    potentialNodeList = prioritizeNodes(potentialNodeList, sysmeta);
+    
     // parse the sysmeta.ReplicationPolicy
     ReplicationPolicy replicationPolicy = sysmeta.getReplicationPolicy();
     
@@ -340,42 +346,6 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
     if ( replicationPolicy.getNumberReplicas() != null ) {
         desiredReplicas = replicationPolicy.getNumberReplicas().intValue();
         
-    }
-
-    // get the preferred and blocked lists for prioritization
-    List<NodeReference> preferredList = 
-        replicationPolicy.getPreferredMemberNodeList();
-    List<NodeReference> blockedList = 
-      replicationPolicy.getBlockedMemberNodeList();
-
-    log.info("Removing blocked nodes from the potential replication list for " +
-      pid.getValue());
-    // remove blocked nodes from the potential nodelist
-    if ( blockedList != null && !blockedList.isEmpty() ) {
-      for (NodeReference blockedNode : blockedList) {
-        if ( potentialNodeList.contains(blockedNode) ) {
-          potentialNodeList.remove(blockedNode);
-          
-        }
-      }
-    }
-
-    log.info("Prioritizing preferred nodes in the potential replication list for " +
-      pid.getValue());
-
-    // prioritize preferred nodes in the potential node list
-    if ( preferredList != null && !preferredList.isEmpty() ) {
-      
-      // process preferred nodes backwards
-      for (int i = preferredList.size() - 1; i >= 0; i--) {
-        
-        NodeReference preferredNode = preferredList.get(i);
-        if ( potentialNodeList.contains( preferredNode) ) {
-          potentialNodeList.remove(preferredNode); // remove for reordering
-          potentialNodeList.add(0, preferredNode); // to the top of the list
-           
-        }
-      }
     }
      
     log.info("Desired replicas for identifier " + pid.getValue() + " is " + desiredReplicas);
@@ -756,5 +726,221 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
     public void setCnReplication(CNReplication cnReplication) {
         this.cnReplication = cnReplication;
     }
-  
+
+    /**
+     * For the given node list, report the pending request factor of each node.
+     * 
+     * @param nodeIdentifiers  the list of nodes to include in the report
+     * @param useCache    use the cached values if the cache hasn't expired
+     * @return pendingRequests  the pending request factors of the nodes
+     */
+    public HashMap<NodeReference, Float> getPendingRequestFactors(
+        List<NodeReference> nodeIdentifiers, 
+        boolean useCache) {
+        HashMap<NodeReference, Float> requestFactors = new HashMap<NodeReference, Float>();
+
+       /* TODO: report the pending request factor based on the following notes
+        * at http://epad.dataone.org/20120420-replication-priority-queue
+        * 
+        * Replication Requests Factor R
+        * -----------------------------
+        * The goal here is to be sure not to overload nodes by only
+        * issuing a fixed number of requests for replication to a
+        * given member node. If the request limit is reached, don't
+        * submit more requests.
+        * 
+        * Max request limit (rl)
+        * Number of pending replication tasks on target (rt)
+        * 
+        * R = 1 if rt < rl, 0 otherwise
+        * Also want to deal wiht the number of requests pending
+        * against a source node, but defer until later:
+        * 
+        * Number of pending replication tasks on source (rs)
+        * To be determined -- refactor R including rs
+        */
+
+        return requestFactors;
+    }
+    
+    /**
+     * For the given node list, report the success factor as a surrogate for the 
+     * nodes' demonstrated replication successes over a recent time period.
+     * 
+     * @param nodeIdentifiers  the list of nodes to include in the report
+     * @param useCache    use the cached values if the cache hasn't expired 
+     * @return failureFactors  the failure factors of the nodes
+     */
+    public HashMap<NodeReference, Float> getFailureFactors(List<NodeReference> nodeIdentifiers, 
+        boolean useCache) {
+        HashMap<NodeReference, Float> failureFactors = new HashMap<NodeReference, Float>();
+
+       /* TODO: calculate the failure factor based on the following notes
+        * at http://epad.dataone.org/20120420-replication-priority-queue
+        * 
+        * Failure Factor F
+        * ----------------
+        * The goal here is to avoid nodes that are failing a lot, and
+        * for those that are failing less than an arbitrary threshold,
+        * prioritize them proportionally to their success rate.
+        * 
+        * Number of replication successes over last 3 days (ps)
+        * Number of replication failures over last 3 days (pf) days)
+        * 
+        * Success threshold (st) = default 0.80
+        * F = 0 if ps/(ps+pf) <= st, else ps/(ps+pf)
+        */
+
+        // Placeholder code: assign equal failure factors for now.
+        Iterator<NodeReference> iterator = nodeIdentifiers.iterator();
+        
+        while (iterator.hasNext()) {
+            failureFactors.put((NodeReference) iterator.next(), new Float(1.0));
+        }
+
+        return failureFactors;
+    }
+
+    /**
+     * For the given nodes, return the bandwidth factor as a surrogate for the 
+     * nodes' demonstrated throughput over a recent time period.
+     * 
+     * @param nodeIdentifiers  the list of nodes to include in the report
+     * @param useCache   use the cached values if the cache hasn't expired
+     * @return bandwidthFactors  the bandwidth factor of the node
+     */
+    public HashMap<NodeReference, Float> getBandwidthFactors(List<NodeReference> nodeIdentifiers, 
+        boolean useCache) {
+        HashMap<NodeReference, Float> bandwidthFactors = 
+            new HashMap<NodeReference, Float>();
+        
+        
+       /* TODO: calculate the bandwidth factor based on the following notes
+        * at http://epad.dataone.org/20120420-replication-priority-queue
+        * 
+        * Bandwith Factor B
+        * -----------------
+        * The goal here is to utilize high bandwidth nodes more than
+        * low by skewing the rank in favor of high bandwidth nodes. We
+        * do this by calculating B from 0 to 2 and multiplying the
+        * other metrics by B, which will proportionally reduce or
+        * enhance the rank based on B. THe metric following uses the
+        * range of bandwidths available across all nodes to determine
+        * B such that the lowest bandwidth nodes will be near zero and
+        * the highest near 2, but a lot of the nodes will cluster
+        * around 1 due to the log functions.
+        * 
+        * B  =  2*(log(b/bmin) /  log(bmax/bmin))
+        * 
+        * will range from 0 to 2  
+        * Node Bandwidth b 
+        * MaxNodeBandwith bmax 
+        * MinNodeBandwidth bmin 
+        * 
+        * Note that its not clear how we actually estimate node
+        * bandwidth -- is it a node reported metadata value, or
+        * something we measure during normal operations? The latter
+        * would be possible by recording the time to replicate data
+        * between two nodes and dividing by the replica size, and
+        * assign the resultant value to both nodes -- over time an
+        * average would build up indicating the effective throughput
+        * that considers not just network bandwidth but also storage
+        * I/O rates and admin overhead.
+        */
+
+        // Placeholder code: assign equal bandwidth factors for now
+        Iterator<NodeReference> iterator = nodeIdentifiers.iterator();
+        
+        while (iterator.hasNext()) {
+            bandwidthFactors.put((NodeReference) iterator.next(), new Float(1.0));
+        }
+        
+        return bandwidthFactors;
+    }
+
+    /**
+     * Prioritize a list of potential replica target nodes based on a number of
+     * factors including preferred/blocked node lists, pending request, failure,
+     * and bandwidth factors.
+     * @param sysmeta 
+     * @param potentialNodeList 
+     * 
+     * @return nodesByPriority  a list of nodes by descending priority
+     */
+    public List<NodeReference> prioritizeNodes(List<NodeReference> potentialNodeList, 
+        SystemMetadata sysmeta) {
+        List<NodeReference> nodesByPriority = new ArrayList<NodeReference>();        
+        ReplicationPolicy replicationPolicy = sysmeta.getReplicationPolicy();
+        Identifier pid = sysmeta.getIdentifier();
+        HashMap<NodeReference, Float> requestFactorMap   = new HashMap<NodeReference, Float>();
+        HashMap<NodeReference, Float> failureFactorMap   = new HashMap<NodeReference, Float>();
+        HashMap<NodeReference, Float> bandwidthFactorMap = new HashMap<NodeReference, Float>();
+        
+        log.info("Removing blocked nodes from the potential replication list for " +
+          pid.getValue());
+        // remove blocked nodes from the potential nodelist
+        List<NodeReference> blockedList = 
+            replicationPolicy.getBlockedMemberNodeList();
+        if ( blockedList != null && !blockedList.isEmpty() ) {
+          for (NodeReference blockedNode : blockedList) {
+            if ( potentialNodeList.contains(blockedNode) ) {
+              potentialNodeList.remove(blockedNode);
+              
+            }
+          }
+        }
+
+        log.info("Retrieving performance metrics for the potential replication list for " +
+                pid.getValue());
+        
+        // get performance metrics for the potential node list
+        requestFactorMap   = getPendingRequestFactors(potentialNodeList, true);
+        failureFactorMap   = getFailureFactors(potentialNodeList, true);
+        bandwidthFactorMap = getBandwidthFactors(potentialNodeList, true);
+        
+        TreeMap<NodeReference, Float> nodesByPriorityMap = 
+            new TreeMap<NodeReference, Float>();
+        Iterator<NodeReference> iterator = potentialNodeList.iterator();
+                
+        // iterate through the potential node list and calculate performance scores
+        while (iterator.hasNext()) {
+            NodeReference nodeId = (NodeReference) iterator.next();
+            Float nodePendingRequestFactor = requestFactorMap.get(nodeId);
+            Float nodeFailureFactor = failureFactorMap.get(nodeId);
+            Float nodeBandwidthFactor = bandwidthFactorMap.get(nodeId);
+
+            Float score = 
+                nodePendingRequestFactor * nodeFailureFactor * nodeBandwidthFactor;
+            
+            // TODO: This sorts by node id, not score.  Add a Comparator class
+            // to sort by value.
+            nodesByPriorityMap.put(nodeId, score);
+        }
+        
+        log.info("Prioritizing preferred nodes in the potential replication list for " +
+          pid.getValue());
+
+        // prioritize preferred nodes in the potential node list
+        List<NodeReference> preferredList = 
+            replicationPolicy.getPreferredMemberNodeList();
+        if ( preferredList != null && !preferredList.isEmpty() ) {
+          
+          // process preferred nodes backwards
+          for (int i = preferredList.size() - 1; i >= 0; i--) {
+            
+            NodeReference preferredNode = preferredList.get(i);
+            if ( potentialNodeList.contains( preferredNode) ) {
+              potentialNodeList.remove(preferredNode); // remove for reordering
+              potentialNodeList.add(0, preferredNode); // to the top of the list
+               
+            }
+          }
+        }
+        
+        // TODO: add preferred nodes to the top of the sorted list, and return
+        // the keys of the list
+
+        return nodesByPriority;
+    }
+    
 }
