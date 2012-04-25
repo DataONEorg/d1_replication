@@ -72,4 +72,29 @@ public class CNReplicationImpl implements CNReplication {
        return true;
     }
 
+    @Override
+    public boolean setReplicationStatus(Identifier pid, NodeReference nodeRef, ReplicationStatus status, BaseException failure) throws ServiceFailure, NotImplemented, InvalidToken, NotAuthorized, InvalidRequest, NotFound {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public boolean setReplicationPolicy(Identifier pid, ReplicationPolicy policy, long serialVersion) throws NotImplemented, NotFound, NotAuthorized, ServiceFailure, InvalidRequest, InvalidToken, VersionMismatch {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public boolean isNodeAuthorized(Subject targetNodeSubject, Identifier pid) throws NotImplemented, NotAuthorized, InvalidToken, ServiceFailure, NotFound, InvalidRequest {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public boolean updateReplicationMetadata(Identifier pid, Replica replicaMetadata, long serialVersion) throws NotImplemented, NotAuthorized, ServiceFailure, NotFound, InvalidRequest, InvalidToken, VersionMismatch {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public boolean deleteReplicationMetadata(Identifier pid, NodeReference nodeId, long serialVersion) throws InvalidToken, InvalidRequest, ServiceFailure, NotAuthorized, NotFound, NotImplemented, VersionMismatch {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
 }
