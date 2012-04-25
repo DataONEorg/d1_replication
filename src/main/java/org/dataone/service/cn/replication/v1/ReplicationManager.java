@@ -35,6 +35,8 @@ import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -70,6 +72,7 @@ import org.dataone.service.types.v1.Service;
 import org.dataone.client.CNode;
 import org.dataone.client.D1Client;
 import org.dataone.client.auth.CertificateManager;
+import org.dataone.cn.dao.DaoFactory;
 import org.dataone.cn.hazelcast.HazelcastClientInstance;
 import org.dataone.service.cn.v1.CNReplication;
 
@@ -732,12 +735,19 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
      * 
      * @param nodeIdentifiers  the list of nodes to include in the report
      * @param useCache    use the cached values if the cache hasn't expired
-     * @return pendingRequests  the pending request factors of the nodes
+     * @return requestFactors  the pending request factors of the nodes
      */
-    public HashMap<NodeReference, Float> getPendingRequestFactors(
+    public Map<NodeReference, Integer> getPendingRequestFactors(
         List<NodeReference> nodeIdentifiers, 
         boolean useCache) {
-        HashMap<NodeReference, Float> requestFactors = new HashMap<NodeReference, Float>();
+        
+        // TODO: implement the useCache parameter, ignored for now
+        
+        // A map to store the raw pending replica counts
+        Map<NodeReference, Integer> pendingRequests = new HashMap<NodeReference, Integer>();
+        // A map to store the current request factors per node
+        Map<NodeReference, Integer> requestFactors = new HashMap<NodeReference, Integer>();
+        
 
        /* TODO: report the pending request factor based on the following notes
         * at http://epad.dataone.org/20120420-replication-priority-queue
@@ -759,7 +769,35 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         * Number of pending replication tasks on source (rs)
         * To be determined -- refactor R including rs
         */
+        
+        // TODO: Use a configurable limit. For now, define a static request limit
+        int requestLimit = 10;
+        
+        // query the systemmetadatastatus table to get counts of queued and
+        // requested replicas by node identifier
+        pendingRequests = DaoFactory.getReplicationDao().getPendingReplicasByNode();
+        
+        Iterator<?> iterator = pendingRequests.entrySet().iterator();
+        
+        while(iterator.hasNext()) {
+            Map.Entry<NodeReference, Integer> entry = 
+                (Entry<NodeReference, Integer>) iterator.next();
+            
+            if ( entry.getValue() <= requestLimit ) {
+                // currently under or equal to the limit
+                requestFactors.put(entry.getKey(), new Integer(1));
+                
+            } else {
+                // currently over the limit
+                requestFactors.put(entry.getKey(), new Integer(0));
+                log.info("Node " + entry.getKey().getValue() + 
+                    " is currently over its request limit of " +
+                    requestLimit + " requests.");
 
+            }
+            
+            
+        }
         return requestFactors;
     }
     
@@ -872,7 +910,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         List<NodeReference> nodesByPriority = new ArrayList<NodeReference>();        
         ReplicationPolicy replicationPolicy = sysmeta.getReplicationPolicy();
         Identifier pid = sysmeta.getIdentifier();
-        HashMap<NodeReference, Float> requestFactorMap   = new HashMap<NodeReference, Float>();
+        Map<NodeReference, Integer> requestFactorMap   = new HashMap<NodeReference, Integer>();
         HashMap<NodeReference, Float> failureFactorMap   = new HashMap<NodeReference, Float>();
         HashMap<NodeReference, Float> bandwidthFactorMap = new HashMap<NodeReference, Float>();
         
@@ -905,7 +943,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         // iterate through the potential node list and calculate performance scores
         while (iterator.hasNext()) {
             NodeReference nodeId = (NodeReference) iterator.next();
-            Float nodePendingRequestFactor = requestFactorMap.get(nodeId);
+            Integer nodePendingRequestFactor = requestFactorMap.get(nodeId);
             Float nodeFailureFactor = failureFactorMap.get(nodeId);
             Float nodeBandwidthFactor = bandwidthFactorMap.get(nodeId);
 
