@@ -23,36 +23,82 @@ import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.Subject;
 
 /**
- * Mock Class that acts as an implementation of CNReplication so that we don't need
- * an accessible CN running on a remote server somewhere in order to unit test
+ * Mock Class that acts as an implementation of CNReplication so that we don't
+ * need an accessible CN running on a remote server somewhere in order to unit
+ * test
  * 
  * @author waltz
  */
 public class CNReplicationImpl implements CNReplication {
 
     @Override
-    public boolean setReplicationStatus(Session session, Identifier pid, NodeReference nodeRef, ReplicationStatus status, BaseException failure) throws ServiceFailure, NotImplemented, InvalidToken, NotAuthorized, InvalidRequest, NotFound {
+    public boolean setReplicationStatus(Session session, Identifier pid, NodeReference nodeRef,
+            ReplicationStatus status, BaseException failure) throws ServiceFailure, NotImplemented,
+            InvalidToken, NotAuthorized, InvalidRequest, NotFound {
         return true;
     }
 
     @Override
-    public boolean setReplicationPolicy(Session session, Identifier pid, ReplicationPolicy policy, long serialVersion) throws NotImplemented, NotFound, NotAuthorized, ServiceFailure, InvalidRequest, InvalidToken, VersionMismatch {
+    public boolean setReplicationPolicy(Session session, Identifier pid, ReplicationPolicy policy,
+            long serialVersion) throws NotImplemented, NotFound, NotAuthorized, ServiceFailure,
+            InvalidRequest, InvalidToken, VersionMismatch {
         return true;
     }
 
     @Override
-    public boolean isNodeAuthorized(Session originatingNodeSession, Subject targetNodeSubject, Identifier pid) throws NotImplemented, NotAuthorized, InvalidToken, ServiceFailure, NotFound, InvalidRequest {
+    public boolean isNodeAuthorized(Session originatingNodeSession, Subject targetNodeSubject,
+            Identifier pid) throws NotImplemented, NotAuthorized, InvalidToken, ServiceFailure,
+            NotFound, InvalidRequest {
         return true;
     }
 
     @Override
-    public boolean updateReplicationMetadata(Session targetNodeSession, Identifier pid, Replica replicaMetadata, long serialVersion) throws NotImplemented, NotAuthorized, ServiceFailure, NotFound, InvalidRequest, InvalidToken, VersionMismatch {
+    public boolean updateReplicationMetadata(Session targetNodeSession, Identifier pid,
+            Replica replicaMetadata, long serialVersion) throws NotImplemented, NotAuthorized,
+            ServiceFailure, NotFound, InvalidRequest, InvalidToken, VersionMismatch {
         return true;
     }
 
     @Override
-    public boolean deleteReplicationMetadata(Session session, Identifier pid, NodeReference nodeId, long serialVersion) throws InvalidToken, ServiceFailure, NotAuthorized, NotFound, NotImplemented, VersionMismatch {
-       return true;
+    public boolean deleteReplicationMetadata(Session session, Identifier pid, NodeReference nodeId,
+            long serialVersion) throws InvalidToken, ServiceFailure, NotAuthorized, NotFound,
+            NotImplemented, VersionMismatch {
+        return true;
+    }
+
+    @Override
+    public boolean setReplicationStatus(Identifier pid, NodeReference nodeRef,
+            ReplicationStatus status, BaseException failure) throws ServiceFailure, NotImplemented,
+            InvalidToken, NotAuthorized, InvalidRequest, NotFound {
+        return true;
+    }
+
+    @Override
+    public boolean setReplicationPolicy(Identifier pid, ReplicationPolicy policy, long serialVersion)
+            throws NotImplemented, NotFound, NotAuthorized, ServiceFailure, InvalidRequest,
+            InvalidToken, VersionMismatch {
+        return true;
+    }
+
+    @Override
+    public boolean isNodeAuthorized(Subject targetNodeSubject, Identifier pid)
+            throws NotImplemented, NotAuthorized, InvalidToken, ServiceFailure, NotFound,
+            InvalidRequest {
+        return true;
+    }
+
+    @Override
+    public boolean updateReplicationMetadata(Identifier pid, Replica replicaMetadata,
+            long serialVersion) throws NotImplemented, NotAuthorized, ServiceFailure, NotFound,
+            InvalidRequest, InvalidToken, VersionMismatch {
+        return true;
+    }
+
+    @Override
+    public boolean deleteReplicationMetadata(Identifier pid, NodeReference nodeId,
+            long serialVersion) throws InvalidToken, InvalidRequest, ServiceFailure, NotAuthorized,
+            NotFound, NotImplemented, VersionMismatch {
+        return true;
     }
 
 }
