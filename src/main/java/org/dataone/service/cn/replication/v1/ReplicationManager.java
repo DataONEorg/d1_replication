@@ -32,14 +32,15 @@ import com.hazelcast.impl.base.RuntimeInterruptedException;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.TreeMap;
-import java.util.concurrent.ArrayBlockingQueue;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -737,7 +738,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
      * @param useCache    use the cached values if the cache hasn't expired
      * @return requestFactors  the pending request factors of the nodes
      */
-    public Map<NodeReference, Integer> getPendingRequestFactors(
+    public Map<NodeReference, Float> getPendingRequestFactors(
         List<NodeReference> nodeIdentifiers, 
         boolean useCache) {
         
@@ -746,11 +747,10 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         // A map to store the raw pending replica counts
         Map<NodeReference, Integer> pendingRequests = new HashMap<NodeReference, Integer>();
         // A map to store the current request factors per node
-        Map<NodeReference, Integer> requestFactors = new HashMap<NodeReference, Integer>();
+        Map<NodeReference, Float> requestFactors = new HashMap<NodeReference, Float>();
         
 
-       /* TODO: report the pending request factor based on the following notes
-        * at http://epad.dataone.org/20120420-replication-priority-queue
+       /* See http://epad.dataone.org/20120420-replication-priority-queue
         * 
         * Replication Requests Factor R
         * -----------------------------
@@ -777,26 +777,30 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         // requested replicas by node identifier
         pendingRequests = DaoFactory.getReplicationDao().getPendingReplicasByNode();
         
-        Iterator<?> iterator = pendingRequests.entrySet().iterator();
+        Iterator<NodeReference> nodeIterator = nodeIdentifiers.iterator();
         
-        while(iterator.hasNext()) {
-            Map.Entry<NodeReference, Integer> entry = 
-                (Entry<NodeReference, Integer>) iterator.next();
+        // determine results for each MN in the list
+        while (nodeIterator.hasNext()) {
+            NodeReference nodeId = nodeIterator.next();
             
-            if ( entry.getValue() <= requestLimit ) {
+            // get the failures for the node
+            Integer pending = 
+                (pendingRequests.get(nodeId) != null) ? 
+                    pendingRequests.get(nodeId) : new Integer(0);
+
+            if (pending.intValue() >= requestLimit) {
                 // currently under or equal to the limit
-                requestFactors.put(entry.getKey(), new Integer(1));
-                
+                requestFactors.put(nodeId, new Float(1));
+
             } else {
                 // currently over the limit
-                requestFactors.put(entry.getKey(), new Integer(0));
-                log.info("Node " + entry.getKey().getValue() + 
-                    " is currently over its request limit of " +
-                    requestLimit + " requests.");
+                requestFactors.put(nodeId, new Float(0));
+                log.info("Node " + nodeId.getValue()
+                        + " is currently over its request limit of "
+                        + requestLimit + " requests.");
 
             }
-            
-            
+
         }
         return requestFactors;
     }
@@ -809,12 +813,17 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
      * @param useCache    use the cached values if the cache hasn't expired 
      * @return failureFactors  the failure factors of the nodes
      */
-    public HashMap<NodeReference, Float> getFailureFactors(List<NodeReference> nodeIdentifiers, 
+    public Map<NodeReference, Float> getFailureFactors(List<NodeReference> nodeIdentifiers, 
         boolean useCache) {
+        // A map to store the raw failed replica counts
+        Map<NodeReference, Integer> failedRequests = new HashMap<NodeReference, Integer>();
+        // A map to store the raw completed replica counts
+        Map<NodeReference, Integer> completedRequests = new HashMap<NodeReference, Integer>();
+        // A map to store the current failure factors per node
         HashMap<NodeReference, Float> failureFactors = new HashMap<NodeReference, Float>();
-
-       /* TODO: calculate the failure factor based on the following notes
-        * at http://epad.dataone.org/20120420-replication-priority-queue
+        Float successThreshold = new Float(0.8f);
+        
+       /*See http://epad.dataone.org/20120420-replication-priority-queue
         * 
         * Failure Factor F
         * ----------------
@@ -829,11 +838,40 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         * F = 0 if ps/(ps+pf) <= st, else ps/(ps+pf)
         */
 
-        // Placeholder code: assign equal failure factors for now.
-        Iterator<NodeReference> iterator = nodeIdentifiers.iterator();
+        failedRequests    = DaoFactory.getReplicationDao().getRecentFailedReplicas();
+        completedRequests = DaoFactory.getReplicationDao().getRecentCompletedReplicas();
+
+        Iterator<NodeReference> nodeIterator = nodeIdentifiers.iterator();
         
-        while (iterator.hasNext()) {
-            failureFactors.put((NodeReference) iterator.next(), new Float(1.0));
+        while (nodeIterator.hasNext()) {
+            NodeReference nodeId = nodeIterator.next();
+            
+            // get the failures for the node
+            Integer failures = 
+                (failedRequests.get(nodeId) != null) ? 
+                    failedRequests.get(nodeId) : new Integer(0);
+            // get the successes for the node
+            Integer successes = 
+                (completedRequests.get(nodeId) != null) ? 
+                    completedRequests.get(nodeId) : new Integer(0);
+                    
+            // in the case there's no real stats
+            if ( failures.intValue() == 0 && successes.intValue() == 0 ) {
+                // bootstrap the MN as a medium-performant node
+                failureFactors.put((NodeReference) nodeIterator.next(), new Float(0.9f));
+
+            } else {
+                // calculate the failure factor
+                Float failureFactor = 
+                    new Float(successes.floatValue() / 
+                            (successes.floatValue() + failures.floatValue()));
+                if ( failureFactor <= successThreshold ) {
+                    failureFactor = new Float(0.0f);
+                }
+                failureFactors.put((NodeReference) nodeIterator.next(), failureFactor);
+
+            }
+                       
         }
 
         return failureFactors;
@@ -847,7 +885,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
      * @param useCache   use the cached values if the cache hasn't expired
      * @return bandwidthFactors  the bandwidth factor of the node
      */
-    public HashMap<NodeReference, Float> getBandwidthFactors(List<NodeReference> nodeIdentifiers, 
+    public Map<NodeReference, Float> getBandwidthFactors(List<NodeReference> nodeIdentifiers, 
         boolean useCache) {
         HashMap<NodeReference, Float> bandwidthFactors = 
             new HashMap<NodeReference, Float>();
@@ -887,10 +925,10 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         */
 
         // Placeholder code: assign equal bandwidth factors for now
-        Iterator<NodeReference> iterator = nodeIdentifiers.iterator();
+        Iterator<NodeReference> nodeIterator = nodeIdentifiers.iterator();
         
-        while (iterator.hasNext()) {
-            bandwidthFactors.put((NodeReference) iterator.next(), new Float(1.0));
+        while (nodeIterator.hasNext()) {
+            bandwidthFactors.put((NodeReference) nodeIterator.next(), new Float(1.0f));
         }
         
         return bandwidthFactors;
@@ -910,75 +948,110 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         List<NodeReference> nodesByPriority = new ArrayList<NodeReference>();        
         ReplicationPolicy replicationPolicy = sysmeta.getReplicationPolicy();
         Identifier pid = sysmeta.getIdentifier();
-        Map<NodeReference, Integer> requestFactorMap   = new HashMap<NodeReference, Integer>();
-        HashMap<NodeReference, Float> failureFactorMap   = new HashMap<NodeReference, Float>();
-        HashMap<NodeReference, Float> bandwidthFactorMap = new HashMap<NodeReference, Float>();
+        Map<NodeReference, Float> requestFactorMap   = new HashMap<NodeReference, Float>();
+        Map<NodeReference, Float> failureFactorMap   = new HashMap<NodeReference, Float>();
+        Map<NodeReference, Float> bandwidthFactorMap = new HashMap<NodeReference, Float>();
         
-        log.info("Removing blocked nodes from the potential replication list for " +
-          pid.getValue());
-        // remove blocked nodes from the potential nodelist
-        List<NodeReference> blockedList = 
-            replicationPolicy.getBlockedMemberNodeList();
-        if ( blockedList != null && !blockedList.isEmpty() ) {
-          for (NodeReference blockedNode : blockedList) {
-            if ( potentialNodeList.contains(blockedNode) ) {
-              potentialNodeList.remove(blockedNode);
-              
-            }
-          }
-        }
-
         log.info("Retrieving performance metrics for the potential replication list for " +
                 pid.getValue());
         
         // get performance metrics for the potential node list
-        requestFactorMap   = getPendingRequestFactors(potentialNodeList, true);
-        failureFactorMap   = getFailureFactors(potentialNodeList, true);
-        bandwidthFactorMap = getBandwidthFactors(potentialNodeList, true);
-        
-        TreeMap<NodeReference, Float> nodesByPriorityMap = 
-            new TreeMap<NodeReference, Float>();
-        Iterator<NodeReference> iterator = potentialNodeList.iterator();
+        requestFactorMap   = getPendingRequestFactors(potentialNodeList, false);
+        failureFactorMap   = getFailureFactors(potentialNodeList, false);
+        bandwidthFactorMap = getBandwidthFactors(potentialNodeList, false);
+
+        // get the preferred list, if any
+        List<NodeReference> preferredList = null;
+        if ( replicationPolicy != null ) {
+            preferredList = replicationPolicy.getPreferredMemberNodeList();
+            
+        }
+            
+        // get the blocked list, if any
+        List<NodeReference> blockedList = null;
+        if ( replicationPolicy != null ) {
+            preferredList = replicationPolicy.getBlockedMemberNodeList();
+            
+        }
+
+        Map<NodeReference, Float> nodeScoreMap = new HashMap<NodeReference, Float>();        
+        SortedSet<Map.Entry<NodeReference, Float>> sortedScores;        
+        Iterator<NodeReference> nodeIterator = potentialNodeList.iterator();
                 
         // iterate through the potential node list and calculate performance scores
-        while (iterator.hasNext()) {
-            NodeReference nodeId = (NodeReference) iterator.next();
-            Integer nodePendingRequestFactor = requestFactorMap.get(nodeId);
+        while (nodeIterator.hasNext()) {
+            NodeReference nodeId = (NodeReference) nodeIterator.next();
+            Float preferenceFactor = 1.0f; // default preference for all nodes
+            
+            // increase preference for preferred nodes
+            if ( preferredList != null && preferredList.contains(nodeId) ) {
+                preferenceFactor = 2.0f;             
+                
+            }
+
+            // decrease preference for preferred nodes
+            if ( blockedList != null && blockedList.contains(nodeId) ) {
+                preferenceFactor = 0.0f;
+                
+            }
+            
+            Float nodePendingRequestFactor = requestFactorMap.get(nodeId);
             Float nodeFailureFactor = failureFactorMap.get(nodeId);
             Float nodeBandwidthFactor = bandwidthFactorMap.get(nodeId);
 
-            Float score = 
-                nodePendingRequestFactor * nodeFailureFactor * nodeBandwidthFactor;
+            Float score = nodePendingRequestFactor * 
+                          nodeFailureFactor * 
+                          nodeBandwidthFactor *
+                          preferenceFactor;
+            log.info("Priority score for " + nodeId.getValue() + " is " + score.intValue());
+            nodeScoreMap.put(nodeId, score);
             
-            // TODO: This sorts by node id, not score.  Add a Comparator class
-            // to sort by value.
-            nodesByPriorityMap.put(nodeId, score);
-        }
-        
-        log.info("Prioritizing preferred nodes in the potential replication list for " +
-          pid.getValue());
-
-        // prioritize preferred nodes in the potential node list
-        List<NodeReference> preferredList = 
-            replicationPolicy.getPreferredMemberNodeList();
-        if ( preferredList != null && !preferredList.isEmpty() ) {
-          
-          // process preferred nodes backwards
-          for (int i = preferredList.size() - 1; i >= 0; i--) {
+            // remove blocked and non-performant nodes
+            Iterator<Map.Entry<NodeReference, Float>> iterator = 
+                nodeScoreMap.entrySet().iterator();
             
-            NodeReference preferredNode = preferredList.get(i);
-            if ( potentialNodeList.contains( preferredNode) ) {
-              potentialNodeList.remove(preferredNode); // remove for reordering
-              potentialNodeList.add(0, preferredNode); // to the top of the list
-               
+            while ( iterator.hasNext() ) {
+                Map.Entry<NodeReference, Float> entry = iterator.next();
+                
+                if ( entry.getValue().intValue() == 0) {
+                    nodeScoreMap.remove(entry.getKey());
+                }
             }
-          }
         }
         
-        // TODO: add preferred nodes to the top of the sorted list, and return
-        // the keys of the list
-
+        sortedScores = entriesSortedByValues(nodeScoreMap);
+        Iterator<Entry<NodeReference, Float>> scoresIterator = sortedScores.iterator();
+        
+        // fill the list according to priority by adding each successively less
+        // prioritized nodeId to the end of the list
+        while(scoresIterator.hasNext()) {
+            nodesByPriority.add(nodesByPriority.size(), scoresIterator.next().getKey());
+        }
+        
         return nodesByPriority;
     }
-    
+
+    /*
+     * A generic method to sort a map by the values. Used to prioritize nodes.
+     * 
+     * @param map   the map to sort
+     * @return sortedEntries   the sorted set of map entries
+     */
+    private <K,V extends Comparable<? super V>> SortedSet<Map.Entry<K,V>> 
+        entriesSortedByValues(Map<K,V> map) {
+        
+        SortedSet<Map.Entry<K,V>> sortedEntries = 
+            new TreeSet<Map.Entry<K,V>>(
+                new Comparator<Map.Entry<K,V>>() {
+                    @Override 
+                    public int compare(Map.Entry<K,V> e1, Map.Entry<K,V> e2) {
+                        int res = e1.getValue().compareTo(e2.getValue());
+                        return res != 0 ? res : 1; // preserve items with equal values
+                    }
+                }
+            );
+        sortedEntries.addAll(map.entrySet());
+        return sortedEntries;
+    }
+
 }
