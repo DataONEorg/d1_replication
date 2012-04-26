@@ -1013,22 +1013,9 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
             
             while ( iterator.hasNext() ) {
                 Map.Entry<NodeReference, Float> entry = iterator.next();
-                if (log.isDebugEnabled()) {
-                    log.debug("Prioritized nodes list: ");
-                }
                 if ( entry.getValue().intValue() == 0) {
                     nodeScoreMap.remove(entry.getKey());
-                    if (log.isDebugEnabled()) {
-                        log.debug("Node:\t" + entry.getKey().getValue() +
-                            ", score: " + entry.getValue().intValue() + "\t(removed)");
-                    }
-
-                } else {
-                    if (log.isDebugEnabled()) {
-                        log.debug("Node:\t" + entry.getKey().getValue() +
-                            ", score: " + entry.getValue().intValue() + "\t(kept)");
-                    }
-
+                    
                 }
             }
         }
@@ -1036,10 +1023,20 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         sortedScores = entriesSortedByValues(nodeScoreMap);
         Iterator<Entry<NodeReference, Float>> scoresIterator = sortedScores.iterator();
         
+        if (log.isDebugEnabled()) {
+            log.debug("Prioritized nodes list: ");
+        }
+
         // fill the list according to priority by adding each successively less
         // prioritized nodeId to the end of the list
         while(scoresIterator.hasNext()) {
-            nodesByPriority.add(nodesByPriority.size(), scoresIterator.next().getKey());
+            Entry<NodeReference, Float> entry = scoresIterator.next();
+            NodeReference n = entry.getKey();
+            Float s = entry.getValue();
+            nodesByPriority.add(nodesByPriority.size(), n);
+            if (log.isDebugEnabled()) {
+                log.debug("Node:\t" + n.getValue() + ", score:\t" + s.intValue());
+            }
         }
         
         return nodesByPriority;
