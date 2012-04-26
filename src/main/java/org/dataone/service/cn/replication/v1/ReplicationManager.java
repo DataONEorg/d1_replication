@@ -999,6 +999,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
             Float nodeFailureFactor = failureFactorMap.get(nodeId);
             Float nodeBandwidthFactor = bandwidthFactorMap.get(nodeId);
 
+            // Score S = R * F * B * P (any zero score removes node from the list)
             Float score = nodePendingRequestFactor * 
                           nodeFailureFactor * 
                           nodeBandwidthFactor *
@@ -1012,9 +1013,22 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
             
             while ( iterator.hasNext() ) {
                 Map.Entry<NodeReference, Float> entry = iterator.next();
-                
+                if (log.isDebugEnabled()) {
+                    log.debug("Prioritized nodes list: ");
+                }
                 if ( entry.getValue().intValue() == 0) {
                     nodeScoreMap.remove(entry.getKey());
+                    if (log.isDebugEnabled()) {
+                        log.debug("Node:\t" + entry.getKey().getValue() +
+                            ", score: " + entry.getValue().intValue() + "\t(removed)");
+                    }
+
+                } else {
+                    if (log.isDebugEnabled()) {
+                        log.debug("Node:\t" + entry.getKey().getValue() +
+                            ", score: " + entry.getValue().intValue() + "\t(kept)");
+                    }
+
                 }
             }
         }
