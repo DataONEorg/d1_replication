@@ -8,7 +8,8 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Properties;
 
-import org.apache.log4j.Logger;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.quartz.JobDetail;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
@@ -19,8 +20,7 @@ import org.quartz.impl.StdSchedulerFactory;
 
 public class ReplicationAuditQuartzScheduler {
 
-    private static Logger logger = Logger
-            .getLogger(ReplicationAuditQuartzScheduler.class.getName());
+    private static Log logger = LogFactory.getLog(ReplicationAuditQuartzScheduler.class.getName());
 
     private static final String QUARTZ_TRIGGER = "replica-audit-trigger";
     private static final String QUARTZ_GROUP = "d1-cn-replica-audit";
@@ -52,11 +52,11 @@ public class ReplicationAuditQuartzScheduler {
             scheduler.start();
 
         } catch (SchedulerException e) {
-            logger.error(e.getMessage(), e);
+            logger.error("Replication Audit Scheduler start() ", e);
         } catch (FileNotFoundException e) {
-            logger.error(e.getMessage(), e);
+            logger.error("Replication Audit Scheduler start() ", e);
         } catch (IOException e) {
-            logger.error(e.getMessage(), e);
+            logger.error("Replication Audit Scheduler start() ", e);
         }
     }
 
@@ -76,7 +76,7 @@ public class ReplicationAuditQuartzScheduler {
                 scheduler.deleteJob(jobKey(QUARTZ_JOB, QUARTZ_GROUP));
             }
         } catch (SchedulerException e) {
-            logger.error(e.getMessage(), e);
+            logger.error("Replication Aduit Scheduler stop() ", e);
         }
     }
 }

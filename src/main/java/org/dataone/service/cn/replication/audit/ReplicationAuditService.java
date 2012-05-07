@@ -14,12 +14,12 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 
 import org.apache.log4j.Logger;
+import org.dataone.cn.dao.DaoFactory;
+import org.dataone.cn.dao.ReplicationDao;
+import org.dataone.cn.dao.exceptions.DataAccessException;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.configuration.Settings;
 import org.dataone.service.types.v1.Identifier;
-import org.springframework.beans.support.PagedListHolder;
-import org.springframework.context.ApplicationContext;
-import org.springframework.context.support.ClassPathXmlApplicationContext;
 
 import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.core.IdGenerator;
@@ -31,7 +31,7 @@ public class ReplicationAuditService {
     private static final int taskChunkSize = 10;
     private static final long auditPeriod = 1000 * 60 * 60 * 24 * 14; // 14 days
 
-    private ReplicationDao auditDao;
+    private ReplicationDao replicationDao = DaoFactory.getReplicationDao();
 
     private HazelcastClient processingClient;
 
@@ -61,10 +61,7 @@ public class ReplicationAuditService {
     }
 
     public static void main(String[] args) {
-        ApplicationContext context = new ClassPathXmlApplicationContext(
-                "replication-audit-context.xml");
-        ReplicationAuditService service = (ReplicationAuditService) context
-                .getBean("replicationAuditService");
+        ReplicationAuditService service = new ReplicationAuditService();
         service.auditReplication();
     }
 
@@ -73,10 +70,16 @@ public class ReplicationAuditService {
         if (auditGenerationLock.tryLock()) {
             try {
                 Date auditDate = calculateAuditDate();
-                // implement paging through pids to be audited here
-                PagedListHolder<Identifier> pagedReplicas = this.auditDao.getReplicasByDate(
-                        auditDate, pageSize, 0);
-                auditPids(pagedReplicas.getPageList());
+                // TODO: implement paging through pids to be audited here
+                List<Identifier> pagedReplicas = null;
+                try {
+                    this.replicationDao.getReplicasByDate(auditDate, pageSize, 0);
+                } catch (DataAccessException dae) {
+                    log.error(
+                            "Unable to retrieve replicas by date using replication dao for audit date: "
+                                    + auditDate.toString() + ".", dae);
+                }
+                auditPids(pagedReplicas);
             } finally {
                 auditGenerationLock.unlock();
             }
@@ -126,20 +129,17 @@ public class ReplicationAuditService {
         try {
             future = executorService.submit(auditTask);
         } catch (RejectedExecutionException rej) {
-            log.error("Unable to submit tasks to executor service");
-            rej.printStackTrace();
+            log.error("Unable to submit tasks to executor service. ", rej);
             log.error("Sleeping for 5 seconds, trying again");
             try {
                 Thread.sleep(5000);
             } catch (InterruptedException e) {
-                log.error("sleep interrupted.");
-                e.printStackTrace();
+                log.error("sleep interrupted.", e);
             }
             try {
                 future = executorService.submit(auditTask);
             } catch (RejectedExecutionException reEx) {
-                log.error("Still unable to submit tasks to executor service, failing.");
-                reEx.printStackTrace();
+                log.error("Still unable to submit tasks to executor service, failing. ", reEx);
             }
         }
         if (future != null) {
@@ -165,13 +165,12 @@ public class ReplicationAuditService {
                     log.debug("Replica audit task completed with result: " + result);
                 }
             } catch (InterruptedException e) {
-                log.error("Replica audit task interrupted, cancelling.");
+                log.error("Replica audit task interrupted, cancelling.", e);
                 future.cancel(true);
             } catch (CancellationException e) {
-                log.error("Replica audit task cancelled.");
+                log.error("Replica audit task cancelled.", e);
             } catch (ExecutionException e) {
-                log.error("Replica audit task threw exception during execution: ");
-                e.getCause().printStackTrace();
+                log.error("Replica audit task threw exception during execution. ", e);
             } catch (TimeoutException e) {
                 if (timedOut == false) {
                     log.debug("Replica audit task timed out.  waiting another 5 seconds.");
@@ -197,9 +196,5 @@ public class ReplicationAuditService {
             auditGenerationLock = processingClient.getLock(HZ_AUDIT_LOCK_NAME);
             executorService = processingClient.getExecutorService(REPLICA_EXECUTOR_SERVICE);
         }
-    }
-
-    public void setAuditDao(ReplicationDao auditDao) {
-        this.auditDao = auditDao;
     }
 }

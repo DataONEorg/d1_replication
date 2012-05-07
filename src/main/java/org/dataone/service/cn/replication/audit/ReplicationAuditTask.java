@@ -83,10 +83,13 @@ public class ReplicationAuditTask implements Serializable, Callable<String> {
 
     public String call() throws IllegalStateException {
 
+        // do we really need to configure the certificate location every time?
+        // cert manager is a singleton - only one cert location per jvm.....
         configureCertificate();
         createCNode();
         if (cn == null) {
-            log.error("Unable to process replication audit tasks due to failure to aquire handle to CNode object.");
+            log.error("Replication Audit Task call().  Unable to process replication audit tasks "
+                    + "due to failure to aquire handle to CNode object.");
             return "FAILURE - replication audit task, unable to create CNode client.";
         }
         for (Identifier pid : pidsToAudit) {
@@ -102,7 +105,7 @@ public class ReplicationAuditTask implements Serializable, Callable<String> {
             String cnChecksumValue = sysMeta.getChecksum().getValue();
 
             for (Replica replica : sysMeta.getReplicaList()) {
-                
+
                 // TODO: Use hzNodes in processing cluster to read node list
                 // Replicas on CN node do not count towards total replica count.
                 MNode mn = getMNode(replica.getReplicaMemberNode());
@@ -121,7 +124,7 @@ public class ReplicationAuditTask implements Serializable, Callable<String> {
                     queueToReplication = true;
                 } else if (mnChecksum.getValue().equals(cnChecksumValue)) {
                     validReplicaCount++;
-                    replica.setReplicaVerified(new Date(System.currentTimeMillis()));
+                    replica.setReplicaVerified(calculateReplicaVerifiedDate());
                     boolean success = updateReplica(pid, sysMeta, replica);
                     if (!success) {
                         log.error("Cannot update replica verified date  for pid: " + pid
@@ -173,17 +176,17 @@ public class ReplicationAuditTask implements Serializable, Callable<String> {
             ReplicationManager.INSTANCE.createAndQueueTasks(pid);
             return true;
         } catch (ServiceFailure e) {
-            e.printStackTrace();
+            log.error("Replication Audit Task sendToReplication ServiceFailure exception.", e);
         } catch (NotImplemented e) {
-            e.printStackTrace();
+            log.error("Replication Audit Task sendToReplication NotImplemented exception.", e);
         } catch (InvalidToken e) {
-            e.printStackTrace();
+            log.error("Replication Audit Task sendToReplication InvalidToken exception.", e);
         } catch (NotAuthorized e) {
-            e.printStackTrace();
+            log.error("Replication Audit Task sendToReplication NotAuthorized exception.", e);
         } catch (InvalidRequest e) {
-            e.printStackTrace();
+            log.error("Replication Audit Task sendToReplication InvalidRequest exception.", e);
         } catch (NotFound e) {
-            e.printStackTrace();
+            log.error("Replication Audit Task sendToReplication NotFound exception. ", e);
         }
         return false;
     }
@@ -192,20 +195,20 @@ public class ReplicationAuditTask implements Serializable, Callable<String> {
         try {
             cn.updateReplicationMetadata(null, pid, replica, sysMeta.getSerialVersion().longValue());
             return true;
-        } catch (NotImplemented e) {
-            e.printStackTrace();
-        } catch (NotAuthorized e) {
-            e.printStackTrace();
         } catch (ServiceFailure e) {
-            e.printStackTrace();
-        } catch (NotFound e) {
-            e.printStackTrace();
-        } catch (InvalidRequest e) {
-            e.printStackTrace();
+            log.error("Replication Audit Task updateReplica ServiceFailure exception.", e);
+        } catch (NotImplemented e) {
+            log.error("Replication Audit Task updateReplica NotImplemented exception.", e);
         } catch (InvalidToken e) {
-            e.printStackTrace();
+            log.error("Replication Audit Task updateReplica InvalidToken exception.", e);
+        } catch (NotAuthorized e) {
+            log.error("Replication Audit Task updateReplica NotAuthorized exception.", e);
+        } catch (InvalidRequest e) {
+            log.error("Replication Audit Task updateReplica InvalidRequest exception.", e);
+        } catch (NotFound e) {
+            log.error("Replication Audit Task updateReplica NotFound exception.", e);
         } catch (VersionMismatch e) {
-            e.printStackTrace();
+            log.error("Replication Audit Task updateReplica VersionMismatch exception.", e);
         }
         return false;
     }
@@ -213,18 +216,18 @@ public class ReplicationAuditTask implements Serializable, Callable<String> {
     private Checksum getChecksumFromMN(Identifier pid, SystemMetadata sysMeta, MNode mn) {
         try {
             return mn.getChecksum(null, pid, sysMeta.getChecksum().getAlgorithm());
-        } catch (InvalidRequest e) {
-            e.printStackTrace();
-        } catch (InvalidToken e) {
-            e.printStackTrace();
-        } catch (NotAuthorized e) {
-            e.printStackTrace();
-        } catch (NotImplemented e) {
-            e.printStackTrace();
         } catch (ServiceFailure e) {
-            e.printStackTrace();
+            log.error("Replication Audit Task getChecksumFromMN ServiceFailure exception.", e);
+        } catch (NotImplemented e) {
+            log.error("Replication Audit Task getChecksumFromMN NotImplemented exception.", e);
+        } catch (InvalidToken e) {
+            log.error("Replication Audit Task getChecksumFromMN InvalidToken exception.", e);
+        } catch (NotAuthorized e) {
+            log.error("Replication Audit Task getChecksumFromMN NotAuthorized exception.", e);
+        } catch (InvalidRequest e) {
+            log.error("Replication Audit Task getChecksumFromMN InvalidRequest exception.", e);
         } catch (NotFound e) {
-            e.printStackTrace();
+            log.error("Replication Audit Task getChecksumFromMN NotFound exception.", e);
         }
         return null;
     }
@@ -232,16 +235,16 @@ public class ReplicationAuditTask implements Serializable, Callable<String> {
     private SystemMetadata getSystemMetadataFromCN(Identifier pid) {
         try {
             return cn.getSystemMetadata(null, pid);
-        } catch (InvalidToken e) {
-            e.printStackTrace();
         } catch (ServiceFailure e) {
-            e.printStackTrace();
-        } catch (NotAuthorized e) {
-            e.printStackTrace();
-        } catch (NotFound e) {
-            e.printStackTrace();
+            log.error("Replication Audit Task getSystemMetadataFromCN ServiceFailure exception.", e);
         } catch (NotImplemented e) {
-            e.printStackTrace();
+            log.error("Replication Audit Task getSystemMetadataFromCN NotImplemented exception.", e);
+        } catch (InvalidToken e) {
+            log.error("Replication Audit Task getSystemMetadataFromCN InvalidToken exception.", e);
+        } catch (NotAuthorized e) {
+            log.error("Replication Audit Task getSystemMetadataFromCN NotAuthorized exception.", e);
+        } catch (NotFound e) {
+            log.error("Replication Audit Task getSystemMetadataFromCN NotFound exception.", e);
         }
         return null;
     }
@@ -252,20 +255,22 @@ public class ReplicationAuditTask implements Serializable, Callable<String> {
             try {
                 mn = D1Client.getMN(nodeRef);
             } catch (ServiceFailure e) {
-                log.warn("Caught a ServiceFailure while getting a reference to the MN "
-                        + nodeRef.getValue() + " during replication task id " + getTaskid());
+                log.warn(
+                        "Caught a ServiceFailure while getting a reference to the MN "
+                                + nodeRef.getValue() + " during replication task id " + getTaskid()
+                                + ".", e);
                 try {
                     // wait and try again, else fail
                     Thread.sleep(3000);
                     mn = D1Client.getMN(nodeRef);
                 } catch (ServiceFailure e1) {
                     log.error("Caught a ServiceFailure while getting a reference to the MN "
-                            + nodeRef.getValue() + " during replication task id " + getTaskid());
-                    e1.printStackTrace();
+                            + nodeRef.getValue() + " during replication task id " + getTaskid()
+                            + ". ", e1);
                 } catch (InterruptedException ie) {
                     log.error("Caught a ServiceFailure while getting a reference to the MN "
-                            + nodeRef.getValue() + " during replication task id " + getTaskid());
-                    ie.printStackTrace();
+                            + nodeRef.getValue() + " during replication task id " + getTaskid()
+                            + ". ", ie);
                 }
             }
             mnMap.put(nodeRef, mn);
@@ -278,19 +283,17 @@ public class ReplicationAuditTask implements Serializable, Callable<String> {
             cn = D1Client.getCN();
         } catch (ServiceFailure e) {
             log.warn("Caught a ServiceFailure while getting a reference to the CN "
-                    + "during replica audit task id " + getTaskid());
+                    + "during replica audit task id " + getTaskid() + ".", e);
             // try again, then fail
             try {
                 Thread.sleep(3000);
                 cn = D1Client.getCN();
             } catch (ServiceFailure e1) {
                 log.warn("Second ServiceFailure while getting a reference to the CN "
-                        + "during replica audit task id " + getTaskid());
-                e1.printStackTrace();
+                        + "during replica audit task id " + getTaskid() + ".", e1);
             } catch (InterruptedException ie) {
                 log.error("Caught InterruptedException while getting a reference to the CN "
-                        + "during replica audit task id " + getTaskid());
-                ie.printStackTrace();
+                        + "during replica audit task id " + getTaskid() + ".", ie);
             }
         }
     }
@@ -304,6 +307,11 @@ public class ReplicationAuditTask implements Serializable, Callable<String> {
         CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
         log.info("MNReplicationTask task id " + this.taskid + " is using an X509 certificate "
                 + "from " + clientCertificateLocation);
+    }
+
+    private Date calculateReplicaVerifiedDate() {
+        // TODO: should be current time with no timezone...
+        return new Date(System.currentTimeMillis());
     }
 
     public int getRetryCount() {
