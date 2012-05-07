@@ -992,14 +992,38 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
 
             }
 
-            Float nodePendingRequestFactor = requestFactorMap.get(nodeId);
-            Float nodeFailureFactor = failureFactorMap.get(nodeId);
-            Float nodeBandwidthFactor = bandwidthFactorMap.get(nodeId);
+            Float nodePendingRequestFactor = null;
+            if ( requestFactorMap.get(nodeId) != null) { 
+                nodePendingRequestFactor = requestFactorMap.get(nodeId);
+                
+            } else {
+                nodePendingRequestFactor = 0.0f;
+            }
+            
+            Float nodeFailureFactor = null;
+            if (failureFactorMap.get(nodeId) != null ) {
+                nodeFailureFactor = failureFactorMap.get(nodeId);
+                
+            } else {
+                nodeFailureFactor = 0.0f;
+                
+            }
+            
+            Float nodeBandwidthFactor = null;
+            if (bandwidthFactorMap.get(nodeId) != null ) {
+                nodeBandwidthFactor = bandwidthFactorMap.get(nodeId);
+                
+            } else {
+                nodeBandwidthFactor = 0.0f;
+                
+            }
 
-            // Score S = R * F * B * P (any zero score removes node from the
-            // list)
-            Float score = nodePendingRequestFactor * nodeFailureFactor * nodeBandwidthFactor
-                    * preferenceFactor;
+            // Score S = R * F * B * P 
+            // (any zero score removes node from the list)
+            Float score = nodePendingRequestFactor * 
+                          nodeFailureFactor        * 
+                          nodeBandwidthFactor      * 
+                          preferenceFactor;
             log.info("Priority score for " + nodeId.getValue() + " is " + score.intValue());
             nodeScoreMap.put(nodeId, score);
 
