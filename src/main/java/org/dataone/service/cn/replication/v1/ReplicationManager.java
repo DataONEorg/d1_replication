@@ -990,11 +990,14 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
             if (blockedList != null && blockedList.contains(nodeId)) {
                 preferenceFactor = 0.0f;
 
+
             }
+            log.debug("Node " + nodeId + "preferenceFactor is " + preferenceFactor);
 
             Float nodePendingRequestFactor = null;
             if ( requestFactorMap.get(nodeId) != null) { 
                 nodePendingRequestFactor = requestFactorMap.get(nodeId);
+                log.debug("Node " + nodeId + "requestFactor is " + nodePendingRequestFactor);
                 
             } else {
                 nodePendingRequestFactor = 0.0f;
@@ -1003,7 +1006,8 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
             Float nodeFailureFactor = null;
             if (failureFactorMap.get(nodeId) != null ) {
                 nodeFailureFactor = failureFactorMap.get(nodeId);
-                
+                log.debug("Node " + nodeId + "failureFactor is " + nodeFailureFactor);
+
             } else {
                 nodeFailureFactor = 0.0f;
                 
@@ -1012,7 +1016,8 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
             Float nodeBandwidthFactor = null;
             if (bandwidthFactorMap.get(nodeId) != null ) {
                 nodeBandwidthFactor = bandwidthFactorMap.get(nodeId);
-                
+                log.debug("Node " + nodeId + "bandwidthFactor is " + nodeBandwidthFactor);
+
             } else {
                 nodeBandwidthFactor = 0.0f;
                 
@@ -1024,11 +1029,17 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                           nodeFailureFactor        * 
                           nodeBandwidthFactor      * 
                           preferenceFactor;
+            log.debug("Score for " + nodeId.getValue()        + " will be "  +  
+                                     nodePendingRequestFactor + " * "        +
+                                     nodeFailureFactor        + " * "        +
+                                     nodeBandwidthFactor      + " * "        +
+                                     preferenceFactor);
             log.info("Priority score for " + nodeId.getValue() + " is " + score.intValue());
             nodeScoreMap.put(nodeId, score);
 
             // remove blocked and non-performant nodes
-            Iterator<Map.Entry<NodeReference, Float>> iterator = nodeScoreMap.entrySet().iterator();
+            Iterator<Map.Entry<NodeReference, Float>> iterator = 
+                nodeScoreMap.entrySet().iterator();
 
             while (iterator.hasNext()) {
                 Map.Entry<NodeReference, Float> entry = iterator.next();
