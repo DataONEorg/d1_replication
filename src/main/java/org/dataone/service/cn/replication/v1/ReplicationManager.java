@@ -780,8 +780,10 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
             NodeReference nodeId = nodeIterator.next();
 
             // get the failures for the node
-            Integer pending = (pendingRequests.get(nodeId) != null) ? pendingRequests.get(nodeId)
-                    : new Integer(0);
+            Integer pending = 
+                (pendingRequests.get(nodeId) != null) ? pendingRequests.get(nodeId): new Integer(0);
+            log.debug("Pending requests for node " + nodeId.getValue() + " is " +
+                    pending.intValue());
 
             if (pending.intValue() <= requestLimit) {
                 // currently under or equal to the limit
@@ -992,12 +994,12 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
 
 
             }
-            log.debug("Node " + nodeId + "preferenceFactor is " + preferenceFactor);
+            log.debug("Node " + nodeId.getValue() + " preferenceFactor is " + preferenceFactor);
 
             Float nodePendingRequestFactor = null;
             if ( requestFactorMap.get(nodeId) != null) { 
                 nodePendingRequestFactor = requestFactorMap.get(nodeId);
-                log.debug("Node " + nodeId + "requestFactor is " + nodePendingRequestFactor);
+                log.debug("Node " + nodeId.getValue() + " requestFactor is " + nodePendingRequestFactor);
                 
             } else {
                 nodePendingRequestFactor = 0.0f;
@@ -1006,7 +1008,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
             Float nodeFailureFactor = null;
             if (failureFactorMap.get(nodeId) != null ) {
                 nodeFailureFactor = failureFactorMap.get(nodeId);
-                log.debug("Node " + nodeId + "failureFactor is " + nodeFailureFactor);
+                log.debug("Node " + nodeId.getValue() + " failureFactor is " + nodeFailureFactor);
 
             } else {
                 nodeFailureFactor = 0.0f;
@@ -1016,7 +1018,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
             Float nodeBandwidthFactor = null;
             if (bandwidthFactorMap.get(nodeId) != null ) {
                 nodeBandwidthFactor = bandwidthFactorMap.get(nodeId);
-                log.debug("Node " + nodeId + "bandwidthFactor is " + nodeBandwidthFactor);
+                log.debug("Node " + nodeId.getValue() + " bandwidthFactor is " + nodeBandwidthFactor);
 
             } else {
                 nodeBandwidthFactor = 0.0f;
