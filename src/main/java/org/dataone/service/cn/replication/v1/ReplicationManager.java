@@ -783,7 +783,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
             Integer pending = (pendingRequests.get(nodeId) != null) ? pendingRequests.get(nodeId)
                     : new Integer(0);
 
-            if (pending.intValue() >= requestLimit) {
+            if (pending.intValue() <= requestLimit) {
                 // currently under or equal to the limit
                 requestFactors.put(nodeId, new Float(1));
 
