@@ -1014,7 +1014,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                 log.debug("Node " + nodeId.getValue() + " failureFactor is " + nodeFailureFactor);
 
             } else {
-                nodeFailureFactor = 0.0f;
+                nodeFailureFactor = 1.0f;
                 
             }
             
@@ -1048,7 +1048,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
 
             while (iterator.hasNext()) {
                 Map.Entry<NodeReference, Float> entry = iterator.next();
-                if (entry.getValue().intValue() == 0) {
+                if (entry.getValue().floatValue() == 0.0f) {
                     nodeScoreMap.remove(entry.getKey());
                     log.debug("Removing node " + entry.getKey().getValue() +
                         " from the potential node list.");
