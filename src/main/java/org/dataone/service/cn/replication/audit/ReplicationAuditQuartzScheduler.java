@@ -10,12 +10,12 @@ import java.util.Properties;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.quartz.CronScheduleBuilder;
+import org.quartz.CronTrigger;
 import org.quartz.JobDetail;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
 import org.quartz.SchedulerFactory;
-import org.quartz.SimpleScheduleBuilder;
-import org.quartz.SimpleTrigger;
 import org.quartz.impl.StdSchedulerFactory;
 
 public class ReplicationAuditQuartzScheduler {
@@ -25,8 +25,6 @@ public class ReplicationAuditQuartzScheduler {
     private static final String QUARTZ_TRIGGER = "replica-audit-trigger";
     private static final String QUARTZ_GROUP = "d1-cn-replica-audit";
     private static final String QUARTZ_JOB = "d1-replica-audit-job";
-
-    private int hours = 24;
 
     private Scheduler scheduler;
 
@@ -42,10 +40,9 @@ public class ReplicationAuditQuartzScheduler {
             JobDetail job = newJob(ReplicationAuditQuartzJob.class).withIdentity(QUARTZ_JOB,
                     QUARTZ_GROUP).build();
 
-            // TODO: NEED TO SCHEDULE BY TIME OF DAY TO SYNCH WITH OTHER CN
-            SimpleTrigger trigger = newTrigger().withIdentity(QUARTZ_TRIGGER, QUARTZ_GROUP)//
+            CronTrigger trigger = newTrigger().withIdentity(QUARTZ_TRIGGER, QUARTZ_GROUP)//
                     .startNow() //
-                    .withSchedule(SimpleScheduleBuilder.repeatHourlyForever(hours)) //
+                    .withSchedule(CronScheduleBuilder.dailyAtHourAndMinute(0, 0)) //
                     .build();
 
             scheduler.scheduleJob(job, trigger);
