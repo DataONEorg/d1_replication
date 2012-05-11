@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.SortedSet;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
@@ -974,6 +975,8 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
 
         Map<NodeReference, Float> nodeScoreMap = new HashMap<NodeReference, Float>();
         SortedSet<Map.Entry<NodeReference, Float>> sortedScores;
+        ValueComparator valueComparator = new ValueComparator(nodeScoreMap);
+        TreeMap<NodeReference, Float> sortedScoresMap = new TreeMap(valueComparator);
         Iterator<NodeReference> nodeIterator = potentialNodeList.iterator();
 
         // iterate through the potential node list and calculate performance
@@ -1047,54 +1050,65 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                 Map.Entry<NodeReference, Float> entry = iterator.next();
                 if (entry.getValue().intValue() == 0) {
                     nodeScoreMap.remove(entry.getKey());
+                    log.debug("Removing node " + entry.getKey().getValue() +
+                        " from the potential node list.");
 
                 }
             }
         }
 
-        sortedScores = entriesSortedByValues(nodeScoreMap);
-        Iterator<Entry<NodeReference, Float>> scoresIterator = sortedScores.iterator();
+        sortedScoresMap.putAll(nodeScoreMap);
 
-        if (log.isDebugEnabled()) {
-            log.debug("Prioritized nodes list: ");
-        }
-
-        // fill the list according to priority by adding each successively less
-        // prioritized nodeId to the end of the list
-        while (scoresIterator.hasNext()) {
-            Entry<NodeReference, Float> entry = scoresIterator.next();
-            NodeReference n = entry.getKey();
-            Float s = entry.getValue();
-            nodesByPriority.add(nodesByPriority.size(), n);
-            if (log.isDebugEnabled()) {
-                log.debug("Node:\t" + n.getValue() + ", score:\t" + s.intValue());
+        // log the sorted map size and entries
+        log.debug("Sorted scores map size: " + sortedScoresMap.size());
+        if ( sortedScoresMap.size() > 0 ) {
+            log.debug("Sorted scores members: ");
+            for (Entry<NodeReference, Float> entry : sortedScoresMap.entrySet()) {
+                log.debug("Node: " + entry.getKey().getValue() + ", score: " + 
+                    entry.getValue().floatValue());
             }
+            
         }
-
+        
+        nodesByPriority = (List<NodeReference>) sortedScoresMap.keySet();
+        
         return nodesByPriority;
     }
 
-    /*
-     * A generic method to sort a map by the values. Used to prioritize nodes.
-     * 
-     * @param map the map to sort
-     * 
-     * @return sortedEntries the sorted set of map entries
+    
+    /**
+     * A comparator class used to compare map values for sorting by value
+     * @author cjones
+     *
      */
-    private <K, V extends Comparable<? super V>> SortedSet<Map.Entry<K, V>> entriesSortedByValues(
-            Map<K, V> map) {
-
-        SortedSet<Map.Entry<K, V>> sortedEntries = new TreeSet<Map.Entry<K, V>>(
-                new Comparator<Map.Entry<K, V>>() {
-                    @Override
-                    public int compare(Map.Entry<K, V> e1, Map.Entry<K, V> e2) {
-                        int res = e1.getValue().compareTo(e2.getValue());
-                        return res != 0 ? res : 1; // preserve items with equal
-                                                   // values
-                    }
-                });
-        sortedEntries.addAll(map.entrySet());
-        return sortedEntries;
+    private class ValueComparator implements Comparator {
+        Map incomingMap;
+        
+        /**
+         * Constructor - creates the map value comparator instnace
+         * @param incomingMap
+         */
+        public ValueComparator(Map incomingMap) {
+            this.incomingMap = incomingMap;
+            
+        }
+        
+        /**
+         * Compare object values in the map
+         * @return integer showing a is less than, equal to, or greater than b
+         */
+        public int compare(Object a, Object b) {
+            if ( (Float)incomingMap.get(a) < (Float)incomingMap.get(b) ) {
+                return 1;
+                
+            } else if ( (Float)incomingMap.get(a) == (Float)incomingMap.get(b) ) {
+                return 0;
+                
+            } else {
+                return -1;
+                
+            }
+        }
     }
 
 }
