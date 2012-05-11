@@ -1036,7 +1036,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                                      nodeFailureFactor        + " * "        +
                                      nodeBandwidthFactor      + " * "        +
                                      preferenceFactor);
-            log.info("Priority score for " + nodeId.getValue() + " is " + score.intValue());
+            log.info("Priority score for " + nodeId.getValue() + " is " + score.floatValue());
             nodeScoreMap.put(nodeId, score);
 
             // remove blocked and non-performant nodes
