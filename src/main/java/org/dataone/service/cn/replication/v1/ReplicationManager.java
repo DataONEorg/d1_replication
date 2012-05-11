@@ -942,6 +942,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
      * 
      * @return nodesByPriority a list of nodes by descending priority
      */
+    @SuppressWarnings("unchecked")
     public List<NodeReference> prioritizeNodes(List<NodeReference> potentialNodeList,
             SystemMetadata sysmeta) {
         List<NodeReference> nodesByPriority = new ArrayList<NodeReference>();
@@ -974,9 +975,9 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         }
 
         Map<NodeReference, Float> nodeScoreMap = new HashMap<NodeReference, Float>();
-        SortedSet<Map.Entry<NodeReference, Float>> sortedScores;
         ValueComparator valueComparator = new ValueComparator(nodeScoreMap);
-        TreeMap<NodeReference, Float> sortedScoresMap = new TreeMap(valueComparator);
+        TreeMap<NodeReference, Float> sortedScoresMap = 
+            new TreeMap<NodeReference, Float>(valueComparator);
         Iterator<NodeReference> nodeIterator = potentialNodeList.iterator();
 
         // iterate through the potential node list and calculate performance
@@ -1051,19 +1052,18 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
 
         sortedScoresMap.putAll(nodeScoreMap);
 
-        // log the sorted map size and entries
+        // add sorted map entries to the sorted potential node list
         log.debug("Sorted scores map size: " + sortedScoresMap.size());
         if ( sortedScoresMap.size() > 0 ) {
             log.debug("Sorted scores members: ");
             for (Entry<NodeReference, Float> entry : sortedScoresMap.entrySet()) {
+                nodesByPriority.add(entry.getKey()); // append to retain order
                 log.debug("Node: " + entry.getKey().getValue() + ", score: " + 
                     entry.getValue().floatValue());
             }
             
         }
-        
-        nodesByPriority = (List<NodeReference>) sortedScoresMap.keySet();
-        
+                
         return nodesByPriority;
     }
 
