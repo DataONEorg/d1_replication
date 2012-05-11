@@ -999,35 +999,27 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
             }
             log.debug("Node " + nodeId.getValue() + " preferenceFactor is " + preferenceFactor);
 
-            Float nodePendingRequestFactor = null;
+            Float nodePendingRequestFactor = 1.0f;
             if ( requestFactorMap.get(nodeId) != null) { 
                 nodePendingRequestFactor = requestFactorMap.get(nodeId);
                 log.debug("Node " + nodeId.getValue() + " requestFactor is " + nodePendingRequestFactor);
                 
-            } else {
-                nodePendingRequestFactor = 0.0f;
             }
             
-            Float nodeFailureFactor = null;
+            Float nodeFailureFactor = 1.0f;
             if (failureFactorMap.get(nodeId) != null ) {
                 nodeFailureFactor = failureFactorMap.get(nodeId);
                 log.debug("Node " + nodeId.getValue() + " failureFactor is " + nodeFailureFactor);
 
-            } else {
-                nodeFailureFactor = 1.0f;
-                
             }
             
-            Float nodeBandwidthFactor = null;
+            Float nodeBandwidthFactor = 1.0f;
             if (bandwidthFactorMap.get(nodeId) != null ) {
                 nodeBandwidthFactor = bandwidthFactorMap.get(nodeId);
                 log.debug("Node " + nodeId.getValue() + " bandwidthFactor is " + nodeBandwidthFactor);
 
-            } else {
-                nodeBandwidthFactor = 0.0f;
-                
             }
-
+            
             // Score S = R * F * B * P 
             // (any zero score removes node from the list)
             Float score = nodePendingRequestFactor * 
@@ -1043,18 +1035,18 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
             nodeScoreMap.put(nodeId, score);
 
             // remove blocked and non-performant nodes
-            Iterator<Map.Entry<NodeReference, Float>> iterator = 
-                nodeScoreMap.entrySet().iterator();
-
-            while (iterator.hasNext()) {
-                Map.Entry<NodeReference, Float> entry = iterator.next();
-                if (entry.getValue().floatValue() == 0.0f) {
-                    nodeScoreMap.remove(entry.getKey());
-                    log.debug("Removing node " + entry.getKey().getValue() +
-                        " from the potential node list.");
-
-                }
-            }
+            //Iterator<Map.Entry<NodeReference, Float>> iterator = 
+            //    nodeScoreMap.entrySet().iterator();
+            //
+            //while (iterator.hasNext()) {
+            //    Map.Entry<NodeReference, Float> entry = iterator.next();
+            //    if (entry.getValue().floatValue() == 0.0f) {
+            //        nodeScoreMap.remove(entry.getKey());
+            //        log.debug("Removing node " + entry.getKey().getValue() +
+            //            " from the potential node list.");
+            //
+            //    }
+            //}
         }
 
         sortedScoresMap.putAll(nodeScoreMap);
