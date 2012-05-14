@@ -139,14 +139,8 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
     /* The Hazelcast distributed replication tasks queue */
     private IQueue<MNReplicationTask> replicationTasks;
 
-    /* The Replication task thread queue */
-    private BlockingQueue<Runnable> taskThreadQueue;
-
-    /* The handler instance for rejected tasks */
-    private RejectedExecutionHandler handler;
-
-    /* The thread pool executor instance for executing tasks */
-    private ThreadPoolExecutor executor;
+    /* The Hazelcast distributed replication events queue*/
+    private IQueue<Identifier> replicationEvents;
 
     /* The event listener used to manage incoming map and queue changes */
     private ReplicationEventListener listener;
@@ -165,16 +159,22 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
      */
     public ReplicationManager() {
 
-        this.nodeMap = Settings.getConfiguration().getString("dataone.hazelcast.nodes");
-        this.systemMetadataMap = Settings.getConfiguration().getString(
-                "dataone.hazelcast.systemMetadata");
-        this.tasksQueue = Settings.getConfiguration().getString(
-                "dataone.hazelcast.replicationQueuedTasks");
-        this.taskIds = Settings.getConfiguration().getString("dataone.hazelcast.tasksIdGenerator");
-        this.hzAuditString = Settings.getConfiguration().getString("dataone.hazelcast.auditString");
-        this.shortListAge = Settings.getConfiguration().getString("dataone.hazelcast.shortListAge");
-        this.shortListNumRows = Settings.getConfiguration().getString(
-                "dataone.hazelcast.shortListNumRows");
+        this.nodeMap = 
+            Settings.getConfiguration().getString("dataone.hazelcast.nodes");
+        this.systemMetadataMap = 
+            Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
+        this.tasksQueue = 
+            Settings.getConfiguration().getString("dataone.hazelcast.replicationQueuedTasks");
+        this.eventsQueue =
+            Settings.getConfiguration().getString("dataone.hazelcast.replicationQueuedEvents");
+        this.taskIds = 
+            Settings.getConfiguration().getString("dataone.hazelcast.tasksIdGenerator");
+        this.hzAuditString = 
+            Settings.getConfiguration().getString("dataone.hazelcast.auditString");
+        this.shortListAge = 
+            Settings.getConfiguration().getString("dataone.hazelcast.shortListAge");
+        this.shortListNumRows = 
+            Settings.getConfiguration().getString("dataone.hazelcast.shortListNumRows");
 
         // Connect to the Hazelcast storage cluster
         this.hzClient = HazelcastClientInstance.getHazelcastClient();
@@ -184,10 +184,11 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         this.hzMember = Hazelcast.getDefaultInstance();
 
         // get references to cluster structures
-        this.nodes = this.hzMember.getMap(nodeMap);
-        this.systemMetadata = this.hzClient.getMap(systemMetadataMap);
-        this.replicationTasks = this.hzMember.getQueue(tasksQueue);
-        this.taskIdGenerator = this.hzMember.getIdGenerator(taskIds);
+        this.nodes = this.hzMember.getMap(this.nodeMap);
+        this.systemMetadata = this.hzClient.getMap(this.systemMetadataMap);
+        this.replicationEvents = this.hzMember.getQueue(eventsQueue);
+        this.replicationTasks = this.hzMember.getQueue(this.tasksQueue);
+        this.taskIdGenerator = this.hzMember.getIdGenerator(this.taskIds);
 
         // monitor the replication structures
 
@@ -996,7 +997,6 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
             if (blockedList != null && blockedList.contains(nodeId)) {
                 preferenceFactor = 0.0f;
 
-
             }
             log.debug("Node " + nodeId.getValue() + " preferenceFactor is " + preferenceFactor);
 
@@ -1032,22 +1032,27 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                                      nodeFailureFactor        + " * "        +
                                      nodeBandwidthFactor      + " * "        +
                                      preferenceFactor);
+            
+            // if the node is already listed and is pending or complete, 
+            // zero its score (to avoid repeat replica tasks)
+            List<Replica> replicaList = sysmeta.getReplicaList();
+            for (Replica replica : replicaList ) {
+                String nodeIdStr = replica.getReplicaMemberNode().getValue();
+                ReplicationStatus nodeStatus = replica.getReplicationStatus();
+                if ( nodeIdStr == nodeId.getValue() && 
+                    (nodeStatus == ReplicationStatus.QUEUED    ||
+                     nodeStatus == ReplicationStatus.REQUESTED ||
+                     nodeStatus == ReplicationStatus.COMPLETED)) {
+                    score = new Float(0.0f);
+                    log.debug("Node " + nodeId.getValue() + " is already listed " +
+                        "as a " + nodeStatus.toString() + " replica for identifier" +
+                        pid.getValue());
+                    break;
+                }
+            }
             log.info("Priority score for " + nodeId.getValue() + " is " + score.floatValue());
             nodeScoreMap.put(nodeId, score);
 
-            // remove blocked and non-performant nodes
-            //Iterator<Map.Entry<NodeReference, Float>> iterator = 
-            //    nodeScoreMap.entrySet().iterator();
-            //
-            //while (iterator.hasNext()) {
-            //    Map.Entry<NodeReference, Float> entry = iterator.next();
-            //    if (entry.getValue().floatValue() == 0.0f) {
-            //        nodeScoreMap.remove(entry.getKey());
-            //        log.debug("Removing node " + entry.getKey().getValue() +
-            //            " from the potential node list.");
-            //
-            //    }
-            //}
         }
 
         sortedScoresMap.putAll(nodeScoreMap);
@@ -1057,9 +1062,39 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         if ( sortedScoresMap.size() > 0 ) {
             log.debug("Sorted scores members: ");
             for (Entry<NodeReference, Float> entry : sortedScoresMap.entrySet()) {
-                nodesByPriority.add(entry.getKey()); // append to retain order
-                log.debug("Node: " + entry.getKey().getValue() + ", score: " + 
-                    entry.getValue().floatValue());
+                if ( entry.getValue().floatValue() > 0 ) {
+                    nodesByPriority.add(entry.getKey()); // append to retain order
+                    log.debug("Node: " + entry.getKey().getValue() + ", score: " + 
+                        entry.getValue().floatValue());
+                    
+                } else {
+                    log.info("Removed " + entry.getKey().getValue() + 
+                          ", score is " + entry.getValue().floatValue());
+                    
+                }
+            }
+            
+        }
+        
+        // if the prioritization results cause the replication policy to not
+        // be fulfilled immediately (lack of currently available target nodes),
+        // add the pid back onto the hzReplicationEvents queue for later 
+        // processing (when targets become available)
+        log.debug("Nodes by priority list size: " + nodesByPriority.size());
+        int desiredCount = sysmeta.getReplicationPolicy().getNumberReplicas();
+        if ( nodesByPriority.size() >= desiredCount ) {
+            log.debug("There are enough target nodes to fulfill the replication " +
+                    "policy. Not resubmitting identifier " + pid.getValue());
+        } else {
+            log.debug("There are not enough target nodes to fulfill the replication " +
+                    "policy. Resubmitting identifier " + pid.getValue());
+            boolean resubmitted = this.replicationEvents.offer(pid);
+            if ( resubmitted ) {
+                log.debug("Successfully resubmitted identifier " + pid.getValue());
+                
+            } else {
+                log.warn("Couldn't resubmit identifier " + pid.getValue());
+
             }
             
         }
