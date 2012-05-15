@@ -20,8 +20,6 @@ import org.dataone.service.types.v1.ReplicationPolicy;
 import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.SystemMetadata;
 
-import com.hazelcast.core.IQueue;
-
 public class ReplicationPrioritizationStrategy {
 
     public static Log log = LogFactory
@@ -254,8 +252,7 @@ public class ReplicationPrioritizationStrategy {
      */
     @SuppressWarnings("unchecked")
     public List<NodeReference> prioritizeNodes(
-            List<NodeReference> potentialNodeList, SystemMetadata sysmeta,
-            IQueue<Identifier> replicationEvents) {
+            List<NodeReference> potentialNodeList, SystemMetadata sysmeta) {
         List<NodeReference> nodesByPriority = new ArrayList<NodeReference>();
         ReplicationPolicy replicationPolicy = sysmeta.getReplicationPolicy();
         Identifier pid = sysmeta.getIdentifier();
@@ -387,31 +384,6 @@ public class ReplicationPrioritizationStrategy {
             }
 
         }
-
-        // if the prioritization results cause the replication policy to not
-        // be fulfilled immediately (lack of currently available target nodes),
-        // add the pid back onto the hzReplicationEvents queue for later
-        // processing (when targets become available)
-        log.debug("Nodes by priority list size: " + nodesByPriority.size());
-        int desiredCount = sysmeta.getReplicationPolicy().getNumberReplicas();
-        if (nodesByPriority.size() >= desiredCount) {
-            log.debug("There are enough target nodes to fulfill the replication "
-                    + "policy. Not resubmitting identifier " + pid.getValue());
-        } else {
-            log.debug("There are not enough target nodes to fulfill the replication "
-                    + "policy. Resubmitting identifier " + pid.getValue());
-            boolean resubmitted = replicationEvents.offer(pid);
-            if (resubmitted) {
-                log.debug("Successfully resubmitted identifier "
-                        + pid.getValue());
-
-            } else {
-                log.warn("Couldn't resubmit identifier " + pid.getValue());
-
-            }
-
-        }
-
         return nodesByPriority;
     }
 
