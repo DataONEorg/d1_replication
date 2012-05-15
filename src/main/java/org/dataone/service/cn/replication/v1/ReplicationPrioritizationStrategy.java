@@ -20,6 +20,15 @@ import org.dataone.service.types.v1.ReplicationPolicy;
 import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.SystemMetadata;
 
+/**
+ * ReplicationPrioritizationStrategy encapsulates the logic and calculations
+ * used to prioritize target Member Nodes as replication targets.
+ * 
+ * Used as a delegate by ReplicationManager.
+ * 
+ * @author cjones
+ * 
+ */
 public class ReplicationPrioritizationStrategy {
 
     public static Log log = LogFactory
