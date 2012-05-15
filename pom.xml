@@ -165,18 +165,12 @@
 			<scope>test</scope>
 		</dependency> 
 	    <dependency>
-	      <groupId>org.dataone</groupId>
-	      <artifactId>d1_cn_common</artifactId>
-	      <version>${d1_cn_common_version_test}</version>
-	      <type>test-jar</type>
-	      <scope>test</scope>
-	    </dependency>
-        <dependency>
-                <groupId>com.h2database</groupId>
-                <artifactId>h2</artifactId>
-                <version>1.3.163</version>
-                <scope>test</scope>
-        </dependency>      
+		      <groupId>org.dataone</groupId>
+		      <artifactId>d1_cn_common</artifactId>
+		      <version>${d1_cn_common_version_test}</version>
+		      <type>test-jar</type>
+		      <scope>test</scope>
+	    </dependency>     
         <dependency>
         	<groupId>org.dataone</groupId>
         	<artifactId>d1_libclient_java</artifactId>
