@@ -864,7 +864,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
             // in the case there's no real stats
             if (failures.intValue() == 0 && successes.intValue() == 0) {
                 // bootstrap the MN as a medium-performant node
-                failureFactors.put((NodeReference) nodeIterator.next(), new Float(0.9f));
+                failureFactors.put(nodeId, new Float(0.9f));
 
             } else {
                 // calculate the failure factor
@@ -873,7 +873,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                 if (failureFactor <= successThreshold) {
                     failureFactor = new Float(0.0f);
                 }
-                failureFactors.put((NodeReference) nodeIterator.next(), failureFactor);
+                failureFactors.put(nodeId, failureFactor);
 
             }
 
