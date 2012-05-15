@@ -379,10 +379,10 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
 
         }
 
-        boolean alreadyAdded = false;
-
         // for each node in the potential node list up to the desired replicas
         for (int j = 0; j < desiredReplicas; j++) {
+
+            boolean alreadyAdded = false;
 
             NodeReference potentialNode = potentialNodeList.get(j);
             // for each replica in the replica list
