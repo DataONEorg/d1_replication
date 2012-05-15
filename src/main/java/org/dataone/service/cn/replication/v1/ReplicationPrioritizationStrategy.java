@@ -287,7 +287,7 @@ public class ReplicationPrioritizationStrategy {
         // get the blocked list, if any
         List<NodeReference> blockedList = null;
         if (replicationPolicy != null) {
-            preferredList = replicationPolicy.getBlockedMemberNodeList();
+            blockedList = replicationPolicy.getBlockedMemberNodeList();
 
         }
 
