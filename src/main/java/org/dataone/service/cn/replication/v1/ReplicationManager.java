@@ -867,13 +867,20 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         } else {
             log.debug("There are not enough target nodes to fulfill the replication "
                     + "policy. Resubmitting identifier " + pid.getValue());
-            boolean resubmitted = this.replicationEvents.offer(pid);
-            if (resubmitted) {
-                log.debug("Successfully resubmitted identifier "
-                        + pid.getValue());
+            if ( !this.replicationEvents.contains(pid) ) {
+                boolean resubmitted = this.replicationEvents.offer(pid);
+                if (resubmitted) {
+                    log.debug("Successfully resubmitted identifier "
+                            + pid.getValue());
 
+                } else {
+                    log.warn("Couldn't resubmit identifier " + pid.getValue());
+
+                }
+                
             } else {
-                log.warn("Couldn't resubmit identifier " + pid.getValue());
+                log.debug("Identifier " + pid.getValue() + " is already in " +
+                    "the hzReplicationEvents queue, not resubmitting.");
 
             }
 
