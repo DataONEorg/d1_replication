@@ -29,11 +29,9 @@
     <dateSysMetadataModified>2011-05-04T18:13:51.000-00:00</dateSysMetadataModified>
     <originMemberNode>urn:node:sq1d</originMemberNode>
     <authoritativeMemberNode>urn:node:sq1d</authoritativeMemberNode>
-    <!--
     <replica>
         <replicaMemberNode>urn:node:sq1d</replicaMemberNode>
         <replicationStatus>completed</replicationStatus>
         <replicaVerified>2011-05-04T18:13:51.000-00:00</replicaVerified>
     </replica>
-    -->
 </d1:systemMetadata>
