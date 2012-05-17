@@ -188,8 +188,8 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                 + " queue.");
 
         // Set up the certificate location, create a null session
-        String clientCertificateLocation = Settings.getConfiguration()
-                .getString("D1Client.certificate.directory")
+        String clientCertificateLocation = 
+            Settings.getConfiguration().getString("D1Client.certificate.directory")
                 + File.separator
                 + Settings.getConfiguration().getString(
                         "D1Client.certificate.filename");
@@ -206,8 +206,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         // Get an CNode reference to communicate with
         try {
             log.debug("D1Client.CN_URL = "
-                    + Settings.getConfiguration()
-                            .getProperty("D1Client.CN_URL"));
+                    + Settings.getConfiguration().getProperty("D1Client.CN_URL"));
 
             cnode = D1Client.getCN();
             log.info("ReplicationManager D1Client base_url is: "
@@ -316,6 +315,29 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
             replicaList = new ArrayList<Replica>();
 
         }
+
+        // change the desired replicas count to account for pending/completed replicas        
+        int currentListedReplicaCount = 0;
+        
+        for (Replica listedReplica : replicaList) {
+            NodeReference nodeId = listedReplica.getReplicaMemberNode();
+            ReplicationStatus listedStatus = listedReplica.getReplicationStatus();
+            
+            NodeType nodeType = this.nodes.get(nodeId).getType();
+            if (nodeType == NodeType.CN ||
+                nodeId == sysmeta.getAuthoritativeMemberNode()) {
+                continue; // don't count CNs or authoritative nodes as replicas
+                
+            }
+            if ( listedStatus == ReplicationStatus.QUEUED ||
+                 listedStatus == ReplicationStatus.REQUESTED ||
+                 listedStatus == ReplicationStatus.COMPLETED ) {
+                currentListedReplicaCount++;
+            }
+        }
+        log.debug("There are currently " + currentListedReplicaCount +
+                " pending/completed replicas listed for identifier " + pid.getValue());
+
         // List of Nodes for building MNReplicationTasks
         log.info("Building a potential target node list for identifier "
                 + pid.getValue());
@@ -325,8 +347,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
 
         // authoritative member node to replicate from
         try {
-            authoritativeNode = this.nodes.get(sysmeta
-                    .getAuthoritativeMemberNode());
+            authoritativeNode = this.nodes.get(sysmeta.getAuthoritativeMemberNode());
 
         } catch (NullPointerException npe) {
             throw new InvalidRequest("1080", "Object " + pid.getValue()
@@ -380,7 +401,8 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         }
 
         // for each node in the potential node list up to the desired replicas
-        for (int j = 0; j < desiredReplicas; j++) {
+        // (less the pending/completed replicas)
+        for (int j = 0; j < desiredReplicas - currentListedReplicaCount; j++) {
 
             boolean alreadyAdded = false;
 
@@ -393,10 +415,10 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                 NodeReference replicaNode = replica.getReplicaMemberNode();
                 ReplicationStatus status = replica.getReplicationStatus();
                 if (potentialNode.getValue().equals(replicaNode.getValue())
-                        && (status.equals(ReplicationStatus.QUEUED)
-                                || status.equals(ReplicationStatus.REQUESTED)
-                                || status.equals(ReplicationStatus.FAILED) || status
-                                    .equals(ReplicationStatus.COMPLETED))) {
+                        && (status.equals(ReplicationStatus.QUEUED) || 
+                            status.equals(ReplicationStatus.REQUESTED) || 
+                            status.equals(ReplicationStatus.FAILED) || 
+                            status.equals(ReplicationStatus.COMPLETED))) {
                     alreadyAdded = true;
                     break;
 
@@ -419,8 +441,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
 
             // may be more than one version of MNReplication
             List<String> implementedVersions = new ArrayList<String>();
-            List<Service> origServices = authoritativeNode.getServices()
-                    .getServiceList();
+            List<Service> origServices = authoritativeNode.getServices().getServiceList();
             for (Service service : origServices) {
                 if (service.getName().equals("MNReplication")
                         && service.getAvailable()) {
@@ -452,19 +473,16 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
             // a replica doesn't exist. add it
             if (replicable) {
                 Replica replicaMetadata = new Replica();
-                replicaMetadata
-                        .setReplicaMemberNode(targetNode.getIdentifier());
+                replicaMetadata.setReplicaMemberNode(targetNode.getIdentifier());
                 replicaMetadata.setReplicationStatus(ReplicationStatus.QUEUED);
-                replicaMetadata.setReplicaVerified(Calendar.getInstance()
-                        .getTime());
+                replicaMetadata.setReplicaVerified(Calendar.getInstance().getTime());
 
                 try {
                     sysmeta = this.systemMetadata.get(pid); // refresh sysmeta
                                                             // to avoid
                                                             // VersionMismatch
                     this.cnReplication.updateReplicationMetadata(session, pid,
-                            replicaMetadata, sysmeta.getSerialVersion()
-                                    .longValue());
+                            replicaMetadata, sysmeta.getSerialVersion().longValue());
 
                 } catch (VersionMismatch e) {
 
@@ -472,8 +490,8 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                     try {
                         sysmeta = this.systemMetadata.get(pid);
                         this.cnReplication.updateReplicationMetadata(session,
-                                pid, replicaMetadata, sysmeta
-                                        .getSerialVersion().longValue());
+                                pid, replicaMetadata, 
+                                sysmeta.getSerialVersion().longValue());
 
                     } catch (VersionMismatch e1) {
                         String msg = "Couldn't get the correct serialVersion to update "
@@ -851,8 +869,8 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
     public List<NodeReference> prioritizeNodes(
             List<NodeReference> potentialNodeList, SystemMetadata sysmeta) {
 
-        List<NodeReference> nodesByPriority = prioritizationStrategy
-                .prioritizeNodes(potentialNodeList, sysmeta);
+        List<NodeReference> nodesByPriority = 
+            prioritizationStrategy.prioritizeNodes(potentialNodeList, sysmeta);
 
         // if the prioritization results cause the replication policy to not
         // be fulfilled immediately (lack of currently available target nodes),
