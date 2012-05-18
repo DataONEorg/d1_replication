@@ -386,7 +386,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         log.info("Desired replicas for identifier " + pid.getValue() + " is "
                 + desiredReplicas);
         log.info("Potential target node list size for " + pid.getValue() + " is "
-                + desiredReplicas);
+                + potentialNodeList.size());
 
         // can't have more replicas than MNs
         if (desiredReplicas > potentialNodeList.size()) {
