@@ -399,12 +399,20 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
 
         // for each node in the potential node list up to the desired replicas
         // (less the pending/completed replicas)
+        int desiredReplicasLessListed = desiredReplicas - currentListedReplicaCount;
+        log.debug("Desired replica count less already listed replica count is "
+                + desiredReplicasLessListed);
         for (int j = 0; j < desiredReplicas - currentListedReplicaCount; j++) {
 
+            log.debug("Evaluating item " + j + " of " + 
+                desiredReplicasLessListed + " in the potential node list.");
             NodeReference potentialNode = potentialNodeList.get(j);
 
             targetNode = this.nodes.get(potentialNode);
-
+            log.debug("currently evaluating " + 
+                targetNode.getIdentifier().getValue() + " for task creation " +
+                "for identifier " + pid.getValue());
+            
             // may be more than one version of MNReplication
             List<String> implementedVersions = new ArrayList<String>();
             List<Service> origServices = authoritativeNode.getServices()
