@@ -98,8 +98,8 @@ public class TestReplicationPrioritization {
         Map<NodeReference, Float> requestFactors = prioritiyStrategy
                 .getPendingRequestFactors(nodeIds, false);
         for (NodeReference nodeRef : requestFactors.keySet()) {
-            System.out.println("Node: " + nodeRef.getValue()
-                    + " request factor: " + requestFactors.get(nodeRef));
+            System.out.println("Node: " + nodeRef.getValue() + " request factor: "
+                    + requestFactors.get(nodeRef));
             if ("node1".equals(nodeRef.getValue())) {
                 Assert.assertTrue(requestFactors.get(nodeRef) == 0.0f);
             } else if ("node2".equals(nodeRef.getValue())) {
@@ -171,8 +171,8 @@ public class TestReplicationPrioritization {
         Map<NodeReference, Float> requestFactors = prioritiyStrategy
                 .getFailureFactors(nodeIds, false);
         for (NodeReference nodeRef : requestFactors.keySet()) {
-            System.out.println("Node: " + nodeRef.getValue()
-                    + " request factor: " + requestFactors.get(nodeRef));
+            System.out.println("Node: " + nodeRef.getValue() + " request factor: "
+                    + requestFactors.get(nodeRef));
             if ("node1".equals(nodeRef.getValue())) {
                 Assert.assertTrue(requestFactors.get(nodeRef) == 1.0f);
             } else if ("node2".equals(nodeRef.getValue())) {
@@ -181,7 +181,7 @@ public class TestReplicationPrioritization {
                 Assert.assertEquals(0.8333333f, requestFactors.get(nodeRef)
                         .floatValue());
             } else if ("node4".equals(nodeRef.getValue())) {
-                Assert.assertEquals(requestFactors.get(nodeRef), 0.9f);
+                Assert.assertEquals(requestFactors.get(nodeRef), 1.0f);
             }
         }
     }
@@ -299,8 +299,8 @@ public class TestReplicationPrioritization {
             }
         }
 
-        SystemMetadata sysmeta = createSystemMetadata("testPid1",
-                preferredNodes, blockedNodes);
+        SystemMetadata sysmeta = createSystemMetadata("testPid1", preferredNodes,
+                blockedNodes);
         List<NodeReference> nodes = prioritiyStrategy.prioritizeNodes(nodeIds,
                 sysmeta);
         for (NodeReference node : nodes) {
