@@ -163,7 +163,7 @@ public class ReplicationManagerTest {
         try {
             // replicationManager.createAndQueueTasks(pid);
             // expect numberReplicas less the already created replica
-            assertEquals((int) sysmeta.getReplicationPolicy().getNumberReplicas() - 1,
+            assertEquals((int) sysmeta.getReplicationPolicy().getNumberReplicas(),
                     (int) replicationManager.createAndQueueTasks(sysmeta.getIdentifier()));
         } catch (Exception e) {
             e.printStackTrace();
