@@ -135,7 +135,7 @@ public class ReplicationPrioritizationStrategy {
         // A map to store the current failure factors per node
         HashMap<NodeReference, Float> failureFactors = new HashMap<NodeReference, Float>();
         Float successThreshold = new Float(0.8f);
-
+        Float failureFactor;
         /*
          * See http://epad.dataone.org/20120420-replication-priority-queue
          * 
@@ -179,14 +179,23 @@ public class ReplicationPrioritizationStrategy {
             // in the case there's no real stats
             if (failures.intValue() == 0 && successes.intValue() == 0) {
                 // bootstrap the MN as a medium-performant node
-                failureFactors.put(nodeId, new Float(0.9f));
+                failureFactors.put(nodeId, new Float(1.0f));
 
             } else {
-                // calculate the failure factor
-                Float failureFactor = new Float(successes.floatValue()
-                        / (successes.floatValue() + failures.floatValue()));
-                if (failureFactor <= successThreshold) {
-                    failureFactor = new Float(0.0f);
+                // for MNs that are young, give 'em 5 attempts before calculating
+                if ( failedRequests.size() + completedRequests.size() < 5 ) {
+                    failureFactor = new Float(1.0f); 
+                    log.debug("Gave node " + nodeId.getValue() + " a pass " +
+                        "since it has less than 5 replica attempts.");
+                    
+                } else {
+                    // calculate the failure factor
+                    failureFactor = new Float(successes.floatValue()
+                            / (successes.floatValue() + failures.floatValue()));
+                    if ( failureFactor <= successThreshold ) {
+                        failureFactor = new Float(0.0f);
+                        
+                    }
                 }
                 failureFactors.put(nodeId, failureFactor);
 
@@ -355,9 +364,10 @@ public class ReplicationPrioritizationStrategy {
             for (Replica replica : replicaList) {
                 String nodeIdStr = replica.getReplicaMemberNode().getValue();
                 ReplicationStatus nodeStatus = replica.getReplicationStatus();
-                if (nodeIdStr == nodeId.getValue()
-                        && (nodeStatus == ReplicationStatus.QUEUED
-                                || nodeStatus == ReplicationStatus.REQUESTED || nodeStatus == ReplicationStatus.COMPLETED)) {
+                if (nodeIdStr == nodeId.getValue() && 
+                   (nodeStatus == ReplicationStatus.QUEUED || 
+                    nodeStatus == ReplicationStatus.REQUESTED || 
+                    nodeStatus == ReplicationStatus.COMPLETED)) {
                     score = new Float(0.0f);
                     log.debug("Node " + nodeId.getValue()
                             + " is already listed " + "as a "
