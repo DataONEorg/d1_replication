@@ -148,18 +148,17 @@ public class ReplicationEventListener
             log.error("There was a problem handling task creation for " + 
             		pid.getValue() + ". The error message was " +
                 e.getMessage());
-            if ( pid != null ) {
-                handledReplicationEvents.remove(pid);                
-            }
             e.printStackTrace();
             
         } catch (InterruptedException e) {
+            log.debug("Polling of the hzReplicationEvents queue was interrupted.");
+
+        } finally {
             if ( pid != null ) {
                 handledReplicationEvents.remove(pid);                
             }
-            log.debug("Polling of the hzReplicationEvents queue was interrupted.");
 
-        }       
+        }
     }
 
     /**
