@@ -320,8 +320,8 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
             ReplicationStatus listedStatus = listedReplica.getReplicationStatus();
 
             NodeType nodeType = this.nodes.get(nodeId).getType();
-            if (nodeType == NodeType.CN
-                    || nodeId == sysmeta.getAuthoritativeMemberNode()) {
+            if (nodeType == NodeType.CN || 
+                nodeId.getValue().equals(sysmeta.getAuthoritativeMemberNode().getValue())) {
                 continue; // don't count CNs or authoritative nodes as replicas
 
             }
