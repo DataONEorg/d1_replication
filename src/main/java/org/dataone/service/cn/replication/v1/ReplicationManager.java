@@ -320,15 +320,35 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                 NodeReference nodeId = listedReplica.getReplicaMemberNode();
                 ReplicationStatus listedStatus = listedReplica.getReplicationStatus();
 
-                NodeType nodeType = this.nodes.get(nodeId).getType();
-                if (nodeType == NodeType.CN || 
-                    nodeId.getValue().equals(sysmeta.getAuthoritativeMemberNode().getValue())) {
-                    continue; // don't count CNs or authoritative nodes as replicas
+                Node node = new Node();
+                NodeType nodeType = null;
+                try {
+                    node = this.nodes.get(nodeId);
+                    if ( node != null ) {                        
+                        log.debug("The potential target node id is: " +
+                            node.getIdentifier().getValue());
+                        nodeType = node.getType();
+                        if ( nodeType == NodeType.CN || 
+                                nodeId.getValue().equals(
+                                   sysmeta.getAuthoritativeMemberNode().getValue())) {
+                                continue; // don't count CNs or authoritative nodes as replicas
 
+                           }
+                        
+                    } else {
+                        log.debug("The potential target node id is null! ");
+                        continue;
+                    }
+                    
+                } catch (Exception e) {
+                    log.debug("There was an error getting the node type: " +
+                         e.getMessage());
+                    e.printStackTrace();
                 }
-                if (listedStatus == ReplicationStatus.QUEUED
-                        || listedStatus == ReplicationStatus.REQUESTED
-                        || listedStatus == ReplicationStatus.COMPLETED) {
+                
+                if (listedStatus == ReplicationStatus.QUEUED    ||
+                    listedStatus == ReplicationStatus.REQUESTED ||
+                    listedStatus == ReplicationStatus.COMPLETED) {
                     currentListedReplicaCount++;
                     listedReplicaNodes.add(nodeId);
                 }
