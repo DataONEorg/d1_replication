@@ -336,7 +336,8 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                            }
                         
                     } else {
-                        log.debug("The potential target node id is null! ");
+                        log.debug("The potential target node id is null for "
+                            + nodeId.getValue());
                         continue;
                     }
                     
