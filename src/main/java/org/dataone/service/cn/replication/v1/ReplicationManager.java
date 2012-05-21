@@ -251,7 +251,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
     public int createAndQueueTasks(Identifier pid) throws ServiceFailure,
             NotImplemented, InvalidToken, NotAuthorized, InvalidRequest, NotFound {
 
-        log.info("ReplicationManager.createAndQueueTasks called.");
+        log.debug("ReplicationManager.createAndQueueTasks called.");
         boolean allowed;
         int taskCount = 0;
         int desiredReplicas = 3;
@@ -267,10 +267,10 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         try {
             // if replication isn't allowed, return
             allowed = isAllowed(pid);
-            log.info("Replication is allowed for identifier " + pid.getValue());
+            log.debug("Replication is allowed for identifier " + pid.getValue());
 
             if (!allowed) {
-                log.info("Replication is not allowed for the object identified by "
+                log.debug("Replication is not allowed for the object identified by "
                         + pid.getValue());
                 return 0;
 
@@ -294,7 +294,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                     }
                 }
                 if (!no_task_with_pid) {
-                    log.info("A replication task for the object identified by "
+                    log.debug("A replication task for the object identified by "
                             + pid.getValue() + " has already been queued.");
                     return 0;
 
@@ -302,7 +302,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
             }
 
             // get the system metadata for the pid
-            log.info("Getting the replica list for identifier " + pid.getValue());
+            log.debug("Getting the replica list for identifier " + pid.getValue());
 
             sysmeta = this.systemMetadata.get(pid);
             replicaList = sysmeta.getReplicaList();
@@ -359,7 +359,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                     + pid.getValue());
 
             // List of Nodes for building MNReplicationTasks
-            log.info("Building a potential target node list for identifier "
+            log.debug("Building a potential target node list for identifier "
                     + pid.getValue());
             nodeList = (Set<NodeReference>) this.nodes.keySet();
             potentialNodeList = new ArrayList<NodeReference>(); // will be our short
@@ -394,7 +394,9 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
 
             // prioritize replica targets by preferred/blocked lists and other
             // performance metrics
+            log.trace("METRICS:\tPRIORITIZE:\tPID:\t" + pid.getValue());
             potentialNodeList = prioritizeNodes(potentialNodeList, sysmeta);
+            log.trace("METRICS:\tEND PRIORITIZE:\tPID:\t" + pid.getValue());
 
             // parse the sysmeta.ReplicationPolicy
             ReplicationPolicy replicationPolicy = sysmeta.getReplicationPolicy();
@@ -462,7 +464,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                         replicable = true;
                     }
                 }
-                log.info("Based on evaluating the target node services, node id "
+                log.debug("Based on evaluating the target node services, node id "
                         + targetNode.getIdentifier().getValue() + " is replicable: "
                         + replicable + " (during evaluation for " + pid.getValue() + ")");
 
@@ -503,6 +505,9 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
 
                     log.info("Updated system metadata for identifier " + pid.getValue()
                             + " with QUEUED replication status.");
+                    log.trace("METRICS:\tREPLICATION:\tQUEUE:\tPID:\t" + pid.getValue() + 
+                        "\tNODE:\t" + targetNode.getIdentifier().getValue() + 
+                        "\tSIZE:\t" + sysmeta.getSize().intValue());
 
                     Long taskid = taskIdGenerator.newId();
                     // add the task to the task list
@@ -712,14 +717,16 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
 
             String message = "Polling of the replication task queue was interrupted. "
                     + "The message was: " + e.getMessage();
-            log.info(message);
+            log.debug(message);
         } catch (RuntimeInterruptedException rie) {
             String message = "Hazelcast instance was lost due to cluster shutdown, "
                     + rie.getMessage();
+            log.debug(message);
 
         } catch (IllegalStateException ise) {
             String message = "Hazelcast instance was lost due to cluster shutdown, "
                     + ise.getMessage();
+            log.debug(message);
         }
 
     }

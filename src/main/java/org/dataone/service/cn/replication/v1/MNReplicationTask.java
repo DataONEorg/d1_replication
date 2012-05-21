@@ -409,6 +409,12 @@ public class MNReplicationTask
                     this.pid.getValue() + " during " + 
                     " MNReplicationTask id " + this.taskid);
        }               
+        log.trace("METRICS:\tREPLICATION:\tEND QUEUE:\tPID:\t" + pid.getValue() + 
+                "\tNODE:\t" + targetNode.getValue() + 
+                "\tSIZE:\t" + sysmeta.getSize().intValue());
+        log.trace("METRICS:\tREPLICATION:\tREQUEST:\tPID:\t" + pid.getValue() + 
+                "\tNODE:\t" + targetNode.getValue() + 
+                "\tSIZE:\t" + sysmeta.getSize().intValue());
 
        return this.pid.getValue();
     }
