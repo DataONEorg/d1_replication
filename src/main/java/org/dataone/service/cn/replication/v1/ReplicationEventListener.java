@@ -140,7 +140,9 @@ public class ReplicationEventListener
                 log.info("Won the replication events queue poll [top of] for " + pid.getValue());
                 // evaluate the object's replication policy for potential task creation
                 handledReplicationEvents.add(pid);
+                log.trace("METRICS:\tEVALUATE:\tPID:\t" + pid.getValue());
                 this.replicationManager.createAndQueueTasks(pid);
+                log.trace("METRICS:\tEND EVALUATE:\tPID:\t" + pid.getValue());
                 handledReplicationEvents.remove(pid);
             }
             
