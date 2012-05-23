@@ -139,25 +139,37 @@ public class ReplicationEventListener
             if ( pid != null ) {    
                 log.info("Won the replication events queue poll [top of] for " + pid.getValue());
                 // evaluate the object's replication policy for potential task creation
-                handledReplicationEvents.add(pid);
+                this.handledReplicationEvents.add(pid);
                 log.trace("METRICS:\tREPLICATION:\tEVALUATE:\tPID:\t" + pid.getValue());
                 this.replicationManager.createAndQueueTasks(pid);
                 log.trace("METRICS:\tREPLICATION:\tEND EVALUATE:\tPID:\t" + pid.getValue());
-                handledReplicationEvents.remove(pid);
+                this.handledReplicationEvents.remove(pid);
             }
             
         } catch (BaseException e) {
             log.error("There was a problem handling task creation for " + 
-            		pid.getValue() + ". The error message was " +
-                e.getMessage());
+            		pid.getValue() + ". The error message was " + e.getMessage());
             e.printStackTrace();
+            try {
+                // something went very wrong trying to create tasks for this 
+                // pid.  Resubmit it to evaluate again.
+                if ( !this.replicationEvents.contains(pid) ) {
+                    this.replicationEvents.put(pid);
+                    
+                }
+                
+            } catch (InterruptedException e1) {
+                log.error("Adding to the hzReplicationEvents queue was interrupted.");
+                e1.printStackTrace();
+            }
             
         } catch (InterruptedException e) {
-            log.debug("Polling of the hzReplicationEvents queue was interrupted.");
-
+            log.error("Polling of the hzReplicationEvents queue was interrupted.");
+            e.printStackTrace();
+            
         } finally {
             if ( pid != null ) {
-                handledReplicationEvents.remove(pid);                
+                this.handledReplicationEvents.remove(pid);                
             }
 
         }
