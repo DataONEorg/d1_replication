@@ -43,6 +43,10 @@ import org.dataone.service.types.v1.SystemMetadata;
 
 import org.dataone.service.types.v1.NodeReference;
 
+import com.hazelcast.core.Hazelcast;
+import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.IQueue;
+
 
 /**
  * A single replication task to be queued and executed by the Replication Service.
@@ -89,6 +93,16 @@ public class MNReplicationTask
     /* The number of times the task has been retried */
     private int retryCount;
 
+    /* The name of the hzReplicationTasks property */
+    private String tasksQueue;
+
+    /* The instance of the Hazelcast processing cluster member */
+    private HazelcastInstance hzMember;
+
+    /* The Hazelcast distributed replication tasks queue */
+    private IQueue<MNReplicationTask> replicationTasks;
+
+    private String cnRouterBaseURL;
 
     /**
      * Constructor - create an empty replication task instance
@@ -106,6 +120,12 @@ public class MNReplicationTask
     public MNReplicationTask(String taskid, Identifier pid,
             NodeReference originatingNode, NodeReference targetNode) {
         this.taskid = taskid;
+        // get a reference to the hzReplicationTasks queue
+        this.tasksQueue = 
+            Settings.getConfiguration().getString("dataone.hazelcast.replicationQueuedTasks");
+        this.hzMember = Hazelcast.getDefaultInstance();
+        this.replicationTasks = this.hzMember.getQueue(this.tasksQueue);
+
         this.pid = pid;
         this.originatingNode = originatingNode;
         this.targetNode = targetNode;
@@ -116,6 +136,8 @@ public class MNReplicationTask
         CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
         log.info("MNReplicationTask task id " + this.taskid + " is using an X509 certificate "
                 + "from " + clientCertificateLocation + " for identifier " + this.pid.getValue());
+        this.cnRouterBaseURL = "https://" +
+            Settings.getConfiguration().getString("cn.router.hostname") + "/cn";
     }
 
     /**
@@ -340,6 +362,7 @@ public class MNReplicationTask
                 log.error("Can't get system metadata: CNode object is null for " +
                     " task id " + getTaskid() + ", identifier " + getPid().getValue() +
                     ", target node " + getTargetNode().getValue());
+                success = false;
             }
                         
         } catch (BaseException e) {
@@ -351,16 +374,23 @@ public class MNReplicationTask
                 Thread.sleep(5000L);
                 // get the most recent system metadata for the pid
                 if (this.cn != null ) {
-                    sysmeta = cn.getSystemMetadata(session, pid);
-                    success = targetMN.replicate(session, sysmeta, this.originatingNode);
-                    log.info("Task id " + this.getTaskid() + " called replicate() at targetNode " + 
-                            this.targetNode.getValue() + ", identifier " + this.pid.getValue() +
-                            ". Success: " + success);
+                    try {
+                        Checksum checksum = this.targetMN.getChecksum(getPid(), "SHA-1");
+                        exists = checksum.equals(sysmeta.getChecksum());
+                        
+                    } catch (NotFound nf) {
+                        sysmeta = cn.getSystemMetadata(session, pid);
+                        success = targetMN.replicate(session, sysmeta, this.originatingNode);
+                        log.info("Task id " + this.getTaskid() + " called replicate() at targetNode " + 
+                                this.targetNode.getValue() + ", identifier " + this.pid.getValue() +
+                                ". Success: " + success);
+                    }
                     
                 } else {
                     log.error("Can't get system metadata: CNode object is null for " +
                         " task id " + getTaskid() + ", identifier " + getPid().getValue() +
                         ", target node " + getTargetNode().getValue());
+                    success = false;
                 }
                                
             } catch (BaseException e1) {
@@ -397,8 +427,18 @@ public class MNReplicationTask
             status = ReplicationStatus.REQUESTED;
             
         } else {
-            status = ReplicationStatus.FAILED;
-
+            // re-queue the task up to 10 times, then fail
+            if ( this.retryCount < 10) {
+                status = ReplicationStatus.QUEUED;
+                this.replicationTasks.add(this);
+                log.debug("Task " + this.getTaskid() + " was re-queued " +
+                    "for identifier " + this.pid.getValue() + " on node " +
+                    this.targetNode.getValue());
+                
+            } else {
+                status = ReplicationStatus.FAILED;
+                
+            }
         }
         
         // for replicas that already exist, just update the system metadata
@@ -409,29 +449,33 @@ public class MNReplicationTask
 
         try {
             if (this.cn != null) {
+                
                 cn.setReplicationStatus(session, pid, targetNode, status, null);
-                log.info( "Task" + this.getTaskid() + " updated replica status for identifier " + 
+                log.info( "Task " + this.getTaskid() + " updated replica status for identifier " + 
                     this.pid.getValue() + " on node " + 
                     this.targetNode.getValue() + " to " + status.toString());
             } else {
-                log.info( "Task" + this.getTaskid() + 
+                log.error( "Task " + this.getTaskid() + 
                     " can't update replica status for identifier " + 
                     this.pid.getValue() + " on node " + 
                     this.targetNode.getValue() + " to " + status.toString() +
-                    ". CNode reference is null.");
-                
+                    ". CNode reference is null, trying the router address");
+                // try setting the status against the router address
+                CNode routerCN = new CNode(this.cnRouterBaseURL);
+                routerCN.setReplicationStatus(session, pid, targetNode, status, null);
             }
             
         } catch (BaseException e1) {
-            log.info("There was a problem setting the replication status to " +
-                    " REQUESTED for identifier " + 
+            log.error("There was a problem setting the replication status to " +
+                    status.toString() + "  for identifier " + 
                     this.pid.getValue() + " during " + 
                     " MNReplicationTask id " + this.taskid);
        }               
         log.trace("METRICS:\tREPLICATION:\tEND QUEUE:\tPID:\t" + pid.getValue() + 
                 "\tNODE:\t" + targetNode.getValue() + 
                 "\tSIZE:\t" + sysmeta.getSize().intValue());
-        log.trace("METRICS:\tREPLICATION:\tREQUEST:\tPID:\t" + pid.getValue() + 
+        log.trace("METRICS:\tREPLICATION:\t" + status.toString() + 
+                ":\tPID:\t" + pid.getValue() + 
                 "\tNODE:\t" + targetNode.getValue() + 
                 "\tSIZE:\t" + sysmeta.getSize().intValue());
 
