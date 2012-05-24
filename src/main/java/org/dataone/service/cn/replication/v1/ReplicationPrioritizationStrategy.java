@@ -13,6 +13,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.dataone.cn.dao.DaoFactory;
 import org.dataone.cn.dao.exceptions.DataAccessException;
+import org.dataone.configuration.Settings;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.Replica;
@@ -34,7 +35,22 @@ public class ReplicationPrioritizationStrategy {
     public static Log log = LogFactory
             .getLog(ReplicationPrioritizationStrategy.class);
 
+    /* The number of concurrent outstanding requests to a target member node */
+    private int requestLimit = 10;
+    
+    /* The number of concurrent outstanding requests to a target member node */
+    private float successThreshold = 0.8f;
+
+    /**
+     * Constructor: create a prioritization strategy
+     */
     public ReplicationPrioritizationStrategy() {
+        // load prioritization settings
+        this.requestLimit = 
+            Settings.getConfiguration().getInt("replication.concurrent.request.limit");
+        this.successThreshold = 
+            Settings.getConfiguration().getFloat("replication.success.threshold");
+        
     }
 
     /**
@@ -74,10 +90,6 @@ public class ReplicationPrioritizationStrategy {
          * -- refactor R including rs
          */
 
-        // TODO: Use a configurable limit. For now, define a static request
-        // limit
-        int requestLimit = 10;
-
         // query the systemmetadatastatus table to get counts of queued and
         // requested replicas by node identifier
         try {
@@ -99,7 +111,7 @@ public class ReplicationPrioritizationStrategy {
             log.debug("Pending requests for node " + nodeId.getValue() + " is "
                     + pending.intValue());
 
-            if (pending.intValue() <= requestLimit) {
+            if (pending.intValue() <= this.requestLimit) {
                 // currently under or equal to the limit
                 requestFactors.put(nodeId, new Float(1));
 
@@ -108,7 +120,7 @@ public class ReplicationPrioritizationStrategy {
                 requestFactors.put(nodeId, new Float(0));
                 log.info("Node " + nodeId.getValue()
                         + " is currently over its request limit of "
-                        + requestLimit + " requests.");
+                        + this.requestLimit + " requests.");
 
             }
 
@@ -134,7 +146,7 @@ public class ReplicationPrioritizationStrategy {
         Map<NodeReference, Integer> completedRequests = new HashMap<NodeReference, Integer>();
         // A map to store the current failure factors per node
         HashMap<NodeReference, Float> failureFactors = new HashMap<NodeReference, Float>();
-        Float successThreshold = new Float(0.8f);
+        Float successThreshold = new Float(this.successThreshold);
         Float failureFactor;
         /*
          * See http://epad.dataone.org/20120420-replication-priority-queue
