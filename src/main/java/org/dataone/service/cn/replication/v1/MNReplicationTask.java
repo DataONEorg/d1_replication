@@ -33,7 +33,9 @@ import org.dataone.client.MNode;
 import org.dataone.client.auth.CertificateManager;
 import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.BaseException;
+import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.ServiceFailure;
+import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.Session;
@@ -241,6 +243,9 @@ public class MNReplicationTask
         
         SystemMetadata sysmeta = null;
         
+        // a flag showing an already existing replica on the target MN
+        boolean exists = false;
+        
         // a flag for success on setting replication status
         boolean success = false;
         
@@ -318,10 +323,18 @@ public class MNReplicationTask
                 // get the most recent system metadata for the pid
                 sysmeta = cn.getSystemMetadata(session, pid);
                 // call for the replication
-                success = this.targetMN.replicate(session, sysmeta, this.originatingNode);
-                log.info("Task id " + this.getTaskid() + " called replicate() at targetNode " + 
-                        this.targetNode.getValue() + ", identifier " + this.pid.getValue() +
-                        ". Success: " + success);
+                
+                // check if the object exists on the target MN already
+                try {
+                    Checksum checksum = this.targetMN.getChecksum(getPid(), "SHA-1");
+                    exists = checksum.equals(sysmeta.getChecksum());
+                    
+                } catch (NotFound nfe) {
+                    success = this.targetMN.replicate(session, sysmeta, this.originatingNode);
+                    log.info("Task id " + this.getTaskid() + " called replicate() at targetNode " + 
+                            this.targetNode.getValue() + ", identifier " + this.pid.getValue() +
+                            ". Success: " + success);
+                }
                
             } else {
                 log.error("Can't get system metadata: CNode object is null for " +
@@ -386,6 +399,12 @@ public class MNReplicationTask
         } else {
             status = ReplicationStatus.FAILED;
 
+        }
+        
+        // for replicas that already exist, just update the system metadata
+        if ( exists ) {
+            status = ReplicationStatus.COMPLETED;
+            
         }
 
         try {
