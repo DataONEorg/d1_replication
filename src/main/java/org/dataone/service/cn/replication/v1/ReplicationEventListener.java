@@ -54,7 +54,7 @@ public class ReplicationEventListener
     implements EntryListener<Identifier, SystemMetadata>, ItemListener<Identifier> {
 
     /* A prefix appended to an identifier for coordinated locks across ReplicationManagers */
-    private static final String EVENT_PREFIX = "replication-event-";
+    private static final String EVENT_PREFIX = "";
 
     /* Get a Log instance */
     public static Log log = LogFactory.getLog(ReplicationEventListener.class);
