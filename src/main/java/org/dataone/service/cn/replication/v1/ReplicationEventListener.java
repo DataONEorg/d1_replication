@@ -54,7 +54,7 @@ public class ReplicationEventListener
     implements EntryListener<Identifier, SystemMetadata>, ItemListener<Identifier> {
 
     /* A prefix appended to an identifier for coordinated locks across ReplicationManagers */
-    private static final String EVENT_PREFIX = "";
+    private static final String EVENT_PREFIX = "replication-event-";
 
     /* Get a Log instance */
     public static Log log = LogFactory.getLog(ReplicationEventListener.class);
@@ -133,17 +133,24 @@ public class ReplicationEventListener
         log.info("Item added event received on the [end of] hzReplicationEvents queue for " 
             + identifier.getValue());
         Identifier pid = null;
+        boolean success = false;
         try {
             // poll the queue to pop the most recent event off of the queue
             pid = this.replicationEvents.poll(3L, TimeUnit.SECONDS);
             if ( pid != null ) {    
                 log.info("Won the replication events queue poll [top of] for " + pid.getValue());
                 // evaluate the object's replication policy for potential task creation
-                this.handledReplicationEvents.add(pid);
-                log.trace("METRICS:\tREPLICATION:\tEVALUATE:\tPID:\t" + pid.getValue());
-                this.replicationManager.createAndQueueTasks(pid);
-                log.trace("METRICS:\tREPLICATION:\tEND EVALUATE:\tPID:\t" + pid.getValue());
-                this.handledReplicationEvents.remove(pid);
+                success = this.handledReplicationEvents.add(pid);
+                if (success) {
+                    log.trace("METRICS:\tREPLICATION:\tEVALUATE:\tPID:\t"
+                            + pid.getValue());
+                    this.replicationManager.createAndQueueTasks(pid);
+                    log.trace("METRICS:\tREPLICATION:\tEND EVALUATE:\tPID:\t"
+                            + pid.getValue());
+                } else {
+                    log.debug("hzHandledReplicationEvents already has " +
+                        "identifier " + pid.getValue() + ". Not adding it.");
+                }
             }
             
         } catch (BaseException e) {
