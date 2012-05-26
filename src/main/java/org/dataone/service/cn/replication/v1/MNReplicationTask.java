@@ -35,6 +35,7 @@ import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.ServiceFailure;
+import org.dataone.service.exceptions.VersionMismatch;
 import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.ReplicationStatus;
@@ -99,10 +100,7 @@ public class MNReplicationTask
     /* The instance of the Hazelcast processing cluster member */
     private HazelcastInstance hzMember;
 
-    /* The Hazelcast distributed replication tasks queue */
-    private IQueue<MNReplicationTask> replicationTasks;
-
-    private String cnRouterBaseURL;
+    private String cnRouterHostname;
 
     /**
      * Constructor - create an empty replication task instance
@@ -120,11 +118,7 @@ public class MNReplicationTask
     public MNReplicationTask(String taskid, Identifier pid,
             NodeReference originatingNode, NodeReference targetNode) {
         this.taskid = taskid;
-        // get a reference to the hzReplicationTasks queue
-        this.tasksQueue = 
-            Settings.getConfiguration().getString("dataone.hazelcast.replicationQueuedTasks");
         this.hzMember = Hazelcast.getDefaultInstance();
-        this.replicationTasks = this.hzMember.getQueue(this.tasksQueue);
 
         this.pid = pid;
         this.originatingNode = originatingNode;
@@ -136,7 +130,7 @@ public class MNReplicationTask
         CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
         log.info("MNReplicationTask task id " + this.taskid + " is using an X509 certificate "
                 + "from " + clientCertificateLocation + " for identifier " + this.pid.getValue());
-        this.cnRouterBaseURL = "https://" +
+        this.cnRouterHostname = "https://" +
             Settings.getConfiguration().getString("cn.router.hostname") + "/cn";
     }
 
@@ -327,6 +321,7 @@ public class MNReplicationTask
                         this.pid.getValue() + " during " + 
                         " task id " + getTaskid());
                 e1.printStackTrace();
+                this.targetMN = null;
                 success = false;
                                     
             } catch (InterruptedException ie) {
@@ -334,6 +329,7 @@ public class MNReplicationTask
                         "during replication task id " + getTaskid() + ", identifier " +
                         getPid().getValue() + ", target node " + getTargetNode().getValue());
                 ie.printStackTrace();
+                this.targetMN = null;
                 success = false;
 
             }
@@ -341,7 +337,7 @@ public class MNReplicationTask
 
         try {
 
-            if (this.cn != null ) {
+            if ( this.cn != null && this.targetMN != null ) {
                 // get the most recent system metadata for the pid
                 sysmeta = cn.getSystemMetadata(session, pid);
                 // call for the replication
@@ -373,7 +369,7 @@ public class MNReplicationTask
                 this.retryCount++;
                 Thread.sleep(5000L);
                 // get the most recent system metadata for the pid
-                if (this.cn != null ) {
+                if ( this.cn != null && this.targetMN != null ) {
                     try {
                         Checksum checksum = this.targetMN.getChecksum(getPid(), "SHA-1");
                         exists = checksum.equals(sysmeta.getChecksum());
@@ -421,24 +417,14 @@ public class MNReplicationTask
             
         }
         
-        // update the replication status
+        // set the replication status
         ReplicationStatus status = null;
         if ( success ) {
             status = ReplicationStatus.REQUESTED;
             
         } else {
-            // re-queue the task up to 10 times, then fail
-            if ( this.retryCount < 10) {
-                status = ReplicationStatus.QUEUED;
-                this.replicationTasks.add(this);
-                log.debug("Task " + this.getTaskid() + " was re-queued " +
-                    "for identifier " + this.pid.getValue() + " on node " +
-                    this.targetNode.getValue());
+            status = ReplicationStatus.FAILED;
                 
-            } else {
-                status = ReplicationStatus.FAILED;
-                
-            }
         }
         
         // for replicas that already exist, just update the system metadata
@@ -447,39 +433,207 @@ public class MNReplicationTask
             
         }
 
-        try {
-            if (this.cn != null) {
-                
-                cn.setReplicationStatus(session, pid, targetNode, status, null);
-                log.info( "Task " + this.getTaskid() + " updated replica status for identifier " + 
-                    this.pid.getValue() + " on node " + 
-                    this.targetNode.getValue() + " to " + status.toString());
+        // depending on the status, update the status or delete the entry
+        // in the system metadata for this identifier
+        boolean deleted = false;
+        boolean updated = false;
+        if ( this.cn != null ) {
+            
+            if ( !status.equals(ReplicationStatus.FAILED) ) {
+                // make every effort to update the status correctly
+                try {
+                    updated = this.cn.setReplicationStatus(session, pid, 
+                              this.targetNode, status, null);
+                    
+                } catch (BaseException be) {
+ 
+                    // there's trouble communicating with the local CN
+                    log.error("There was a problem setting the replication status to " +
+                            status.toString() + "  for identifier " + 
+                            this.pid.getValue() + " during " + 
+                            " MNReplicationTask id " + this.taskid);
+                    // try the router CN address
+                    updated = setReplicationStatus(session, pid, 
+                              this.targetNode, status, null);
+                }                   
+
             } else {
-                log.error( "Task " + this.getTaskid() + 
-                    " can't update replica status for identifier " + 
-                    this.pid.getValue() + " on node " + 
-                    this.targetNode.getValue() + " to " + status.toString() +
-                    ". CNode reference is null, trying the router address");
-                // try setting the status against the router address
-                CNode routerCN = new CNode(this.cnRouterBaseURL);
-                routerCN.setReplicationStatus(session, pid, targetNode, status, null);
+                
+                
+                // this task has failed. make every effort to delete the
+                // replica entry so the node prioritization is not skewed
+                // (due to factors not associated with the node)
+                try {
+                    // call the local cn
+                    deleted = this.cn.deleteReplicationMetadata(session, pid, 
+                            targetNode, sysmeta.getSerialVersion().longValue());
+                    
+                } catch (BaseException  be) {
+                    // err. get the latest system metadata and call the cn
+                    if ( be instanceof VersionMismatch ) {
+                        try {
+                            sysmeta = this.cn.getSystemMetadata(pid);
+                            deleted = this.cn.deleteReplicationMetadata(session, pid, 
+                                targetNode, sysmeta.getSerialVersion().longValue());
+                            
+                        } catch (BaseException e) {
+                            // we're really having difficulties. try the
+                            // round robin CN address
+                            deleted = deleteReplicationMetadata(session, pid, this.targetNode);
+                        }
+                    }
+                }
+                // if we got to this state, something is very wrong with the
+                // CN environment. move on
+                if ( !deleted ) {
+                    log.error("FAILED deletion of replica entry for identifier " + 
+                        pid.getValue() + " and taget node id " + targetNode.getValue());
+                }
             }
             
-        } catch (BaseException e1) {
-            log.error("There was a problem setting the replication status to " +
-                    status.toString() + "  for identifier " + 
-                    this.pid.getValue() + " during " + 
-                    " MNReplicationTask id " + this.taskid);
-       }               
+        } else {
+            if ( !status.equals(ReplicationStatus.FAILED) ) {
+                log.error( "Task " + this.getTaskid() + 
+                        " can't update replica status for identifier " + 
+                        this.pid.getValue() + " on node " + 
+                        this.targetNode.getValue() + " to " + status.toString() +
+                        ". CNode reference is null, trying the router address.");
+                    // try setting the status against the router address
+                    updated = setReplicationStatus(session, pid, targetNode, status, null);
+
+            } else {
+                log.error( "Task " + this.getTaskid() + 
+                        " can't delete the replica entry for identifier " + 
+                        this.pid.getValue() + " and node " + 
+                        this.targetNode.getValue() +
+                        ". CNode reference is null, trying the router address.");
+                // try deleting the entry against the router address
+                deleted = deleteReplicationMetadata(session, pid, this.targetNode);
+
+            }
+        }
+
         log.trace("METRICS:\tREPLICATION:\tEND QUEUE:\tPID:\t" + pid.getValue() + 
                 "\tNODE:\t" + targetNode.getValue() + 
                 "\tSIZE:\t" + sysmeta.getSize().intValue());
-        log.trace("METRICS:\tREPLICATION:\t" + status.toString() + 
-                ":\tPID:\t" + pid.getValue() + 
-                "\tNODE:\t" + targetNode.getValue() + 
-                "\tSIZE:\t" + sysmeta.getSize().intValue());
+        
+        if ( updated ) {
+            log.info("Task " + this.getTaskid()
+                    + " updated replica status for identifier "
+                    + this.pid.getValue() + " on node "
+                    + this.targetNode.getValue() + " to "
+                    + status.toString());
+            log.trace("METRICS:\tREPLICATION:\t" + status.toString().toUpperCase() + 
+                    ":\tPID:\t" + pid.getValue() + 
+                    "\tNODE:\t" + targetNode.getValue() + 
+                    "\tSIZE:\t" + sysmeta.getSize().intValue());
 
+        }
+        
+        if ( deleted ) {
+            log.info("Task " + this.getTaskid()
+                    + " deleted replica entry for identifier "
+                    + this.pid.getValue() + " and node "
+                    + this.targetNode.getValue());
+
+        }
+                
        return this.pid.getValue();
+    }
+
+    /*
+     * Set the replication status against the router CN address instead of the 
+     * local CN via D1Client. This may help with local CN
+     * communication trouble. 
+     */
+    private boolean setReplicationStatus(Session session, Identifier pid,
+            NodeReference targetNode, ReplicationStatus status, BaseException failure) {
+        CNode cn;
+        boolean updated = false;
+        String baseURL = "https://" + this.cnRouterHostname + "/cn";
+        cn = new CNode(baseURL);
+        
+        // try multiple times since at this point we may be dealing with a lame
+        // CN in the cluster and the RR may still point us to it
+        for (int i = 0; i < 5; i++) {
+            
+            try {
+                updated = cn.setReplicationStatus(session, pid, targetNode, status, null);
+                if ( updated ) {
+                    break;
+                }
+            } catch (BaseException be) {
+                if ( log.isDebugEnabled() ) {
+                    be.printStackTrace();
+                    
+                }
+                log.error("Error in calling setReplicationStatus() " +
+                    "at " + baseURL + " for identifier " + pid.getValue() +
+                    ", target node " + targetNode.getValue() + " and status of " +
+                    status.toString() + ": " + be.getMessage());
+                continue;
+            }
+            
+        }
+        return updated;
+    }
+
+    /*
+     * Delete the replica entry for the target node using the CN router URL
+     * rather than the local CN via D1Client.  This may help with local CN
+     * communication trouble. 
+     * 
+     * @param session - the CN session instance
+     * @param - pid - the identifier of the object system metadata being modified
+     * @param targetNode - the node id of the replica target being deleted
+     * @param serialVersion - the serialVersion of the system metadata being
+     *                        operated on
+     */
+    private boolean deleteReplicationMetadata(Session session, Identifier pid,
+            NodeReference targetNode) {
+        
+        SystemMetadata sysmeta;
+        CNode cn;
+        boolean deleted = false;
+        String baseURL = "https://" + this.cnRouterHostname + "/cn";
+        cn = new CNode(baseURL);
+        
+        // try multiple times since at this point we may be dealing with a lame
+        // CN in the cluster and the RR may still point us to it
+        for (int i = 0; i < 5; i++) {
+            try {
+                // refresh the system metadata in case it changed
+                sysmeta = cn.getSystemMetadata(pid);
+                deleted = cn.deleteReplicationMetadata(pid, targetNode, 
+                          sysmeta.getSerialVersion().longValue());
+                if ( deleted ) {
+                    break;
+                }
+                
+            } catch (BaseException be) {
+                if ( log.isDebugEnabled() ) {
+                    be.printStackTrace();
+                    
+                }
+                log.error("Error in calling deleteReplicationMetadata() " +
+                    "at " + baseURL + " for identifier " + pid.getValue() +
+                    " and target node " + targetNode.getValue() +
+                    ": " + be.getMessage());
+                continue;
+                
+            } catch ( RuntimeException re ) {
+                if ( log.isDebugEnabled() ) {
+                    re.printStackTrace();
+                    
+                }
+                log.error("Error in getting sysyem metadata from the map for " +
+                          "identifier " + pid.getValue() + ": " + re.getMessage());
+                continue;
+                
+            }
+        }
+        
+        return deleted;
     }
 
     /**
@@ -509,4 +663,5 @@ public class MNReplicationTask
     public int getRetryCount() {
         return this.retryCount;
     }
+    
 }
