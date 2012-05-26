@@ -280,6 +280,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         // use the distributed lock
         this.lock = null;
         String lockPid = pid.getValue();
+        this.lock = this.hzMember.getLock(lockPid);
         boolean isLocked = false;
         try {
             isLocked = this.lock.tryLock(timeToWait, TimeUnit.SECONDS);
