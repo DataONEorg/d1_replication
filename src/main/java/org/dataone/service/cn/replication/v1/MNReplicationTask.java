@@ -561,8 +561,7 @@ public class MNReplicationTask
             NodeReference targetNode, ReplicationStatus status, BaseException failure) {
         CNode cn;
         boolean updated = false;
-        String baseURL = this.cnRouterHostname + "/cn";
-        cn = new CNode(baseURL);
+        cn = new CNode(this.cnRouterHostname);
         
         // try multiple times since at this point we may be dealing with a lame
         // CN in the cluster and the RR may still point us to it
@@ -578,8 +577,9 @@ public class MNReplicationTask
                     be.printStackTrace();
                     
                 }
-                log.error("Error in calling setReplicationStatus() " +
-                    "at " + baseURL + " for identifier " + pid.getValue() +
+                log.error("Error in calling setReplicationStatus() at "
+                        + this.cnRouterHostname + " for identifier "
+                        + pid.getValue() +
                     ", target node " + targetNode.getValue() + " and status of " +
                     status.toString() + ": " + be.getMessage());
                 continue;
@@ -606,8 +606,7 @@ public class MNReplicationTask
         SystemMetadata sysmeta;
         CNode cn;
         boolean deleted = false;
-        String baseURL = this.cnRouterHostname + "/cn";
-        cn = new CNode(baseURL);
+        cn = new CNode(this.cnRouterHostname);
         
         // try multiple times since at this point we may be dealing with a lame
         // CN in the cluster and the RR may still point us to it
@@ -626,8 +625,9 @@ public class MNReplicationTask
                     be.printStackTrace();
                     
                 }
-                log.error("Error in calling deleteReplicationMetadata() " +
-                    "at " + baseURL + " for identifier " + pid.getValue() +
+                log.error("Error in calling deleteReplicationMetadata() at "
+                        + this.cnRouterHostname + " for identifier "
+                        + pid.getValue() +
                     " and target node " + targetNode.getValue() +
                     ": " + be.getMessage());
                 continue;
