@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Lock;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -133,8 +132,6 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
     /* The event listener used to manage incoming map and queue changes */
     private ReplicationEventListener listener;
 
-    /* The lock on an identifier across the hzProcess cluster */
-    private ILock lock;
     /*
      * The timeout period for tasks submitted to the executor service to
      * complete the call to MN.replicate()
@@ -264,6 +261,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
             NotImplemented, InvalidRequest {
 
         log.debug("ReplicationManager.createAndQueueTasks called.");
+        ILock lock;
         boolean allowed;
         int taskCount = 0;
         int desiredReplicas = 3;
@@ -278,12 +276,12 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         Session session = null;
 
         // use the distributed lock
-        this.lock = null;
+        lock = null;
         String lockPid = pid.getValue();
-        this.lock = this.hzMember.getLock(lockPid);
+        lock = this.hzMember.getLock(lockPid);
         boolean isLocked = false;
         try {
-            isLocked = this.lock.tryLock(timeToWait, TimeUnit.SECONDS);
+            isLocked = lock.tryLock(timeToWait, TimeUnit.SECONDS);
             // only evaluate an identifier if we can get the lock in a reasonable time
             if ( isLocked ) {
                 // if replication isn't allowed, return
@@ -392,7 +390,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
 
                 } finally {
                     if ( isLocked ) {
-                        this.lock.unlock();
+                        lock.unlock();
                     }
                 }
                 // build the potential list of target nodes
