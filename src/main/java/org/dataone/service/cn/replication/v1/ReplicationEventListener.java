@@ -33,6 +33,7 @@ import com.hazelcast.core.EntryEvent;
 import com.hazelcast.core.EntryListener;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.ILock;
 import com.hazelcast.core.IQueue;
 import com.hazelcast.core.IMap;
 import com.hazelcast.core.ISet;
@@ -68,9 +69,6 @@ public class ReplicationEventListener
     /* The name of the replication events queue */
     private String eventsQueue;
     
-    /* The name of the handled replication events set */
-    private String handledEvents;
-
     /* The name of the system metadata map */
     private String systemMetadataMap;
     
@@ -82,10 +80,6 @@ public class ReplicationEventListener
     
     /* The Hazelcast distributed replication events queue*/
     private IQueue<Identifier> replicationEvents;
-
-    /* The Hazelcast distributed handled replication events queue*/
-    private ISet<Identifier> handledReplicationEvents;
-
         
     /**
      * Constructor: create a replication event listener that listens for entry
@@ -99,14 +93,11 @@ public class ReplicationEventListener
         this.hzMember = Hazelcast.getDefaultInstance();
         this.eventsQueue =
             Settings.getConfiguration().getString("dataone.hazelcast.replicationQueuedEvents");
-        this.handledEvents =
-            Settings.getConfiguration().getString("dataone.hazelcast.handledReplicationEvents");
         // get references to the system metadata map and events queue
         this.systemMetadataMap =
             Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
         this.systemMetadata = this.hzClient.getMap(systemMetadataMap);
         this.replicationEvents = this.hzMember.getQueue(eventsQueue);
-        this.handledReplicationEvents = this.hzMember.getSet(handledEvents);
 
         // listen for changes on both structures
         this.systemMetadata.addEntryListener(this, true);
@@ -133,23 +124,33 @@ public class ReplicationEventListener
         log.info("Item added event received on the [end of] hzReplicationEvents queue for " 
             + identifier.getValue());
         Identifier pid = null;
-        boolean success = false;
+        boolean isLocked = false;
+        ILock lock = null;
+        String lockPrefix = "handled-replication-events-";
+        
         try {
             // poll the queue to pop the most recent event off of the queue
             pid = this.replicationEvents.poll(3L, TimeUnit.SECONDS);
             if ( pid != null ) {    
                 log.info("Won the replication events queue poll [top of] for " + pid.getValue());
-                // evaluate the object's replication policy for potential task creation
-                success = this.handledReplicationEvents.add(pid);
-                if (success) {
+                String lockString = lockPrefix + pid.getValue();
+                lock = this.hzMember.getLock(lockString);
+                // lock the string across CN ReplicationEventListener instances
+                isLocked = lock.tryLock(10, TimeUnit.MILLISECONDS);
+                if (isLocked) {
+                    log.debug("Gained the event lock " + lockString);
                     log.trace("METRICS:\tREPLICATION:\tEVALUATE:\tPID:\t"
                             + pid.getValue());
+                    
+                    // evaluate the object's replication policy for potential task creation
                     this.replicationManager.createAndQueueTasks(pid);
+                    
                     log.trace("METRICS:\tREPLICATION:\tEND EVALUATE:\tPID:\t"
                             + pid.getValue());
+                    
                 } else {
-                    log.debug("hzHandledReplicationEvents already has " +
-                        "identifier " + pid.getValue() + ". Not adding it.");
+                    log.debug("Didn't gain the event lock " + lockString);
+                    
                 }
             }
             
@@ -157,26 +158,18 @@ public class ReplicationEventListener
             log.error("There was a problem handling task creation for " + 
             		pid.getValue() + ". The error message was " + e.getMessage());
             e.printStackTrace();
-            try {
-                // something went very wrong trying to create tasks for this 
-                // pid.  Resubmit it to evaluate again.
-                if ( !this.replicationEvents.contains(pid) ) {
-                    this.replicationEvents.put(pid);
-                    
-                }
-                
-            } catch (InterruptedException e1) {
-                log.error("Adding to the hzReplicationEvents queue was interrupted.");
-                e1.printStackTrace();
-            }
-            
+            // something went very wrong trying to create tasks for this 
+            // pid.  Resubmit it to evaluate again.
+            queueEvent(pid);
+                            
         } catch (InterruptedException e) {
             log.error("Polling of the hzReplicationEvents queue was interrupted.");
             e.printStackTrace();
             
         } finally {
-            if ( pid != null ) {
-                this.handledReplicationEvents.remove(pid);                
+            if ( isLocked ) {
+                lock.unlock();
+                
             }
 
         }
@@ -329,20 +322,20 @@ public class ReplicationEventListener
         boolean added = false;
         
         // add event identifiers only if they aren't already added
-        log.info("The current number of potential replication events to be evaluated is: " 
+        log.debug("The current number of potential replication events to be evaluated is: " 
             + this.replicationEvents.size());
         
         // if it is not yet queued and not currently being handled, then we can add it
-        log.info("Replication event for " + identifier.getValue() + " has been handled: " +
-                this.handledReplicationEvents.contains(identifier));
-        log.info("Replication event for " + identifier.getValue() + " has been added  : " +
-                this.replicationEvents.contains(identifier));
-        if (!this.replicationEvents.contains(identifier) && !this.handledReplicationEvents.contains(identifier)) {
+        if ( !this.replicationEvents.contains(identifier) ) {
             added = this.replicationEvents.offer(identifier);
-            if (!added) {
-                log.info("Failed to add " + identifier + 
+            if ( added ) {
+                log.debug("Added " + identifier + 
                     " to the replication event queue");
                 
+            } else {
+                log.debug("Failed to add " + identifier + 
+                " to the replication event queue");
+
             }
         }                
     }
