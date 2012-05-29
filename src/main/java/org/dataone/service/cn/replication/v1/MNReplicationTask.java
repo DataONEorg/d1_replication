@@ -46,6 +46,7 @@ import org.dataone.service.types.v1.NodeReference;
 
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.ILock;
 import com.hazelcast.core.IQueue;
 
 
@@ -258,6 +259,11 @@ public class MNReplicationTask
             getPid().getValue() + " on node " + getTargetNode().getValue());
         
         SystemMetadata sysmeta = null;
+        
+        // variables for hzProcess component coordination only
+        ILock lock = null;
+        String lockString = null;
+        boolean isLocked = false;
         
         // a flag showing an already existing replica on the target MN
         boolean exists = false;
@@ -553,7 +559,7 @@ public class MNReplicationTask
             NodeReference targetNode, ReplicationStatus status, BaseException failure) {
         CNode cn;
         boolean updated = false;
-        String baseURL = "https://" + this.cnRouterHostname + "/cn";
+        String baseURL = this.cnRouterHostname + "/cn";
         cn = new CNode(baseURL);
         
         // try multiple times since at this point we may be dealing with a lame
@@ -598,7 +604,7 @@ public class MNReplicationTask
         SystemMetadata sysmeta;
         CNode cn;
         boolean deleted = false;
-        String baseURL = "https://" + this.cnRouterHostname + "/cn";
+        String baseURL = this.cnRouterHostname + "/cn";
         cn = new CNode(baseURL);
         
         // try multiple times since at this point we may be dealing with a lame
