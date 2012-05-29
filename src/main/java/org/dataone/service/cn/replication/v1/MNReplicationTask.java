@@ -335,6 +335,7 @@ public class MNReplicationTask
             }
         }
 
+        // now try to call MN.replicate()
         try {
 
             if ( this.cn != null && this.targetMN != null ) {
@@ -344,7 +345,8 @@ public class MNReplicationTask
                 
                 // check if the object exists on the target MN already
                 try {
-                    Checksum checksum = this.targetMN.getChecksum(getPid(), "SHA-1");
+                    Checksum checksum = this.targetMN.getChecksum(getPid(), 
+                            sysmeta.getChecksum().getAlgorithm());
                     exists = checksum.equals(sysmeta.getChecksum());
                     
                 } catch (NotFound nfe) {
@@ -371,7 +373,8 @@ public class MNReplicationTask
                 // get the most recent system metadata for the pid
                 if ( this.cn != null && this.targetMN != null ) {
                     try {
-                        Checksum checksum = this.targetMN.getChecksum(getPid(), "SHA-1");
+                        Checksum checksum = this.targetMN.getChecksum(getPid(), 
+                                sysmeta.getChecksum().getAlgorithm());
                         exists = checksum.equals(sysmeta.getChecksum());
                         
                     } catch (NotFound nf) {
