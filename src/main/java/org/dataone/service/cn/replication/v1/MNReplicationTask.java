@@ -21,9 +21,9 @@
  */
 package org.dataone.service.cn.replication.v1;
 
+import java.io.File;
 import java.io.Serializable;
 import java.util.concurrent.Callable;
-import java.io.File;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -38,16 +38,14 @@ import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.exceptions.VersionMismatch;
 import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v1.Identifier;
+import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.SystemMetadata;
 
-import org.dataone.service.types.v1.NodeReference;
-
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.ILock;
-import com.hazelcast.core.IQueue;
 
 
 /**
@@ -370,7 +368,9 @@ public class MNReplicationTask
             }
                         
         } catch (BaseException e) {
-                       
+            log.error("Caught base exception attempting to call relicate for pid:"
+                    + pid.getValue() + " with exception: ");
+            e.printStackTrace();
             try {
                 log.info("The call to MN.replicate() failed for " + pid.getValue() +
                     " on " + this.targetNode.getValue() + ". Trying again in 5 seconds.");
@@ -399,7 +399,9 @@ public class MNReplicationTask
                 }
                                
             } catch (BaseException e1) {
-                
+                log.error("Caught base exception attempting to call relicate for pid:"
+                        + pid.getValue() + " with exception: ");
+                e.printStackTrace();
                 // still couldn't call replicate() successfully. fail.
                 log.error("There was a second problem calling replicate() on " +
                         getTargetNode().getValue() + " for identifier " + 
