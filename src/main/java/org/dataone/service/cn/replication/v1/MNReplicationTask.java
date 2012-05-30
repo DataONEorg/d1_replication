@@ -368,9 +368,9 @@ public class MNReplicationTask
             }
                         
         } catch (BaseException e) {
-            log.error("Caught base exception attempting to call relicate for pid:"
-                    + pid.getValue() + " with exception: ");
-            e.printStackTrace();
+            log.error("Caught base exception attempting to call replicate for pid: "
+                    + pid.getValue() + " with exception: " + e.getDescription()
+                    + " and message: " + e.getMessage());
             try {
                 log.info("The call to MN.replicate() failed for " + pid.getValue() +
                     " on " + this.targetNode.getValue() + ". Trying again in 5 seconds.");
@@ -399,9 +399,11 @@ public class MNReplicationTask
                 }
                                
             } catch (BaseException e1) {
-                log.error("Caught base exception attempting to call relicate for pid:"
-                        + pid.getValue() + " with exception: ");
-                e.printStackTrace();
+                log.error("Caught base exception attempting to call replicate for pid: "
+                        + pid.getValue()
+                        + " with exception: "
+                        + e.getDescription()
+                        + " and message: " + e.getMessage());
                 // still couldn't call replicate() successfully. fail.
                 log.error("There was a second problem calling replicate() on " +
                         getTargetNode().getValue() + " for identifier " + 
