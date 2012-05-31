@@ -376,6 +376,7 @@ public class MNReplicationTask
             log.error("Caught base exception attempting to call replicate for pid: "
                     + pid.getValue() + " with exception: " + e.getDescription()
                     + " and message: " + e.getMessage());
+            e.printStackTrace();
             try {
                 log.info("The call to MN.replicate() failed for " + pid.getValue() +
                     " on " + this.targetNode.getValue() + ". Trying again in 5 seconds.");
@@ -409,6 +410,7 @@ public class MNReplicationTask
                         + " with exception: "
                         + e.getDescription()
                         + " and message: " + e.getMessage());
+                e.printStackTrace();
                 // still couldn't call replicate() successfully. fail.
                 log.error("There was a second problem calling replicate() on " +
                         getTargetNode().getValue() + " for identifier " + 
