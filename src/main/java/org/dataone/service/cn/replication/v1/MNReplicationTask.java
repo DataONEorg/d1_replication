@@ -23,6 +23,7 @@ package org.dataone.service.cn.replication.v1;
 
 import java.io.File;
 import java.io.Serializable;
+import java.security.cert.X509Certificate;
 import java.util.concurrent.Callable;
 
 import org.apache.commons.logging.Log;
@@ -127,8 +128,12 @@ public class MNReplicationTask
                 Settings.getConfiguration().getString("D1Client.certificate.directory")
                 + File.separator + Settings.getConfiguration().getString("D1Client.certificate.filename");
         CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
-        log.info("MNReplicationTask task id " + this.taskid + " is using an X509 certificate "
-                + "from " + clientCertificateLocation + " for identifier " + this.pid.getValue());
+        X509Certificate certificate = CertificateManager.getInstance().loadCertificate();
+        String X500SubjectStr = CertificateManager.getInstance().getSubjectDN(certificate);
+        log.info("MNReplicationTask task id " + this.taskid + 
+            " is using an X509 certificate with subject " + X500SubjectStr +
+            " from " + clientCertificateLocation + 
+            " for identifier " + this.pid.getValue());
         this.cnRouterHostname = "https://" +
             Settings.getConfiguration().getString("cn.router.hostname") + "/cn";
     }
@@ -500,7 +505,7 @@ public class MNReplicationTask
                 // CN environment. move on
                 if ( !deleted ) {
                     log.error("FAILED deletion of replica entry for identifier " + 
-                        pid.getValue() + " and taget node id " + targetNode.getValue());
+                        pid.getValue() + " and target node id " + targetNode.getValue());
                 }
             }
             
