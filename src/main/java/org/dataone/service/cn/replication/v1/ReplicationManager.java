@@ -148,7 +148,10 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
     private String cnRouterHostname;
     
     /**
-     * Constructor - singleton pattern
+     * Constructor - singleton pattern, enforced by Spring application. Although
+     * there is only one instance of ReplicationManager per JVM, the CNs
+     * run in seperate JVMs and therefore 3 or more instances of ReplicationManager
+     * may be operating on the same events and data
      */
     public ReplicationManager() {
 
@@ -571,6 +574,13 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                                     targetNode.getIdentifier());
                             this.replicationTasks.add(task);
                             taskCount++;
+                            
+                        } else {
+                            log.error("CN.updateReplicationMetadata() failed for " +
+                                "identifier " + pid.getValue() +
+                                ", node " + targetNode.getIdentifier().getValue() +
+                                ". Task not created.");
+                            
                         }
                     }
                 }
