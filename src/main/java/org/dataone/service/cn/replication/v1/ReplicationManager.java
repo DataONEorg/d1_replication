@@ -590,7 +590,11 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                         pid.getValue() + ". Re-queuing the identifer.");
                 try {
                     if ( !this.replicationEvents.contains(pid) ) {
-                        this.replicationEvents.offer(pid);
+                        boolean taken = this.replicationEvents.offer(pid);
+                        if (taken == false) {
+                            log.error("ReplicationEvents.offer() returned false for pid: "
+                                    + pid);
+                        }
                     }
                     
                 } catch (Exception e) {
@@ -605,13 +609,20 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                 pid.getValue() + ". Re-queuing the identifer.");
             try {
                 if ( !this.replicationEvents.contains(pid) ) {
-                    this.replicationEvents.offer(pid);
+                    boolean taken = this.replicationEvents.offer(pid);
+                    if (taken == false) {
+                        log.error("ReplicationEvents.offer() returned false for pid: "
+                                + pid);
+                    }
                 }
             } catch (Exception e) {
                 log.error("Couldn't resubmit identifier " + pid.getValue() +
                     " back onto the hzReplicationEvents queue.");
             }
-            
+        } catch (Exception e) {
+            log.error("Unhandled Exception for pid: " + pid.getValue()
+                    + ". Error is : " + e.getMessage());
+            e.printStackTrace();
         } finally {
             // always unlock the identifier
             if ( isLocked ) {
@@ -1037,7 +1048,8 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                             + pid.getValue());
 
                 } else {
-                    log.warn("Couldn't resubmit identifier " + pid.getValue());
+                    log.error("Couldn't resubmit identifier to ReplicationEvents "
+                            + pid.getValue());
 
                 }
 
