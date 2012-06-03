@@ -34,6 +34,7 @@ import org.dataone.client.MNode;
 import org.dataone.client.auth.CertificateManager;
 import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.BaseException;
+import org.dataone.service.exceptions.InvalidRequest;
 import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.exceptions.VersionMismatch;
@@ -462,11 +463,24 @@ public class MNReplicationTask
             if ( !status.equals(ReplicationStatus.FAILED) ) {
                 // make every effort to update the status correctly
                 try {
-                    updated = this.cn.setReplicationStatus(session, pid, 
+                    updated = this.cn.setReplicationStatus(session, this.pid, 
                               this.targetNode, status, null);
                     
                 } catch (BaseException be) {
  
+                	// the replica has already completed from a different task 
+                	if ( be instanceof InvalidRequest ) {
+                		log.warn("Couldn't set the replication status to " + 
+                	        status.toString() + ", it may have possibly " +
+                	        "already been set to completed for identifier " +
+                		    this.pid.getValue() + " and target node " + 
+                	        this.targetNode.getValue() + ". The error was: " +
+                		    be.getMessage());
+                		be.printStackTrace();
+                		return this.pid.getValue();
+                		
+                	}
+                	
                     // there's trouble communicating with the local CN
                     log.error("There was a problem setting the replication status to " +
                             status.toString() + "  for identifier " + 
@@ -548,6 +562,12 @@ public class MNReplicationTask
                     "\tNODE:\t" + targetNode.getValue() + 
                     "\tSIZE:\t" + sysmeta.getSize().intValue());
 
+        } else {
+            log.info("Task " + this.getTaskid()
+                    + " didn't update replica status for identifier "
+                    + this.pid.getValue() + " on node "
+                    + this.targetNode.getValue() + " to "
+                    + status.toString());
         }
         
         if ( deleted ) {
@@ -582,6 +602,18 @@ public class MNReplicationTask
                     break;
                 }
             } catch (BaseException be) {
+            	// the replica has already completed from a different task 
+            	if ( be instanceof InvalidRequest ) {
+            		log.warn("Couldn't set the replication status to " + 
+            	        status.toString() + ", it may have possibly " +
+            	        "already been set to completed for identifier " +
+            		    this.pid.getValue() + " and target node " + 
+            	        this.targetNode.getValue() + ". The error was: " +
+            		    be.getMessage());
+            		be.printStackTrace();
+            		return false;
+            		
+            	}
                 if ( log.isDebugEnabled() ) {
                     be.printStackTrace();
                     
