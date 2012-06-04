@@ -509,11 +509,10 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                             // retry if the serialVersion is wrong
                             try {
                                 sysmeta = this.systemMetadata.get(pid);
-                                updated = this.cnReplication
-                                        .updateReplicationMetadata(session, pid,
-                                                replicaMetadata, sysmeta
-                                                        .getSerialVersion()
-                                                        .longValue());
+                                updated = 
+                                	this.cnReplication.updateReplicationMetadata(
+                                			session, pid, replicaMetadata, 
+                                			sysmeta.getSerialVersion().longValue());
 
                             } catch (VersionMismatch e1) {
                                 String msg = "Couldn't get the correct serialVersion to update "
@@ -524,20 +523,54 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                                 log.info(msg);
 
                             } catch (BaseException be) {
-                                be.printStackTrace();
-                                // something is very wrong with CN self communication
-                                // try the round robin address multiple times
-                                updated = updateReplicationMetadata(session, pid,
-                                        replicaMetadata);
+                            	// the replica has already completed from a different task 
+                            	if ( be instanceof InvalidRequest ) {
+                            		log.warn("Couldn't update replication metadata to " + 
+                            	        replicaMetadata.getReplicationStatus().toString() + 
+                            	        ", it may have possibly already been updated for identifier " +
+                            		    pid.getValue() + " and target node " + 
+                            	        replicaMetadata.getReplicaMemberNode().getValue() + 
+                            	        ". The error was: " +
+                            		    be.getMessage());
+                            		be.printStackTrace();
+                            		
+                            	} else {
+                            		if ( log.isDebugEnabled() ) {
+                                        be.printStackTrace();
+                            			
+                            		}
+                                    // something is very wrong with CN self communication
+                                    // try the round robin address multiple times
+                                    updated = updateReplicationMetadata(session, pid,
+                                            replicaMetadata);
+                            		
+                            	}
 
                             }
 
                         } catch (BaseException be) {
-                            be.printStackTrace();
-                            // something is very wrong with CN self communication
-                            // try the round robin address multiple times
-                            updated = updateReplicationMetadata(session, pid,
-                                    replicaMetadata);
+                        	// the replica has already completed from a different task 
+                        	if ( be instanceof InvalidRequest ) {
+                        		log.warn("Couldn't update replication metadata to " + 
+                        	        replicaMetadata.getReplicationStatus().toString() + 
+                        	        ", it may have possibly already been updated for identifier " +
+                        		    pid.getValue() + " and target node " + 
+                        	        replicaMetadata.getReplicaMemberNode().getValue() + 
+                        	        ". The error was: " +
+                        		    be.getMessage());
+                        		be.printStackTrace();
+                        		
+                        	} else {
+                            	if ( log.isDebugEnabled() ) {
+                                    be.printStackTrace();
+                            		
+                            	}
+                                // something is very wrong with CN self communication
+                                // try the round robin address multiple times
+                                updated = updateReplicationMetadata(session, pid,
+                                        replicaMetadata);
+                        		
+                        	}
 
                         } catch (RuntimeException re) {
                             re.printStackTrace();
@@ -583,7 +616,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                             
                         }
                     }
-                }
+                } // end for()
                 
             } else {
                 log.info("couldn't get a lock while evaluating identifier " +
@@ -698,6 +731,19 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                 }
                 
             } catch (BaseException be) {
+            	// the replica has already completed from a different task 
+            	if ( be instanceof InvalidRequest ) {
+            		log.warn("Couldn't update replication metadata to " + 
+            	        replicaMetadata.getReplicationStatus().toString() + 
+            	        ", it may have possibly already been updated for identifier " +
+            		    pid.getValue() + " and target node " + 
+            	        replicaMetadata.getReplicaMemberNode().getValue() + 
+            	        ". The error was: " +
+            		    be.getMessage());
+            		be.printStackTrace();
+            		return false;
+            		
+            	}
                 if ( log.isDebugEnabled() ) {
                     be.printStackTrace();
                     
