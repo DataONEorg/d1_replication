@@ -227,16 +227,15 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                     Thread.sleep(5000L);
 
                 } catch (InterruptedException e1) {
-                    log.error("There was a problem getting a Coordinating Node reference.");
-                    e1.printStackTrace();
-
+                    log.error(
+                            "There was a problem getting a Coordinating Node reference.",
+                            e1);
                 }
                 cnode = D1Client.getCN();
 
             } catch (ServiceFailure e1) {
                 log.error("There was a problem getting a Coordinating Node reference "
-                        + " for the ReplicationManager. ");
-                e1.printStackTrace();
+                                + " for the ReplicationManager. ", e1);
                 throw new RuntimeException(e1);
 
             }
@@ -362,8 +361,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
 
                     } catch (Exception e) {
                         log.debug("There was an error getting the node type: "
-                                + e.getMessage());
-                        e.printStackTrace();
+                                        + e.getMessage(), e);
                     }
 
                     if (listedStatus == ReplicationStatus.QUEUED
@@ -525,19 +523,21 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                             } catch (BaseException be) {
                             	// the replica has already completed from a different task 
                             	if ( be instanceof InvalidRequest ) {
-                            		log.warn("Couldn't update replication metadata to " + 
-                            	        replicaMetadata.getReplicationStatus().toString() + 
-                            	        ", it may have possibly already been updated for identifier " +
-                            		    pid.getValue() + " and target node " + 
-                            	        replicaMetadata.getReplicaMemberNode().getValue() + 
-                            	        ". The error was: " +
-                            		    be.getMessage());
-                            		be.printStackTrace();
-                            		
+                                    log.warn(
+                                            "Couldn't update replication metadata to "
+                                                    + replicaMetadata.getReplicationStatus()
+                                                            .toString()
+                                                    + ", it may have possibly already been updated for identifier "
+                                                    + pid.getValue()
+                                                    + " and target node "
+                                                    + replicaMetadata
+                                                            .getReplicaMemberNode()
+                                                            .getValue()
+                                                    + ". The error was: "
+                                                    + be.getMessage(), be);
                             	} else {
                             		if ( log.isDebugEnabled() ) {
-                                        be.printStackTrace();
-                            			
+                                        log.debug(be);
                             		}
                                     // something is very wrong with CN self communication
                                     // try the round robin address multiple times
@@ -551,18 +551,22 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                         } catch (BaseException be) {
                         	// the replica has already completed from a different task 
                         	if ( be instanceof InvalidRequest ) {
-                        		log.warn("Couldn't update replication metadata to " + 
-                        	        replicaMetadata.getReplicationStatus().toString() + 
-                        	        ", it may have possibly already been updated for identifier " +
-                        		    pid.getValue() + " and target node " + 
-                        	        replicaMetadata.getReplicaMemberNode().getValue() + 
-                        	        ". The error was: " +
-                        		    be.getMessage());
-                        		be.printStackTrace();
-                        		
+                                log.warn(
+                                        "Couldn't update replication metadata to "
+                                                + replicaMetadata
+                                                        .getReplicationStatus()
+                                                        .toString()
+                                                + ", it may have possibly already been updated for identifier "
+                                                + pid.getValue()
+                                                + " and target node "
+                                                + replicaMetadata
+                                                        .getReplicaMemberNode()
+                                                        .getValue()
+                                                + ". The error was: "
+                                                + be.getMessage(), be);
                         	} else {
                             	if ( log.isDebugEnabled() ) {
-                                    be.printStackTrace();
+                                    log.debug(be);
                             		
                             	}
                                 // something is very wrong with CN self communication
@@ -573,13 +577,12 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                         	}
 
                         } catch (RuntimeException re) {
-                            re.printStackTrace();
                             log.error("Couldn't get system metadata for identifier "
                                     + pid.getValue()
                                     + " while trying to update replica "
                                     + "metadata entry for node "
                                     + replicaMetadata.getReplicaMemberNode()
-                                            .getValue());
+                                            .getValue(), re);
 
                         }
 
@@ -654,8 +657,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
             }
         } catch (Exception e) {
             log.error("Unhandled Exception for pid: " + pid.getValue()
-                    + ". Error is : " + e.getMessage());
-            e.printStackTrace();
+                    + ". Error is : " + e.getMessage(), e);
         } finally {
             // always unlock the identifier
             if ( isLocked ) {
@@ -733,19 +735,21 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
             } catch (BaseException be) {
             	// the replica has already completed from a different task 
             	if ( be instanceof InvalidRequest ) {
-            		log.warn("Couldn't update replication metadata to " + 
-            	        replicaMetadata.getReplicationStatus().toString() + 
-            	        ", it may have possibly already been updated for identifier " +
-            		    pid.getValue() + " and target node " + 
-            	        replicaMetadata.getReplicaMemberNode().getValue() + 
-            	        ". The error was: " +
-            		    be.getMessage());
-            		be.printStackTrace();
+                    log.warn(
+                            "Couldn't update replication metadata to "
+                                    + replicaMetadata.getReplicationStatus()
+                                            .toString()
+                                    + ", it may have possibly already been updated for identifier "
+                                    + pid.getValue()
+                                    + " and target node "
+                                    + replicaMetadata.getReplicaMemberNode()
+                                            .getValue() + ". The error was: "
+                                    + be.getMessage(), be);
             		return false;
             		
             	}
                 if ( log.isDebugEnabled() ) {
-                    be.printStackTrace();
+                    log.debug(be);
                     
                 }
                 log.error("Error in calling updateReplicationMetadata() " +
@@ -754,7 +758,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                 
             } catch ( RuntimeException re ) {
                 if ( log.isDebugEnabled() ) {
-                    re.printStackTrace();
+                    log.debug(re);
                     
                 }
                 log.error("Error in getting sysyem metadata from the map: " +
@@ -795,8 +799,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                     log.debug("Caught exception executing task id "
                             + task.getTaskid() + ": " + e.getMessage());
                     if (log.isDebugEnabled()) {
-                        e.printStackTrace();
-
+                        log.debug(e);
                     }
 
                 }

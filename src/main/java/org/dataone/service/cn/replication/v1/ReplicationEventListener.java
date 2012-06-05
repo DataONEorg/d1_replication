@@ -24,22 +24,21 @@ import java.util.concurrent.locks.Lock;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.dataone.cn.hazelcast.HazelcastClientInstance;
 import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.SystemMetadata;
 
+import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.core.EntryEvent;
 import com.hazelcast.core.EntryListener;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.ILock;
-import com.hazelcast.core.IQueue;
 import com.hazelcast.core.IMap;
-import com.hazelcast.core.ISet;
+import com.hazelcast.core.IQueue;
 import com.hazelcast.core.ItemListener;
-import com.hazelcast.client.HazelcastClient;
-import org.dataone.cn.hazelcast.HazelcastClientInstance;
 
 /**
  * An event listener used to manage change events on the hzSystemMetadata map.
@@ -155,16 +154,16 @@ public class ReplicationEventListener
             }
             
         } catch (BaseException e) {
-            log.error("There was a problem handling task creation for " + 
-            		pid.getValue() + ". The error message was " + e.getMessage());
-            e.printStackTrace();
+            log.error(
+                    "There was a problem handling task creation for "
+                            + pid.getValue() + ". The error message was "
+                            + e.getMessage(), e);
             // something went very wrong trying to create tasks for this 
             // pid.  Resubmit it to evaluate again.
             queueEvent(pid);
                             
         } catch (InterruptedException e) {
-            log.error("Polling of the hzReplicationEvents queue was interrupted.");
-            e.printStackTrace();
+            log.error("Polling of the hzReplicationEvents queue was interrupted.", e);
             
         } finally {
             if ( isLocked ) {
@@ -216,16 +215,11 @@ public class ReplicationEventListener
             }
                   
         } catch (NullPointerException e) {
-            log.debug("The event identifier was null");
-            
+            log.debug("The event identifier was null", e);
         } catch (RuntimeException e) {
-            log.debug("Couldn't get a lock for " + lockString);
-            e.printStackTrace();
-        
+            log.debug("Couldn't get a lock for " + lockString, e);
         } catch (InterruptedException e) {
-            log.debug("Lock retreival was interrupted for " + lockString);
-            e.printStackTrace();
-          
+            log.debug("Lock retreival was interrupted for " + lockString, e);
         } finally {
             if (isLocked) {
               lock.unlock();
@@ -283,16 +277,11 @@ public class ReplicationEventListener
             }
                   
         } catch (NullPointerException e) {
-            log.debug("The event identifier was null");
-            
+            log.debug("The event identifier was null", e);
         } catch (RuntimeException e) {
-            log.debug("Couldn't get a lock for " + lockString);
-            e.printStackTrace();
-        
+            log.debug("Couldn't get a lock for " + lockString, e);
         } catch (InterruptedException e) {
-            log.debug("Lock retreival was interrupted for " + lockString);
-            e.printStackTrace();
-          
+            log.debug("Lock retreival was interrupted for " + lockString, e);
         } finally {
             if (isLocked) {
               lock.unlock();
