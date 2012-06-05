@@ -292,18 +292,20 @@ public class MNReplicationTask
                 this.cn = D1Client.getCN();
             
             } catch (ServiceFailure e1) {
-                log.warn("Second ServiceFailure while getting a reference to the CN " +
-                    "during replication task id " + getTaskid() + ", identifier " +
-                    getPid().getValue() + ", target node " + getTargetNode().getValue());
-                e1.printStackTrace();
+                log.warn(
+                        "Second ServiceFailure while getting a reference to the CN "
+                                + "during replication task id " + getTaskid()
+                                + ", identifier " + getPid().getValue()
+                                + ", target node " + getTargetNode().getValue(), e1);
                 this.cn = null;
                 success = false;
 
             } catch (InterruptedException ie) {
-                log.error("Caught InterruptedException while getting a reference to the CN " +
-                    "during replication task id " + getTaskid() + ", identifier " +
-                    getPid().getValue() + ", target node " + getTargetNode().getValue());
-                ie.printStackTrace();
+                log.error(
+                        "Caught InterruptedException while getting a reference to the CN "
+                                + "during replication task id " + getTaskid()
+                                + ", identifier " + getPid().getValue()
+                                + ", target node " + getTargetNode().getValue(), ie);
                 this.cn = null;
                 success = false;
 
@@ -325,20 +327,20 @@ public class MNReplicationTask
                 this.targetMN = D1Client.getMN(this.targetNode);
             
             } catch (ServiceFailure e1) {
-
-                log.error("There was a problem calling replicate() on " +
-                        getTargetNode().getValue() + " for identifier " + 
-                        this.pid.getValue() + " during " + 
-                        " task id " + getTaskid());
-                e1.printStackTrace();
+                log.error(
+                        "There was a problem calling replicate() on "
+                                + getTargetNode().getValue() + " for identifier "
+                                + this.pid.getValue() + " during " + " task id "
+                                + getTaskid(), e1);
                 this.targetMN = null;
                 success = false;
                                     
             } catch (InterruptedException ie) {
-                log.error("Caught InterruptedException while getting a reference to the MN " +
-                        "during replication task id " + getTaskid() + ", identifier " +
-                        getPid().getValue() + ", target node " + getTargetNode().getValue());
-                ie.printStackTrace();
+                log.error(
+                        "Caught InterruptedException while getting a reference to the MN "
+                                + "during replication task id " + getTaskid()
+                                + ", identifier " + getPid().getValue()
+                                + ", target node " + getTargetNode().getValue(), ie);
                 this.targetMN = null;
                 success = false;
 
@@ -376,8 +378,7 @@ public class MNReplicationTask
         } catch (BaseException e) {
             log.error("Caught base exception attempting to call replicate for pid: "
                     + pid.getValue() + " with exception: " + e.getDescription()
-                    + " and message: " + e.getMessage());
-            e.printStackTrace();
+                    + " and message: " + e.getMessage(), e);
             try {
                 log.info("The call to MN.replicate() failed for " + pid.getValue() +
                     " on " + this.targetNode.getValue() + ". Trying again in 5 seconds.");
@@ -406,34 +407,33 @@ public class MNReplicationTask
                 }
                                
             } catch (BaseException e1) {
-                log.error("Caught base exception attempting to call replicate for pid: "
-                        + pid.getValue()
-                        + " with exception: "
-                        + e.getDescription()
-                        + " and message: " + e.getMessage());
-                e.printStackTrace();
+                log.error(
+                        "Caught base exception attempting to call replicate for pid: "
+                                + pid.getValue() + " with exception: "
+                                + e.getDescription() + " and message: "
+                                + e.getMessage(), e);
                 // still couldn't call replicate() successfully. fail.
-                log.error("There was a second problem calling replicate() on " +
-                        getTargetNode().getValue() + " for identifier " + 
-                        getPid().getValue() + " during " + 
-                        " task id " + getTaskid());
-                e1.printStackTrace();
+                log.error("There was a second problem calling replicate() on "
+                        + getTargetNode().getValue() + " for identifier "
+                        + getPid().getValue() + " during " + " task id "
+                        + getTaskid(), e1);
                 success = false;
                                                 
             } catch (InterruptedException ie) {
-                log.error("Caught InterruptedException while calling replicate() " +
-                    "during replication task id " + getTaskid() + ", identifier " +
-                    getPid().getValue() + ", target node " + getTargetNode().getValue());
-                ie.printStackTrace();
+                log.error("Caught InterruptedException while calling replicate() "
+                        + "during replication task id " + getTaskid()
+                        + ", identifier " + getPid().getValue() + ", target node "
+                        + getTargetNode().getValue(), ie);
                 success = false;
 
             }
             
         } catch (Exception e) {
-            log.error("Unknown exception during replication task id " +
-                getTaskid() + ", identifier " + getPid().getValue() + 
-                ", target node " + getTargetNode().getValue() + ". Error message: " +
-                e.getMessage());
+            log.error(
+                    "Unknown exception during replication task id " + getTaskid()
+                            + ", identifier " + getPid().getValue()
+                            + ", target node " + getTargetNode().getValue()
+                            + ". Error message: " + e.getMessage(), e);
             success = false;
             
         }
@@ -470,13 +470,14 @@ public class MNReplicationTask
  
                 	// the replica has already completed from a different task 
                 	if ( be instanceof InvalidRequest ) {
-                		log.warn("Couldn't set the replication status to " + 
-                	        status.toString() + ", it may have possibly " +
-                	        "already been set to completed for identifier " +
-                		    this.pid.getValue() + " and target node " + 
-                	        this.targetNode.getValue() + ". The error was: " +
-                		    be.getMessage());
-                		be.printStackTrace();
+                        log.warn(
+                                "Couldn't set the replication status to "
+                                        + status.toString()
+                                        + ", it may have possibly "
+                                        + "already been set to completed for identifier "
+                                        + this.pid.getValue() + " and target node "
+                                        + this.targetNode.getValue()
+                                        + ". The error was: " + be.getMessage(), be);
                 		return this.pid.getValue();
                 		
                 	}
@@ -604,25 +605,27 @@ public class MNReplicationTask
             } catch (BaseException be) {
             	// the replica has already completed from a different task 
             	if ( be instanceof InvalidRequest ) {
-            		log.warn("Couldn't set the replication status to " + 
-            	        status.toString() + ", it may have possibly " +
-            	        "already been set to completed for identifier " +
-            		    this.pid.getValue() + " and target node " + 
-            	        this.targetNode.getValue() + ". The error was: " +
-            		    be.getMessage());
-            		be.printStackTrace();
+                    log.warn(
+                            "Couldn't set the replication status to "
+                                    + status.toString()
+                                    + ", it may have possibly "
+                                    + "already been set to completed for identifier "
+                                    + this.pid.getValue() + " and target node "
+                                    + this.targetNode.getValue()
+                                    + ". The error was: " + be.getMessage(), be);
             		return false;
             		
             	}
                 if ( log.isDebugEnabled() ) {
-                    be.printStackTrace();
+                    log.debug(be);
                     
                 }
-                log.error("Error in calling setReplicationStatus() at "
-                        + this.cnRouterHostname + " for identifier "
-                        + pid.getValue() +
-                    ", target node " + targetNode.getValue() + " and status of " +
-                    status.toString() + ": " + be.getMessage());
+                log.error(
+                        "Error in calling setReplicationStatus() at "
+                                + this.cnRouterHostname + " for identifier "
+                                + pid.getValue() + ", target node "
+                                + targetNode.getValue() + " and status of "
+                                + status.toString() + ": " + be.getMessage(), be);
                 continue;
             }
             
@@ -663,23 +666,22 @@ public class MNReplicationTask
                 
             } catch (BaseException be) {
                 if ( log.isDebugEnabled() ) {
-                    be.printStackTrace();
-                    
+                    log.debug(be);
                 }
-                log.error("Error in calling deleteReplicationMetadata() at "
-                        + this.cnRouterHostname + " for identifier "
-                        + pid.getValue() +
-                    " and target node " + targetNode.getValue() +
-                    ": " + be.getMessage());
+                log.error(
+                        "Error in calling deleteReplicationMetadata() at "
+                                + this.cnRouterHostname + " for identifier "
+                                + pid.getValue() + " and target node "
+                                + targetNode.getValue() + ": " + be.getMessage(), be);
                 continue;
                 
             } catch ( RuntimeException re ) {
                 if ( log.isDebugEnabled() ) {
-                    re.printStackTrace();
-                    
+                    log.debug(re);
                 }
-                log.error("Error in getting sysyem metadata from the map for " +
-                          "identifier " + pid.getValue() + ": " + re.getMessage());
+                log.error("Error in getting sysyem metadata from the map for "
+                        + "identifier " + pid.getValue() + ": " + re.getMessage(),
+                        re);
                 continue;
                 
             }
