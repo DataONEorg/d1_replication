@@ -283,8 +283,8 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         lock = this.hzMember.getLock(lockPid);
         boolean isLocked = false;
         try {
-            isLocked = lock.tryLock(timeToWait, TimeUnit.SECONDS);
-            // only evaluate an identifier if we can get the lock in a reasonable time
+            isLocked = lock.tryLock(timeToWait, TimeUnit.MILLISECONDS);
+            // only evaluate an identifier if we can get the lock fairly instantly
             if ( isLocked ) {
                 // if replication isn't allowed, return
                 allowed = isAllowed(pid);
@@ -622,21 +622,21 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                 } // end for()
                 
             } else {
-                log.info("couldn't get a lock while evaluating identifier " +
-                        pid.getValue() + ". Re-queuing the identifer.");
-                try {
-                    if ( !this.replicationEvents.contains(pid) ) {
-                        boolean taken = this.replicationEvents.offer(pid);
-                        if (taken == false) {
-                            log.error("ReplicationEvents.offer() returned false for pid: "
-                                    + pid);
-                        }
-                    }
-                    
-                } catch (Exception e) {
-                    log.error("Couldn't resubmit identifier " + pid.getValue() +
-                        " back onto the hzReplicationEvents queue.");
-                }
+                log.info("Couldn't get a lock while evaluating identifier " +
+                        pid.getValue() + ". Assuming another CN handled it.");
+                //try {
+                //    if ( !this.replicationEvents.contains(pid) ) {
+                //        boolean taken = this.replicationEvents.offer(pid);
+                //        if (taken == false) {
+                //            log.error("ReplicationEvents.offer() returned false for pid: "
+                //                    + pid);
+                //        }
+                //    }
+                //    
+                //} catch (Exception e) {
+                //    log.error("Couldn't resubmit identifier " + pid.getValue() +
+                //        " back onto the hzReplicationEvents queue.");
+                //}
                 
             } // end if(isLocked)
             
