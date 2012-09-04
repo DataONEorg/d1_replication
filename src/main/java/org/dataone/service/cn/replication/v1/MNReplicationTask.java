@@ -24,6 +24,8 @@ package org.dataone.service.cn.replication.v1;
 import java.io.File;
 import java.io.Serializable;
 import java.security.cert.X509Certificate;
+import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.Callable;
 
 import org.apache.commons.logging.Log;
@@ -41,6 +43,7 @@ import org.dataone.service.exceptions.VersionMismatch;
 import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
+import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.SystemMetadata;
@@ -275,6 +278,9 @@ public class MNReplicationTask
         // a flag for success on setting replication status
         boolean success = false;
         
+        // a flag showing if the task has been requested with the MN yet
+        boolean isRequested = false;
+        
         // session is null - certificate is used
         Session session = null;
                 
@@ -353,19 +359,60 @@ public class MNReplicationTask
             if ( this.cn != null && this.targetMN != null ) {
                 // get the most recent system metadata for the pid
                 sysmeta = cn.getSystemMetadata(session, pid);
+                
+                // check to be sure the replica is not requested or completed
+                List<Replica> replicaList = sysmeta.getReplicaList();
+                boolean handled = false;
+                
+                for ( Replica replica : replicaList) {
+                    NodeReference listedNode = replica.getReplicaMemberNode();
+                    ReplicationStatus status = replica.getReplicationStatus();
+                    
+                    if ( listedNode == this.targetNode ) {
+                        if ( status == ReplicationStatus.REQUESTED ||
+                             status == ReplicationStatus.COMPLETED) {
+                            handled = true;
+                            break;
+                            
+                        }
+                    } else {
+                        continue;
+                        
+                    }
+                }
                 // call for the replication
                 
-                // check if the object exists on the target MN already
-                try {
-                    Checksum checksum = this.targetMN.getChecksum(getPid(), 
-                            sysmeta.getChecksum().getAlgorithm());
-                    exists = checksum.equals(sysmeta.getChecksum());
+                if (!handled) {
                     
-                } catch (NotFound nfe) {
-                    success = this.targetMN.replicate(session, sysmeta, this.originatingNode);
-                    log.info("Task id " + this.getTaskid() + " called replicate() at targetNode " + 
-                            this.targetNode.getValue() + ", identifier " + this.pid.getValue() +
-                            ". Success: " + success);
+                    // check if the object exists on the target MN already
+                    try {
+                        Checksum checksum = this.targetMN.getChecksum(getPid(),
+                                sysmeta.getChecksum().getAlgorithm());
+                        exists = checksum.equals(sysmeta.getChecksum());
+
+                    } catch (NotFound nfe) {
+                        // set the status to REQUESTED to avoid race conditions 
+                        // across CN threads handling replication tasks
+                        isRequested = this.cn.setReplicationStatus(getPid(), 
+                                this.targetNode, ReplicationStatus.REQUESTED, null);
+                        log.debug("Task id " + this.getTaskid()
+                                + " called setReplicationStatus() for identifier "
+                                + this.pid.getValue() + ". isRequested result: " + success);
+                        
+                        success = this.targetMN.replicate(session, sysmeta,
+                                this.originatingNode);
+                        log.info("Task id " + this.getTaskid()
+                                + " called replicate() at targetNode "
+                                + this.targetNode.getValue() + ", identifier "
+                                + this.pid.getValue() + ". Success: " + success);
+                    }
+                    
+                } else {
+                    log.info("for task id " + this.getTaskid()
+                            + " replica is already handled for "
+                            + this.targetNode.getValue() + ", identifier "
+                            + this.pid.getValue());
+                    
                 }
                
             } else {
@@ -440,7 +487,7 @@ public class MNReplicationTask
         
         // set the replication status
         ReplicationStatus status = null;
-        if ( success ) {
+        if ( success && !isRequested ) {
             status = ReplicationStatus.REQUESTED;
             
         } else {
@@ -589,6 +636,8 @@ public class MNReplicationTask
      */
     private boolean setReplicationStatus(Session session, Identifier pid,
             NodeReference targetNode, ReplicationStatus status, BaseException failure) {
+        log.warn("setReplicationStatus() called against the router CN address. " +
+                " Is the local CN communicationg properly?");
         CNode cn;
         boolean updated = false;
         cn = new CNode(this.cnRouterHostname);
