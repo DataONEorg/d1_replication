@@ -41,6 +41,18 @@ public class ReplicationPrioritizationStrategy {
     /* The number of concurrent outstanding requests to a target member node */
     private float successThreshold = 0.8f;
 
+    /* flag to switch use of the outstanding request factor in prioritization */
+    private boolean useRequestFactor = true;
+    
+    /* flag to switch use of the failure factor in prioritization */
+    private boolean useFailureFactor = true;
+
+    /* flag to switch use of the bandwidth factor in prioritization */
+    private boolean useBandwidthFactor = true;
+
+    /* flag to switch use of the preference factor in prioritization */
+    private boolean usePreferenceFactor = true;
+
     /**
      * Constructor: create a prioritization strategy
      */
@@ -50,7 +62,14 @@ public class ReplicationPrioritizationStrategy {
             Settings.getConfiguration().getInt("replication.concurrent.request.limit");
         this.successThreshold = 
             Settings.getConfiguration().getFloat("replication.success.threshold");
-        
+        this.useRequestFactor = 
+            Settings.getConfiguration().getBoolean("replication.prioritization.useRequestFactor");
+        this.useFailureFactor = 
+            Settings.getConfiguration().getBoolean("replication.prioritization.useFailureFactor");
+        this.useBandwidthFactor = 
+            Settings.getConfiguration().getBoolean("replication.prioritization.useBandwidthFactor");
+        this.usePreferenceFactor = 
+            Settings.getConfiguration().getBoolean("replication.prioritization.usePreferenceFactor");
     }
 
     /**
@@ -364,6 +383,23 @@ public class ReplicationPrioritizationStrategy {
 
             // Score S = R * F * B * P
             // (any zero score removes node from the list)
+            if ( ! this.useRequestFactor ) {
+                nodePendingRequestFactor = 1.0f;
+                log.debug("useRequestFactor is false, using 1.0");
+            }
+            if ( ! this.useFailureFactor ) {
+                nodeFailureFactor = 1.0f; 
+                log.debug("useFailureFactor is false, using 1.0");
+            }
+            if ( ! this.useBandwidthFactor ) {
+                nodeBandwidthFactor = 1.0f; 
+                log.debug("useBandwidthFactor is false, using 1.0");
+            }
+            if ( ! this.usePreferenceFactor ) {
+                preferenceFactor = 1.0f; 
+                log.debug("usePreferenceFactor is false, using 1.0");
+            }
+
             Float score = nodePendingRequestFactor * nodeFailureFactor
                     * nodeBandwidthFactor * preferenceFactor;
             log.debug("Score for " + nodeId.getValue() + " will be "
