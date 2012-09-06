@@ -397,7 +397,7 @@ public class MNReplicationTask
                                 this.targetNode, ReplicationStatus.REQUESTED, null);
                         log.debug("Task id " + this.getTaskid()
                                 + " called setReplicationStatus() for identifier "
-                                + this.pid.getValue() + ". isRequested result: " + success);
+                                + this.pid.getValue() + ". isRequested result: " + isRequested);
                         
                         success = this.targetMN.replicate(session, sysmeta,
                                 this.originatingNode);
