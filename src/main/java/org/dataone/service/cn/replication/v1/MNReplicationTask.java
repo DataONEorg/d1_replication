@@ -266,7 +266,8 @@ public class MNReplicationTask
             getPid().getValue() + " on node " + getTargetNode().getValue());
         
         SystemMetadata sysmeta = null;
-        
+        ReplicationStatus status = null;
+
         // variables for hzProcess component coordination only
         ILock lock = null;
         String lockString = null;
@@ -366,11 +367,12 @@ public class MNReplicationTask
                 
                 for ( Replica replica : replicaList) {
                     NodeReference listedNode = replica.getReplicaMemberNode();
-                    ReplicationStatus status = replica.getReplicationStatus();
+                    ReplicationStatus currentStatus = replica.getReplicationStatus();
+                    
                     
                     if ( listedNode == this.targetNode ) {
-                        if ( status == ReplicationStatus.REQUESTED ||
-                             status == ReplicationStatus.COMPLETED) {
+                        if ( currentStatus == ReplicationStatus.REQUESTED ||
+                             currentStatus == ReplicationStatus.COMPLETED) {
                             handled = true;
                             break;
                             
@@ -393,8 +395,10 @@ public class MNReplicationTask
                     } catch (NotFound nfe) {
                         // set the status to REQUESTED to avoid race conditions 
                         // across CN threads handling replication tasks
+                        status = ReplicationStatus.REQUESTED;
+
                         isRequested = this.cn.setReplicationStatus(getPid(), 
-                                this.targetNode, ReplicationStatus.REQUESTED, null);
+                                this.targetNode, status, null);
                         log.debug("Task id " + this.getTaskid()
                                 + " called setReplicationStatus() for identifier "
                                 + this.pid.getValue() + ". isRequested result: " + isRequested);
@@ -486,7 +490,6 @@ public class MNReplicationTask
         }
         
         // set the replication status
-        ReplicationStatus status = null;
         if ( success && !isRequested ) {
             status = ReplicationStatus.REQUESTED;
             
