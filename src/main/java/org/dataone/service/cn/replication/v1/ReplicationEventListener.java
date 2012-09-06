@@ -318,7 +318,7 @@ public class ReplicationEventListener
         if ( !this.replicationEvents.contains(identifier) ) {
             added = this.replicationEvents.offer(identifier);
             if ( added ) {
-                log.debug("Added " + identifier + 
+                log.debug("Added " + identifier.getValue() + 
                     " to the replication event queue");
                 
             } else {
