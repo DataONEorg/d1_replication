@@ -135,7 +135,7 @@ public class ReplicationEventListener
                 String lockString = lockPrefix + pid.getValue();
                 lock = this.hzMember.getLock(lockString);
                 // lock the string across CN ReplicationEventListener instances
-                isLocked = lock.tryLock(10L, TimeUnit.MILLISECONDS);
+                isLocked = lock.tryLock(1L, TimeUnit.SECONDS);
                 if (isLocked) {
                     log.debug("Gained the event lock " + lockString);
                     log.trace("METRICS:\tREPLICATION:\tEVALUATE:\tPID:\t"
