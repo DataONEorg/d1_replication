@@ -279,9 +279,11 @@ public class MNReplicationTask
         // a flag for success on setting replication status
         boolean success = false;
         
-        // a flag showing if the task has been requested with the MN yet
-        boolean isRequested = false;
-        
+        boolean updated = false;
+
+        // a flag showing if the replica entry was deleted due to comm problems
+        boolean deleted = false;
+
         // session is null - certificate is used
         Session session = null;
                 
@@ -397,11 +399,11 @@ public class MNReplicationTask
                         // across CN threads handling replication tasks
                         status = ReplicationStatus.REQUESTED;
 
-                        isRequested = this.cn.setReplicationStatus(getPid(), 
+                        updated = this.cn.setReplicationStatus(getPid(), 
                                 this.targetNode, status, null);
                         log.debug("Task id " + this.getTaskid()
                                 + " called setReplicationStatus() for identifier "
-                                + this.pid.getValue() + ". isRequested result: " + isRequested);
+                                + this.pid.getValue() + ". isRequested result: " + updated);
                         
                         success = this.targetMN.replicate(session, sysmeta,
                                 this.originatingNode);
@@ -490,7 +492,7 @@ public class MNReplicationTask
         }
         
         // set the replication status
-        if ( success && !isRequested ) {
+        if ( success && !updated ) {
             status = ReplicationStatus.REQUESTED;
             
         } else {
@@ -506,8 +508,6 @@ public class MNReplicationTask
 
         // depending on the status, update the status or delete the entry
         // in the system metadata for this identifier
-        boolean deleted = false;
-        boolean updated = false;
         if ( this.cn != null ) {
             
             if ( !status.equals(ReplicationStatus.FAILED) ) {
