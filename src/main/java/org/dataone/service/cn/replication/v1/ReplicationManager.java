@@ -3,7 +3,7 @@
  * jointly copyrighted by participating institutions in DataONE. For
  * more information on DataONE, see our web site at http://dataone.org.
  *
- *   Copyright ${year}
+ *   Copyright 2012. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -332,10 +332,11 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                 // replicas
                 int currentListedReplicaCount = 0;
                 List<NodeReference> listedReplicaNodes = new ArrayList<NodeReference>();
+                // add already listed replicas to listedReplicaNodes
                 for (Replica listedReplica : replicaList) {
                     NodeReference nodeId = listedReplica.getReplicaMemberNode();
-                    ReplicationStatus listedStatus = listedReplica
-                            .getReplicationStatus();
+                    ReplicationStatus listedStatus = 
+                        listedReplica.getReplicationStatus();
 
                     Node node = new Node();
                     NodeType nodeType = null;
@@ -345,10 +346,9 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                             log.debug("The potential target node id is: "
                                     + node.getIdentifier().getValue());
                             nodeType = node.getType();
-                            if (nodeType == NodeType.CN
-                                    || nodeId.getValue().equals(
-                                            sysmeta.getAuthoritativeMemberNode()
-                                                    .getValue())) {
+                            if (nodeType == NodeType.CN || 
+                                nodeId.getValue().equals(
+                                  sysmeta.getAuthoritativeMemberNode().getValue())) {
                                 continue; // don't count CNs or authoritative nodes as replicas
 
                             }
@@ -382,18 +382,15 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                                                                     // list
                 // authoritative member node to replicate from
                 try {
-                    authoritativeNode = this.nodes.get(sysmeta
-                            .getAuthoritativeMemberNode());
+                    authoritativeNode = 
+                        this.nodes.get(sysmeta.getAuthoritativeMemberNode());
 
                 } catch (NullPointerException npe) {
                     throw new InvalidRequest( "1080", "Object " + pid.getValue() + 
                             " has no authoritative Member Node in its SystemMetadata");
 
-                } finally {
-                    if ( isLocked ) {
-                        lock.unlock();
-                    }
                 }
+                
                 // build the potential list of target nodes
                 for (NodeReference nodeReference : nodeList) {
                     Node node = this.nodes.get(nodeReference);
@@ -402,26 +399,26 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                     // that are not tagged to replicate
                     if ((node.getType() == NodeType.MN)
                             && node.isReplicate()
-                            && !node.getIdentifier()
-                                    .getValue()
-                                    .equals(authoritativeNode.getIdentifier()
-                                            .getValue())) {
+                            && !node.getIdentifier().getValue().equals(
+                               authoritativeNode.getIdentifier().getValue())) {
                         potentialNodeList.add(node.getIdentifier());
 
                     }
                 }
                 potentialNodeList.removeAll(listedReplicaNodes);
+                
                 // prioritize replica targets by preferred/blocked lists and other
                 // performance metrics
                 log.trace("METRICS:\tPRIORITIZE:\tPID:\t" + pid.getValue());
                 potentialNodeList = prioritizeNodes(potentialNodeList, sysmeta);
                 log.trace("METRICS:\tEND PRIORITIZE:\tPID:\t" + pid.getValue());
+                
                 // parse the sysmeta.ReplicationPolicy
                 ReplicationPolicy replicationPolicy = sysmeta.getReplicationPolicy();
+                
                 // set the desired replicas if present
                 if (replicationPolicy.getNumberReplicas() != null) {
-                    desiredReplicas = replicationPolicy.getNumberReplicas()
-                            .intValue();
+                    desiredReplicas = replicationPolicy.getNumberReplicas().intValue();
 
                 }
                 log.info("Desired replicas for identifier " + pid.getValue()
@@ -443,7 +440,8 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                     desiredReplicas - currentListedReplicaCount;
                 log.debug("Desired replica count less already listed replica count is "
                         + desiredReplicasLessListed);
-                for (int j = 0; j < desiredReplicas - currentListedReplicaCount; j++) {
+                
+                for (int j = 0; j < desiredReplicasLessListed; j++) {
 
                     log.debug("Evaluating item " + j + " of "
                             + desiredReplicasLessListed
@@ -474,8 +472,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
 
                     for (Service service : targetNode.getServices().getServiceList()) {
                         if (service.getName().equals("MNReplication")
-                                && implementedVersions
-                                        .contains(service.getVersion())
+                                && implementedVersions.contains(service.getVersion())
                                 && service.getAvailable()) {
                             replicable = true;
                         }
@@ -498,9 +495,10 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                             sysmeta = this.systemMetadata.get(pid); // refresh sysmeta
                                                                     // to avoid
                                                                     // VersionMismatch
-                            updated = this.cnReplication.updateReplicationMetadata(
-                                    session, pid, replicaMetadata, sysmeta
-                                            .getSerialVersion().longValue());
+                            updated = 
+                                this.cnReplication.updateReplicationMetadata(
+                                    pid, replicaMetadata, 
+                                    sysmeta.getSerialVersion().longValue());
 
                         } catch (VersionMismatch e) {
 
@@ -509,7 +507,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                                 sysmeta = this.systemMetadata.get(pid);
                                 updated = 
                                 	this.cnReplication.updateReplicationMetadata(
-                                			session, pid, replicaMetadata, 
+                                			pid, replicaMetadata, 
                                 			sysmeta.getSerialVersion().longValue());
 
                             } catch (VersionMismatch e1) {
@@ -518,7 +516,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                                         + pid.getValue()
                                         + " and target node "
                                         + targetNode.getIdentifier().getValue();
-                                log.info(msg);
+                                log.error(msg);
 
                             } catch (BaseException be) {
                             	// the replica has already completed from a different task 
@@ -1074,8 +1072,8 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
     public List<NodeReference> prioritizeNodes(
             List<NodeReference> potentialNodeList, SystemMetadata sysmeta) {
 
-        List<NodeReference> nodesByPriority = prioritizationStrategy
-                .prioritizeNodes(potentialNodeList, sysmeta);
+        List<NodeReference> nodesByPriority = 
+            prioritizationStrategy.prioritizeNodes(potentialNodeList, sysmeta);
 
         // if the prioritization results cause the replication policy to not
         // be fulfilled immediately (lack of currently available target nodes),
