@@ -441,6 +441,11 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                 log.debug("Desired replica count less already listed replica count is "
                         + desiredReplicasLessListed);
                 
+                // reset desiredReplicasLessListed to avoid task creation
+                // in the ' 0 > any negative nuber' scenario
+                if ( desiredReplicasLessListed < 0 ) {
+                    desiredReplicasLessListed = 0;
+                }
                 for (int j = 0; j < desiredReplicasLessListed; j++) {
 
                     log.debug("Evaluating item " + j + " of "
