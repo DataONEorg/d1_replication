@@ -16,6 +16,8 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * 
+ * $Id$
  */
 
 package org.dataone.service.cn.replication.v1;
@@ -27,6 +29,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
@@ -34,6 +39,8 @@ import org.apache.commons.logging.LogFactory;
 import org.dataone.client.CNode;
 import org.dataone.client.D1Client;
 import org.dataone.client.auth.CertificateManager;
+import org.dataone.cn.dao.DaoFactory;
+import org.dataone.cn.dao.exceptions.DataAccessException;
 import org.dataone.cn.hazelcast.HazelcastClientInstance;
 import org.dataone.configuration.Settings;
 import org.dataone.service.cn.v1.CNReplication;
@@ -138,6 +145,12 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
     /* The Hazelcast distributed map of status counts by node-status */
     private IMap<String, Integer> nodeReplicationStatus;
 
+    /* A scheduler for replication reporting */
+    private ScheduledExecutorService reportScheduler;
+    
+    /* The future result of reporting counts by node status to hazelcast */
+    private Future<?> reportCountsTask;
+    
     /*
      * The timeout period for tasks submitted to the executor service to
      * complete the call to MN.replicate()
@@ -198,12 +211,26 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         this.taskIdGenerator = this.hzMember.getIdGenerator(this.taskIds);
         this.nodeReplicationStatus = this.hzMember.getMap(this.nodeReplicationStatusMap);
 
+        
         // monitor the replication structures
-
         this.replicationTasks.addItemListener(this, true);
         log.info("Added a listener to the " + this.replicationTasks.getName()
                 + " queue.");
 
+        // Report node status statistics on a scheduled basis
+        // TODO: hold off on scheduling code for now
+        //reportScheduler = Executors.newSingleThreadScheduledExecutor();
+        //this.reportCountsTask = 
+        //    reportScheduler.scheduleAtFixedRate(new Runnable(){
+        //
+        //        @Override
+        //        public void run() {
+        //            // TODO Auto-generated method stub
+        //            
+        //        }
+        //        
+        //    }, 0L, 1L, TimeUnit.SECONDS);
+        
         // Set up the certificate location, create a null session
         String clientCertificateLocation = Settings.getConfiguration().getString(
                 "D1Client.certificate.directory")
@@ -421,6 +448,10 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                 log.trace("METRICS:\tPRIORITIZE:\tPID:\t" + pid.getValue());
                 potentialNodeList = prioritizeNodes(potentialNodeList, sysmeta);
                 log.trace("METRICS:\tEND PRIORITIZE:\tPID:\t" + pid.getValue());
+                
+                // report node-status counts to hazelcast. 
+                // TODO: This may be removed in favor of scheduled reporting.
+                reportCountsByNodeStatus();
                 
                 // parse the sysmeta.ReplicationPolicy
                 ReplicationPolicy replicationPolicy = sysmeta.getReplicationPolicy();
@@ -1072,6 +1103,33 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         return prioritizationStrategy.getBandwidthFactors(nodeIdentifiers, useCache);
     }
 
+    /*
+     * Report replica counts by node status by querying the system metadata
+     * replication status tables on the CNs and push the results into a
+     * deicated hazelcast map
+     * 
+     */
+    private void reportCountsByNodeStatus() {
+        
+        /* A map used to transfer records from the DAO query into hazelcast*/
+        Map<String, Integer> countsByNodeStatusMap = new HashMap<String, Integer>();
+        
+        try {
+            countsByNodeStatusMap = 
+                DaoFactory.getReplicationDao().getCountsByNodeStatus();
+            
+        } catch (DataAccessException e) {
+            log.info("There was an error getting node-status counts: " +
+                    e.getMessage());
+            if (log.isDebugEnabled()) {
+                e.printStackTrace();
+                
+            }
+            
+        }
+        
+        this.nodeReplicationStatus.putAll(countsByNodeStatusMap);
+    }
     /**
      * Prioritize a list of potential replica target nodes based on a number of
      * factors including preferred/blocked node lists, pending request, failure,
