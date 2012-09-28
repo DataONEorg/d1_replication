@@ -132,6 +132,12 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
     /* The event listener used to manage incoming map and queue changes */
     private ReplicationEventListener listener;
 
+    /* The Hazelcast distributed counts by node-status map name */
+    private String nodeReplicationStatusMap;
+
+    /* The Hazelcast distributed map of status counts by node-status */
+    private IMap<String, Integer> nodeReplicationStatus;
+
     /*
      * The timeout period for tasks submitted to the executor service to
      * complete the call to MN.replicate()
@@ -171,7 +177,9 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                 "dataone.hazelcast.shortListAge");
         this.shortListNumRows = Settings.getConfiguration().getString(
                 "dataone.hazelcast.shortListNumRows");
-
+        this.nodeReplicationStatusMap = Settings.getConfiguration().getString(
+        "dataone.hazelcast.nodeReplicationStatusMap");
+        
         this.cnRouterHostname = 
             Settings.getConfiguration().getString("cn.router.hostname");
         
@@ -188,6 +196,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         this.replicationEvents = this.hzMember.getQueue(eventsQueue);
         this.replicationTasks = this.hzMember.getQueue(this.tasksQueue);
         this.taskIdGenerator = this.hzMember.getIdGenerator(this.taskIds);
+        this.nodeReplicationStatus = this.hzMember.getMap(this.nodeReplicationStatusMap);
 
         // monitor the replication structures
 
