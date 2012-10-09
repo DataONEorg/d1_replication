@@ -25,9 +25,12 @@ package org.dataone.service.cn.replication.v1;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -147,10 +150,17 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
 
     /* A scheduler for replication reporting */
     private ScheduledExecutorService reportScheduler;
-    
+
     /* The future result of reporting counts by node status to hazelcast */
     private Future<?> reportCountsTask;
-    
+
+
+    /* A scheduler for pending replica auditing */
+    private ScheduledExecutorService pendingreplicaAuditScheduler;
+
+    /* The future result of reporting counts by node status to hazelcast */
+    private Future<?> pendingReplicaAuditTask;
+
     /*
      * The timeout period for tasks submitted to the executor service to
      * complete the call to MN.replicate()
@@ -217,6 +227,15 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         log.info("Added a listener to the " + this.replicationTasks.getName()
                 + " queue.");
 
+        // TODO: use a more comprehensive MNAuditTask to fix problem replicas
+        // For now, every hour, clear problematic replica entries that are 
+        // causing a given node to have too many pending replica requests
+        pendingreplicaAuditScheduler = Executors.newSingleThreadScheduledExecutor();
+        pendingReplicaAuditTask = 
+            pendingreplicaAuditScheduler.scheduleAtFixedRate(
+                    new PendingReplicaAuditor(), 0L, 1L, TimeUnit.HOURS);
+        
+        
         // Report node status statistics on a scheduled basis
         // TODO: hold off on scheduling code for now
         //reportScheduler = Executors.newSingleThreadScheduledExecutor();
@@ -1117,6 +1136,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         try {
             countsByNodeStatusMap = 
                 DaoFactory.getReplicationDao().getCountsByNodeStatus();
+            log.debug("Counts by Node-Status map size: " + countsByNodeStatusMap.size());
             
         } catch (DataAccessException e) {
             log.info("There was an error getting node-status counts: " +
@@ -1180,5 +1200,85 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
 
         }
         return nodesByPriority;
+    }
+
+    /**
+     * An internal audit class used to periodically handle identifiers that are
+     * erroneously in a pending state (queued or requested).  This will likely be
+     * replaced by the MNAudit class.
+     * 
+     * @author cjones
+     *
+     */
+    private class PendingReplicaAuditor implements Runnable {
+
+        @Override
+        public void run() {
+            /* the list of pending replicas in the queued or requested state before the cutoff date */
+            List<Entry<Identifier, NodeReference>> pendingReplicasByDate = 
+                new ArrayList<Entry<Identifier, NodeReference>>();
+            
+            /* A reference to the Coordinating Node */
+            int pageSize = 0;
+            int pageNumber = 0;
+            int auditHoursBeforeNow = -1;
+            Calendar cal = Calendar.getInstance();
+            cal.add(Calendar.HOUR, auditHoursBeforeNow);            
+            Date auditDate = cal.getTime();
+            
+            try {
+                pendingReplicasByDate = 
+                    DaoFactory.getReplicationDao().getPendingReplicasByDate(auditDate);
+            } catch (DataAccessException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+            
+            log.debug("pendingReplicasByDate size is " + pendingReplicasByDate.size());
+            
+            CNode cn = null;
+            SystemMetadata sysmeta = null;
+            long serialVersion = 0L;
+            // get a reference to the CN to manage replica states
+            try {
+                 cn = D1Client.getCN();
+                 
+            } catch (BaseException e) {
+                log.error("Couldn't connect to the CN to manage replica states: " +
+                        e.getMessage());
+                
+                if ( log.isDebugEnabled()) {
+                    e.printStackTrace();
+                    
+                }
+            }
+
+            Iterator<Entry<Identifier, NodeReference>> iterator = 
+                pendingReplicasByDate.iterator();
+            while (iterator.hasNext()) {
+                Entry entry = (Entry) iterator.next();
+                Identifier identifier = (Identifier) entry.getKey();
+                NodeReference nodeId = (NodeReference) entry.getValue();
+                
+                // Remove the replica to induce a replication policy evaluation
+                // and clear the pending replica list of overdue replicas
+                
+                try {
+                    sysmeta = cn.getSystemMetadata(identifier);
+                    serialVersion = sysmeta.getSerialVersion().longValue();
+                    cn.deleteReplicationMetadata(identifier, nodeId, serialVersion);
+                    
+                } catch (BaseException e) {
+                    log.error("Couldn't remove the replica entry for " +
+                            identifier.getValue() + " at " +
+                            nodeId.getValue() + ": " + e.getMessage());
+                    if ( log.isDebugEnabled() ) {
+                        e.printStackTrace();
+                        
+                    }
+                }
+            }
+        }
+        
     }
 }
