@@ -156,7 +156,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
 
 
     /* A scheduler for pending replica auditing */
-    private ScheduledExecutorService pendingreplicaAuditScheduler;
+    private ScheduledExecutorService pendingReplicaAuditScheduler;
 
     /* The future result of reporting counts by node status to hazelcast */
     private Future<?> pendingReplicaAuditTask;
@@ -230,9 +230,9 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         // TODO: use a more comprehensive MNAuditTask to fix problem replicas
         // For now, every hour, clear problematic replica entries that are 
         // causing a given node to have too many pending replica requests
-        pendingreplicaAuditScheduler = Executors.newSingleThreadScheduledExecutor();
+        pendingReplicaAuditScheduler = Executors.newSingleThreadScheduledExecutor();
         pendingReplicaAuditTask = 
-            pendingreplicaAuditScheduler.scheduleAtFixedRate(
+            pendingReplicaAuditScheduler.scheduleAtFixedRate(
                     new PendingReplicaAuditor(), 0L, 1L, TimeUnit.HOURS);
         
         
