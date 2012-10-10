@@ -311,8 +311,11 @@ public class TestReplicationPrioritization {
         // node 2 is a blocked node so not used, no matter failure, requested
         // metrics
         // node3 is full, too many queued
-        // node4 has too many failures
-        Assert.assertTrue(nodes.size() == 1);
+        // node4 has too many failures: 
+        
+        //updated: not using failure factor at the moment, node4 succeeds
+        //Assert.assertTrue(nodes.size() == 1);
+        Assert.assertTrue(nodes.size() == 2);
     }
 
     @Before
