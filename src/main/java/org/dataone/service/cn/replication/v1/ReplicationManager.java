@@ -37,6 +37,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.configuration.ConversionException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.dataone.client.CNode;
@@ -1235,9 +1236,18 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
             /* A reference to the Coordinating Node */
             int pageSize = 0;
             int pageNumber = 0;
-            int auditHoursBeforeNow = -1;
+            int auditSecondsBeforeNow = -3600;
+            try {
+                auditSecondsBeforeNow = 
+                    Settings.getConfiguration().getInt("replication.audit.pending.window");
+                
+            } catch (ConversionException ce) {
+                log.error("Couldn't convert the replication.audit.pending.window" + 
+                          " property correctly: " + ce.getMessage());
+                
+             }
             Calendar cal = Calendar.getInstance();
-            cal.add(Calendar.HOUR, auditHoursBeforeNow);            
+            cal.add(Calendar.SECOND, auditSecondsBeforeNow);            
             Date auditDate = cal.getTime();
             
             try {
