@@ -323,7 +323,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         int taskCount = 0;
         int desiredReplicas = 3;
         long timeToWait = 5L;
-        List<Replica> replicaList; // the replica list for this pid
+        List<NodeReference> listedReplicaNodes = new ArrayList<NodeReference>();
         Set<NodeReference> nodeList; // the full nodes list
         List<NodeReference> potentialNodeList; // the MN subset of the nodes
                                                // list
@@ -378,57 +378,15 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                 log.debug("Getting the replica list for identifier "
                         + pid.getValue());
                 sysmeta = this.systemMetadata.get(pid);
-                replicaList = sysmeta.getReplicaList();
-                if (replicaList == null) {
-                    replicaList = new ArrayList<Replica>();
-
-                }
-                // change the desired replicas count to account for pending/completed
-                // replicas
-                int currentListedReplicaCount = 0;
-                List<NodeReference> listedReplicaNodes = new ArrayList<NodeReference>();
+                
                 // add already listed replicas to listedReplicaNodes
-                for (Replica listedReplica : replicaList) {
-                    NodeReference nodeId = listedReplica.getReplicaMemberNode();
-                    ReplicationStatus listedStatus = 
-                        listedReplica.getReplicationStatus();
-
-                    Node node = new Node();
-                    NodeType nodeType = null;
-                    try {
-                        node = this.nodes.get(nodeId);
-                        if (node != null) {
-                            log.debug("The potential target node id is: "
-                                    + node.getIdentifier().getValue());
-                            nodeType = node.getType();
-                            if (nodeType == NodeType.CN || 
-                                nodeId.getValue().equals(
-                                  sysmeta.getAuthoritativeMemberNode().getValue())) {
-                                continue; // don't count CNs or authoritative nodes as replicas
-
-                            }
-
-                        } else {
-                            log.debug("The potential target node id is null for "
-                                    + nodeId.getValue());
-                            continue;
-                        }
-
-                    } catch (Exception e) {
-                        log.debug("There was an error getting the node type: "
-                                        + e.getMessage(), e);
-                    }
-
-                    if (listedStatus == ReplicationStatus.QUEUED
-                            || listedStatus == ReplicationStatus.REQUESTED
-                            || listedStatus == ReplicationStatus.COMPLETED) {
-                        currentListedReplicaCount++;
-                        listedReplicaNodes.add(nodeId);
-                    }
-                }
-                log.debug("There are currently " + currentListedReplicaCount
-                        + " pending/completed replicas listed for identifier "
-                        + pid.getValue());
+                listedReplicaNodes = getCurrentReplicaList(sysmeta);
+                int currentListedReplicaCount = listedReplicaNodes.size();
+                int desiredReplicasLessListed = 
+                    desiredReplicas - currentListedReplicaCount;
+                log.debug("Desired replica count less already listed replica count is "
+                        + desiredReplicasLessListed);
+                
                 // List of Nodes for building MNReplicationTasks
                 log.debug("Building a potential target node list for identifier "
                         + pid.getValue());
@@ -460,12 +418,15 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
 
                     }
                 }
+                
+                // then remove the already listed replica nodes
                 potentialNodeList.removeAll(listedReplicaNodes);
                 
                 // prioritize replica targets by preferred/blocked lists and other
                 // performance metrics
                 log.trace("METRICS:\tPRIORITIZE:\tPID:\t" + pid.getValue());
-                potentialNodeList = prioritizeNodes(potentialNodeList, sysmeta);
+                potentialNodeList = 
+                    prioritizeNodes(desiredReplicasLessListed, potentialNodeList, sysmeta);
                 log.trace("METRICS:\tEND PRIORITIZE:\tPID:\t" + pid.getValue());
                 
                 // report node-status counts to hazelcast. 
@@ -493,18 +454,15 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                             + potentialNodeList.size());
 
                 }
-                // for each node in the potential node list up to the desired replicas
-                // (less the pending/completed replicas)
-                int desiredReplicasLessListed = 
-                    desiredReplicas - currentListedReplicaCount;
-                log.debug("Desired replica count less already listed replica count is "
-                        + desiredReplicasLessListed);
                 
                 // reset desiredReplicasLessListed to avoid task creation
                 // in the ' 0 > any negative nuber' scenario
                 if ( desiredReplicasLessListed < 0 ) {
                     desiredReplicasLessListed = 0;
                 }
+                
+                // for each node in the potential node list up to the desired replicas
+                // (less the pending/completed replicas)
                 for (int j = 0; j < desiredReplicasLessListed; j++) {
 
                     log.debug("Evaluating item " + j + " of "
@@ -1070,6 +1028,63 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         return is_pending;
     }
 
+    /**
+     * Given the current system metadata object, return a list of already
+     * listed replica entries that are in the queued, requested, or completed
+     * state.  
+     * @param sysmeta the system metadata object to evaluate
+     * @return listedReplicaNodes  the list of currently listed replica nodes
+     */
+    public List<NodeReference> getCurrentReplicaList(SystemMetadata sysmeta) {
+        List<NodeReference> listedReplicaNodes = new ArrayList<NodeReference>();
+        List<Replica> replicaList; // the replica list for this pid
+        replicaList = sysmeta.getReplicaList();
+        if (replicaList == null) {
+            replicaList = new ArrayList<Replica>();
+
+        }
+        for (Replica listedReplica : replicaList) {
+            NodeReference nodeId = listedReplica.getReplicaMemberNode();
+            ReplicationStatus listedStatus = 
+                listedReplica.getReplicationStatus();
+
+            Node node = new Node();
+            NodeType nodeType = null;
+            try {
+                node = this.nodes.get(nodeId);
+                if (node != null) {
+                    log.debug("The potential target node id is: "
+                            + node.getIdentifier().getValue());
+                    nodeType = node.getType();
+                    if (nodeType == NodeType.CN || 
+                        nodeId.getValue().equals(
+                          sysmeta.getAuthoritativeMemberNode().getValue())) {
+                        continue; // don't count CNs or authoritative nodes as replicas
+
+                    }
+
+                } else {
+                    log.debug("The potential target node id is null for "
+                            + nodeId.getValue());
+                    continue;
+                }
+
+            } catch (Exception e) {
+                log.debug("There was an error getting the node type: "
+                                + e.getMessage(), e);
+            }
+
+            if (listedStatus == ReplicationStatus.QUEUED
+                    || listedStatus == ReplicationStatus.REQUESTED
+                    || listedStatus == ReplicationStatus.COMPLETED) {
+                listedReplicaNodes.add(nodeId);
+            }
+        }
+
+        return listedReplicaNodes;
+        
+    }
+    
     public void setCnReplication(CNReplication cnReplication) {
         this.cnReplication = cnReplication;
     }
@@ -1161,7 +1176,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
      * @return nodesByPriority a list of nodes by descending priority
      */
     @SuppressWarnings("unchecked")
-    public List<NodeReference> prioritizeNodes(
+    public List<NodeReference> prioritizeNodes(int desiredReplicasLessListed,
             List<NodeReference> potentialNodeList, SystemMetadata sysmeta) {
 
         List<NodeReference> nodesByPriority = 
@@ -1173,8 +1188,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         // processing (when targets become available)
         Identifier pid = sysmeta.getIdentifier();
         log.debug("Nodes by priority list size: " + nodesByPriority.size());
-        int desiredCount = sysmeta.getReplicationPolicy().getNumberReplicas();
-        if (nodesByPriority.size() >= desiredCount) {
+        if (nodesByPriority.size() >= desiredReplicasLessListed) {
             log.debug("There are enough target nodes to fulfill the replication "
                     + "policy. Not resubmitting identifier " + pid.getValue());
         } else {
