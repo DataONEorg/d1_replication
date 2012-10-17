@@ -159,6 +159,12 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
     /* A scheduler for pending replica auditing */
     private ScheduledExecutorService pendingReplicaAuditScheduler;
 
+    /* A scheduler for processing the hzReplicationTasks queue */
+    private ScheduledExecutorService replicationTaskScheduler;
+
+    /* The future result of processing the hzReplicationTasks queue */
+    private Future<?> replicationTaskProcess;
+
     /* The future result of reporting counts by node status to hazelcast */
     private Future<?> pendingReplicaAuditTask;
 
@@ -236,6 +242,27 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
             pendingReplicaAuditScheduler.scheduleAtFixedRate(
                     new PendingReplicaAuditor(), 0L, 1L, TimeUnit.HOURS);
         
+        // Poll the hzReplicationTasks queue on a schedule to ensure the 
+        // queue is processed even when tasks aren't being pushed onto the
+        // [end of] the queue
+        replicationTaskScheduler = Executors.newSingleThreadScheduledExecutor();
+        this.replicationTaskProcess = 
+            replicationTaskScheduler.scheduleAtFixedRate(new Runnable(){
+
+                /*
+                 * Induce the processing of the hzReplicationTasks queue
+                 * by calling ReplicationManger.itemAdded() on a schedule
+                 * @see java.lang.Runnable#run()
+                 */
+                @Override
+                public void run() {
+                    ReplicationManager replManager = ReplicationManager.this;
+                    replManager.itemAdded(null);
+                    log.debug("Scheduled poll of hzReplicationTasks fired.");
+                    
+                }
+                
+            }, 300, 5, TimeUnit.SECONDS);
         
         // Report node status statistics on a scheduled basis
         // TODO: hold off on scheduling code for now
@@ -1216,8 +1243,8 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         }
         return nodesByPriority;
     }
-
-    /**
+    
+    /*
      * An internal audit class used to periodically handle identifiers that are
      * erroneously in a pending state (queued or requested).  This will likely be
      * replaced by the MNAudit class.
@@ -1225,7 +1252,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
      * @author cjones
      *
      */
-    private class PendingReplicaAuditor implements Runnable {
+    class PendingReplicaAuditor implements Runnable {
 
         @Override
         public void run() {
