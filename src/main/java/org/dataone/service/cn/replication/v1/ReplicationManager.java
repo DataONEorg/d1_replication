@@ -25,6 +25,7 @@ package org.dataone.service.cn.replication.v1;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -68,14 +69,15 @@ import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.SystemMetadata;
 
 import com.hazelcast.client.HazelcastClient;
+import com.hazelcast.core.EntryEvent;
+import com.hazelcast.core.EntryListener;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.ILock;
 import com.hazelcast.core.IMap;
 import com.hazelcast.core.IQueue;
 import com.hazelcast.core.IdGenerator;
-import com.hazelcast.core.ItemListener;
-import com.hazelcast.impl.base.RuntimeInterruptedException;
+import com.hazelcast.core.MultiMap;
 
 /**
  * A DataONE Coordinating Node implementation which manages replication queues
@@ -87,7 +89,7 @@ import com.hazelcast.impl.base.RuntimeInterruptedException;
  * @author cjones
  * 
  */
-public class ReplicationManager implements ItemListener<MNReplicationTask> {
+public class ReplicationManager implements EntryListener<String, MNReplicationTask> {
 
     /* Get a Log instance */
     public static Log log = LogFactory.getLog(ReplicationManager.class);
@@ -135,7 +137,8 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
     private IMap<Identifier, SystemMetadata> systemMetadata;
 
     /* The Hazelcast distributed replication tasks queue */
-    private IQueue<MNReplicationTask> replicationTasks;
+    // private IQueue<MNReplicationTask> replicationTasks;
+    private MultiMap<String, MNReplicationTask> replicationTaskMap;
 
     /* The Hazelcast distributed replication events queue */
     private IQueue<Identifier> replicationEvents;
@@ -175,37 +178,32 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
 
     /* The router hostname for the CN cluster (round robin) */
     private String cnRouterHostname;
-    
+
     /**
      * Constructor - singleton pattern, enforced by Spring application. Although
-     * there is only one instance of ReplicationManager per JVM, the CNs
-     * run in seperate JVMs and therefore 3 or more instances of ReplicationManager
-     * may be operating on the same events and data
+     * there is only one instance of ReplicationManager per JVM, the CNs run in
+     * seperate JVMs and therefore 3 or more instances of ReplicationManager may
+     * be operating on the same events and data
      */
     public ReplicationManager() {
 
-        this.nodeMap = Settings.getConfiguration().getString(
-                "dataone.hazelcast.nodes");
+        this.nodeMap = Settings.getConfiguration().getString("dataone.hazelcast.nodes");
         this.systemMetadataMap = Settings.getConfiguration().getString(
                 "dataone.hazelcast.systemMetadata");
         this.tasksQueue = Settings.getConfiguration().getString(
                 "dataone.hazelcast.replicationQueuedTasks");
         this.eventsQueue = Settings.getConfiguration().getString(
                 "dataone.hazelcast.replicationQueuedEvents");
-        this.taskIds = Settings.getConfiguration().getString(
-                "dataone.hazelcast.tasksIdGenerator");
-        this.hzAuditString = Settings.getConfiguration().getString(
-                "dataone.hazelcast.auditString");
-        this.shortListAge = Settings.getConfiguration().getString(
-                "dataone.hazelcast.shortListAge");
+        this.taskIds = Settings.getConfiguration().getString("dataone.hazelcast.tasksIdGenerator");
+        this.hzAuditString = Settings.getConfiguration().getString("dataone.hazelcast.auditString");
+        this.shortListAge = Settings.getConfiguration().getString("dataone.hazelcast.shortListAge");
         this.shortListNumRows = Settings.getConfiguration().getString(
                 "dataone.hazelcast.shortListNumRows");
         this.nodeReplicationStatusMap = Settings.getConfiguration().getString(
-        "dataone.hazelcast.nodeReplicationStatusMap");
-        
-        this.cnRouterHostname = 
-            Settings.getConfiguration().getString("cn.router.hostname");
-        
+                "dataone.hazelcast.nodeReplicationStatusMap");
+
+        this.cnRouterHostname = Settings.getConfiguration().getString("cn.router.hostname");
+
         // Connect to the Hazelcast storage cluster
         this.hzClient = HazelcastClientInstance.getHazelcastClient();
 
@@ -217,46 +215,42 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         this.nodes = this.hzMember.getMap(this.nodeMap);
         this.systemMetadata = this.hzClient.getMap(this.systemMetadataMap);
         this.replicationEvents = this.hzMember.getQueue(eventsQueue);
-        this.replicationTasks = this.hzMember.getQueue(this.tasksQueue);
+        this.replicationTaskMap = this.hzMember.getMultiMap(this.tasksQueue);
         this.taskIdGenerator = this.hzMember.getIdGenerator(this.taskIds);
         this.nodeReplicationStatus = this.hzMember.getMap(this.nodeReplicationStatusMap);
 
-        
         // monitor the replication structures
-        this.replicationTasks.addItemListener(this, true);
-        log.info("Added a listener to the " + this.replicationTasks.getName()
-                + " queue.");
+        this.replicationTaskMap.addEntryListener(this, true);
+
+        log.info("Added a listener to the " + this.replicationTaskMap.getName() + " queue.");
 
         // TODO: use a more comprehensive MNAuditTask to fix problem replicas
-        // For now, every hour, clear problematic replica entries that are 
+        // For now, every hour, clear problematic replica entries that are
         // causing a given node to have too many pending replica requests
         pendingReplicaAuditScheduler = Executors.newSingleThreadScheduledExecutor();
-        pendingReplicaAuditTask = 
-            pendingReplicaAuditScheduler.scheduleAtFixedRate(
-                    new PendingReplicaAuditor(), 0L, 1L, TimeUnit.HOURS);
-                
+        pendingReplicaAuditTask = pendingReplicaAuditScheduler.scheduleAtFixedRate(
+                new PendingReplicaAuditor(), 0L, 1L, TimeUnit.HOURS);
+
         // Report node status statistics on a scheduled basis
         // TODO: hold off on scheduling code for now
-        //reportScheduler = Executors.newSingleThreadScheduledExecutor();
-        //this.reportCountsTask = 
-        //    reportScheduler.scheduleAtFixedRate(new Runnable(){
+        // reportScheduler = Executors.newSingleThreadScheduledExecutor();
+        // this.reportCountsTask =
+        // reportScheduler.scheduleAtFixedRate(new Runnable(){
         //
-        //        @Override
-        //        public void run() {
-        //            // TODO Auto-generated method stub
-        //            
-        //        }
-        //        
-        //    }, 0L, 1L, TimeUnit.SECONDS);
-        
+        // @Override
+        // public void run() {
+        // // TODO Auto-generated method stub
+        //
+        // }
+        //
+        // }, 0L, 1L, TimeUnit.SECONDS);
+
         // Set up the certificate location, create a null session
         String clientCertificateLocation = Settings.getConfiguration().getString(
                 "D1Client.certificate.directory")
                 + File.separator
-                + Settings.getConfiguration().getString(
-                        "D1Client.certificate.filename");
-        CertificateManager.getInstance().setCertificateLocation(
-                clientCertificateLocation);
+                + Settings.getConfiguration().getString("D1Client.certificate.filename");
+        CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
         log.info("ReplicationManager is using an X509 certificate from "
                 + clientCertificateLocation);
 
@@ -271,8 +265,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                     + Settings.getConfiguration().getProperty("D1Client.CN_URL"));
 
             cnode = D1Client.getCN();
-            log.info("ReplicationManager D1Client base_url is: "
-                    + cnode.getNodeBaseServiceUrl());
+            log.info("ReplicationManager D1Client base_url is: " + cnode.getNodeBaseServiceUrl());
         } catch (ServiceFailure e) {
 
             // try again, then fail
@@ -281,15 +274,13 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                     Thread.sleep(5000L);
 
                 } catch (InterruptedException e1) {
-                    log.error(
-                            "There was a problem getting a Coordinating Node reference.",
-                            e1);
+                    log.error("There was a problem getting a Coordinating Node reference.", e1);
                 }
                 cnode = D1Client.getCN();
 
             } catch (ServiceFailure e1) {
                 log.error("There was a problem getting a Coordinating Node reference "
-                                + " for the ReplicationManager. ", e1);
+                        + " for the ReplicationManager. ", e1);
                 throw new RuntimeException(e1);
 
             }
@@ -313,8 +304,7 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
      * @throws InvalidRequest
      * @throws NotFound
      */
-    public int createAndQueueTasks(Identifier pid) throws 
-            NotImplemented, InvalidRequest {
+    public int createAndQueueTasks(Identifier pid) throws NotImplemented, InvalidRequest {
 
         log.debug("ReplicationManager.createAndQueueTasks called.");
         ILock lock;
@@ -338,8 +328,9 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         boolean isLocked = false;
         try {
             isLocked = lock.tryLock(timeToWait, TimeUnit.MILLISECONDS);
-            // only evaluate an identifier if we can get the lock fairly instantly
-            if ( isLocked ) {
+            // only evaluate an identifier if we can get the lock fairly
+            // instantly
+            if (isLocked) {
                 // if replication isn't allowed, return
                 allowed = isAllowed(pid);
                 log.debug("Replication is allowed for identifier " + pid.getValue());
@@ -350,13 +341,13 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
 
                 }
                 boolean no_task_with_pid = true;
-                // check if there are pending tasks or tasks recently put into the task
+                // check if there are pending tasks or tasks recently put into
+                // the task
                 // queue
                 if (!isPending(pid)) {
-                    log.debug("Replication is not pending for identifier "
-                            + pid.getValue());
+                    log.debug("Replication is not pending for identifier " + pid.getValue());
                     // check for already queued tasks for this pid
-                    for (MNReplicationTask task : replicationTasks) {
+                    for (MNReplicationTask task : this.replicationTaskMap.values()) {
                         // if the task's pid is equal to the event's pid
                         if (task.getPid().getValue().equals(pid.getValue())) {
                             no_task_with_pid = false;
@@ -374,114 +365,108 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                     }
                 }
                 // get the system metadata for the pid
-                log.debug("Getting the replica list for identifier "
-                        + pid.getValue());
+                log.debug("Getting the replica list for identifier " + pid.getValue());
                 sysmeta = this.systemMetadata.get(pid);
-                
+
                 // add already listed replicas to listedReplicaNodes
                 listedReplicaNodes = getCurrentReplicaList(sysmeta);
                 int currentListedReplicaCount = listedReplicaNodes.size();
-                int desiredReplicasLessListed = 
-                    desiredReplicas - currentListedReplicaCount;
+                int desiredReplicasLessListed = desiredReplicas - currentListedReplicaCount;
                 log.debug("Desired replica count less already listed replica count is "
                         + desiredReplicasLessListed);
-                
+
                 // List of Nodes for building MNReplicationTasks
-                log.debug("Building a potential target node list for identifier "
-                        + pid.getValue());
+                log.debug("Building a potential target node list for identifier " + pid.getValue());
                 nodeList = (Set<NodeReference>) this.nodes.keySet();
-                potentialNodeList = new ArrayList<NodeReference>(); // will be our short
+                potentialNodeList = new ArrayList<NodeReference>(); // will be
+                                                                    // our short
                                                                     // list
                 // authoritative member node to replicate from
                 try {
-                    authoritativeNode = 
-                        this.nodes.get(sysmeta.getAuthoritativeMemberNode());
+                    authoritativeNode = this.nodes.get(sysmeta.getAuthoritativeMemberNode());
 
                 } catch (NullPointerException npe) {
-                    throw new InvalidRequest( "1080", "Object " + pid.getValue() + 
-                            " has no authoritative Member Node in its SystemMetadata");
+                    throw new InvalidRequest("1080", "Object " + pid.getValue()
+                            + " has no authoritative Member Node in its SystemMetadata");
 
                 }
-                
+
                 // build the potential list of target nodes
                 for (NodeReference nodeReference : nodeList) {
                     Node node = this.nodes.get(nodeReference);
 
-                    // only add MNs as targets, excluding the authoritative MN and MNs
+                    // only add MNs as targets, excluding the authoritative MN
+                    // and MNs
                     // that are not tagged to replicate
                     if ((node.getType() == NodeType.MN)
                             && node.isReplicate()
-                            && !node.getIdentifier().getValue().equals(
-                               authoritativeNode.getIdentifier().getValue())) {
+                            && !node.getIdentifier().getValue()
+                                    .equals(authoritativeNode.getIdentifier().getValue())) {
                         potentialNodeList.add(node.getIdentifier());
 
                     }
                 }
-                
+
                 // then remove the already listed replica nodes
                 potentialNodeList.removeAll(listedReplicaNodes);
-                
-                // prioritize replica targets by preferred/blocked lists and other
+
+                // prioritize replica targets by preferred/blocked lists and
+                // other
                 // performance metrics
                 log.trace("METRICS:\tPRIORITIZE:\tPID:\t" + pid.getValue());
-                potentialNodeList = 
-                    prioritizeNodes(desiredReplicasLessListed, potentialNodeList, sysmeta);
+                potentialNodeList = prioritizeNodes(desiredReplicasLessListed, potentialNodeList,
+                        sysmeta);
                 log.trace("METRICS:\tEND PRIORITIZE:\tPID:\t" + pid.getValue());
-                
-                // report node-status counts to hazelcast. 
+
+                // report node-status counts to hazelcast.
                 // TODO: This may be removed in favor of scheduled reporting.
                 reportCountsByNodeStatus();
-                
+
                 // parse the sysmeta.ReplicationPolicy
                 ReplicationPolicy replicationPolicy = sysmeta.getReplicationPolicy();
-                
+
                 // set the desired replicas if present
                 if (replicationPolicy.getNumberReplicas() != null) {
                     desiredReplicas = replicationPolicy.getNumberReplicas().intValue();
 
                 }
-                log.info("Desired replicas for identifier " + pid.getValue()
-                        + " is " + desiredReplicas);
-                log.info("Potential target node list size for " + pid.getValue()
-                        + " is " + potentialNodeList.size());
+                log.info("Desired replicas for identifier " + pid.getValue() + " is "
+                        + desiredReplicas);
+                log.info("Potential target node list size for " + pid.getValue() + " is "
+                        + potentialNodeList.size());
                 // can't have more replicas than MNs
                 if (desiredReplicas > potentialNodeList.size()) {
                     desiredReplicas = potentialNodeList.size(); // yikes
-                    log.info("Changed the desired replicas for identifier "
-                            + pid.getValue()
+                    log.info("Changed the desired replicas for identifier " + pid.getValue()
                             + " to the size of the potential target node list: "
                             + potentialNodeList.size());
 
                 }
-                
+
                 // reset desiredReplicasLessListed to avoid task creation
                 // in the ' 0 > any negative nuber' scenario
-                if ( desiredReplicasLessListed < 0 ) {
+                if (desiredReplicasLessListed < 0) {
                     desiredReplicasLessListed = 0;
                 }
-                
-                // for each node in the potential node list up to the desired replicas
+
+                // for each node in the potential node list up to the desired
+                // replicas
                 // (less the pending/completed replicas)
                 for (int j = 0; j < desiredReplicasLessListed; j++) {
 
-                    log.debug("Evaluating item " + j + " of "
-                            + desiredReplicasLessListed
+                    log.debug("Evaluating item " + j + " of " + desiredReplicasLessListed
                             + " in the potential node list.");
                     NodeReference potentialNode = potentialNodeList.get(j);
 
                     targetNode = this.nodes.get(potentialNode);
-                    log.debug("currently evaluating "
-                            + targetNode.getIdentifier().getValue()
-                            + " for task creation " + "for identifier "
-                            + pid.getValue());
+                    log.debug("currently evaluating " + targetNode.getIdentifier().getValue()
+                            + " for task creation " + "for identifier " + pid.getValue());
 
                     // may be more than one version of MNReplication
                     List<String> implementedVersions = new ArrayList<String>();
-                    List<Service> origServices = authoritativeNode.getServices()
-                            .getServiceList();
+                    List<Service> origServices = authoritativeNode.getServices().getServiceList();
                     for (Service service : origServices) {
-                        if (service.getName().equals("MNReplication")
-                                && service.getAvailable()) {
+                        if (service.getName().equals("MNReplication") && service.getAvailable()) {
                             implementedVersions.add(service.getVersion());
                         }
                     }
@@ -499,10 +484,8 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                         }
                     }
                     log.debug("Based on evaluating the target node services, node id "
-                            + targetNode.getIdentifier().getValue()
-                            + " is replicable: "
-                            + replicable
-                            + " (during evaluation for " + pid.getValue() + ")");
+                            + targetNode.getIdentifier().getValue() + " is replicable: "
+                            + replicable + " (during evaluation for " + pid.getValue() + ")");
 
                     // a replica doesn't exist. add it
                     boolean updated = false;
@@ -513,35 +496,32 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                         replicaMetadata.setReplicaVerified(Calendar.getInstance().getTime());
 
                         try {
-                            sysmeta = this.systemMetadata.get(pid); // refresh sysmeta
+                            sysmeta = this.systemMetadata.get(pid); // refresh
+                                                                    // sysmeta
                                                                     // to avoid
                                                                     // VersionMismatch
-                            updated = 
-                                this.cnReplication.updateReplicationMetadata(
-                                    pid, replicaMetadata, 
-                                    sysmeta.getSerialVersion().longValue());
+                            updated = this.cnReplication.updateReplicationMetadata(pid,
+                                    replicaMetadata, sysmeta.getSerialVersion().longValue());
 
                         } catch (VersionMismatch e) {
 
                             // retry if the serialVersion is wrong
                             try {
                                 sysmeta = this.systemMetadata.get(pid);
-                                updated = 
-                                	this.cnReplication.updateReplicationMetadata(
-                                			pid, replicaMetadata, 
-                                			sysmeta.getSerialVersion().longValue());
+                                updated = this.cnReplication.updateReplicationMetadata(pid,
+                                        replicaMetadata, sysmeta.getSerialVersion().longValue());
 
                             } catch (VersionMismatch e1) {
                                 String msg = "Couldn't get the correct serialVersion to update "
-                                        + "the replica metadata for identifier "
-                                        + pid.getValue()
+                                        + "the replica metadata for identifier " + pid.getValue()
                                         + " and target node "
                                         + targetNode.getIdentifier().getValue();
                                 log.error(msg);
 
                             } catch (BaseException be) {
-                            	// the replica has already completed from a different task 
-                            	if ( be instanceof InvalidRequest ) {
+                                // the replica has already completed from a
+                                // different task
+                                if (be instanceof InvalidRequest) {
                                     log.warn(
                                             "Couldn't update replication metadata to "
                                                     + replicaMetadata.getReplicationStatus()
@@ -549,145 +529,134 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
                                                     + ", it may have possibly already been updated for identifier "
                                                     + pid.getValue()
                                                     + " and target node "
-                                                    + replicaMetadata
-                                                            .getReplicaMemberNode()
-                                                            .getValue()
-                                                    + ". The error was: "
+                                                    + replicaMetadata.getReplicaMemberNode()
+                                                            .getValue() + ". The error was: "
                                                     + be.getMessage(), be);
-                            	} else {
-                            		if ( log.isDebugEnabled() ) {
+                                } else {
+                                    if (log.isDebugEnabled()) {
                                         log.debug(be);
-                            		}
-                                    // something is very wrong with CN self communication
-                                    // try the round robin address multiple times
+                                    }
+                                    // something is very wrong with CN self
+                                    // communication
+                                    // try the round robin address multiple
+                                    // times
                                     updated = updateReplicationMetadata(session, pid,
                                             replicaMetadata);
-                            		
-                            	}
+
+                                }
 
                             }
 
                         } catch (BaseException be) {
-                        	// the replica has already completed from a different task 
-                        	if ( be instanceof InvalidRequest ) {
+                            // the replica has already completed from a
+                            // different task
+                            if (be instanceof InvalidRequest) {
                                 log.warn(
                                         "Couldn't update replication metadata to "
-                                                + replicaMetadata
-                                                        .getReplicationStatus()
-                                                        .toString()
+                                                + replicaMetadata.getReplicationStatus().toString()
                                                 + ", it may have possibly already been updated for identifier "
-                                                + pid.getValue()
-                                                + " and target node "
-                                                + replicaMetadata
-                                                        .getReplicaMemberNode()
-                                                        .getValue()
-                                                + ". The error was: "
-                                                + be.getMessage(), be);
-                        	} else {
-                            	if ( log.isDebugEnabled() ) {
+                                                + pid.getValue() + " and target node "
+                                                + replicaMetadata.getReplicaMemberNode().getValue()
+                                                + ". The error was: " + be.getMessage(), be);
+                            } else {
+                                if (log.isDebugEnabled()) {
                                     log.debug(be);
-                            		
-                            	}
-                                // something is very wrong with CN self communication
+
+                                }
+                                // something is very wrong with CN self
+                                // communication
                                 // try the round robin address multiple times
-                                updated = updateReplicationMetadata(session, pid,
-                                        replicaMetadata);
-                        		
-                        	}
+                                updated = updateReplicationMetadata(session, pid, replicaMetadata);
+
+                            }
 
                         } catch (RuntimeException re) {
-                            log.error("Couldn't get system metadata for identifier "
-                                    + pid.getValue()
-                                    + " while trying to update replica "
-                                    + "metadata entry for node "
-                                    + replicaMetadata.getReplicaMemberNode()
-                                            .getValue(), re);
+                            log.error(
+                                    "Couldn't get system metadata for identifier " + pid.getValue()
+                                            + " while trying to update replica "
+                                            + "metadata entry for node "
+                                            + replicaMetadata.getReplicaMemberNode().getValue(), re);
 
                         }
 
                         // create the task if the update succeeded
-                        if ( updated ) {
-                            log.info("Updated system metadata for identifier "
-                                    + pid.getValue()
+                        if (updated) {
+                            log.info("Updated system metadata for identifier " + pid.getValue()
                                     + " with QUEUED replication status.");
-                            log.trace("METRICS:\tREPLICATION:\tQUEUE:\tPID:\t"
-                                    + pid.getValue() + "\tNODE:\t"
-                                    + targetNode.getIdentifier().getValue()
+                            log.trace("METRICS:\tREPLICATION:\tQUEUE:\tPID:\t" + pid.getValue()
+                                    + "\tNODE:\t" + targetNode.getIdentifier().getValue()
                                     + "\tSIZE:\t" + sysmeta.getSize().intValue());
                             Long taskid = taskIdGenerator.newId();
                             // add the task to the task list
                             log.info("Adding a new MNReplicationTask to the queue where "
-                                    + "pid = "
-                                    + pid.getValue()
-                                    + ", originatingNode = "
+                                    + "pid = " + pid.getValue() + ", originatingNode = "
                                     + authoritativeNode.getIdentifier().getValue()
-                                    + ", targetNode = "
-                                    + targetNode.getIdentifier().getValue());
-                            MNReplicationTask task = new MNReplicationTask(
-                                    taskid.toString(), pid,
-                                    authoritativeNode.getIdentifier(),
-                                    targetNode.getIdentifier());
-                            this.replicationTasks.add(task);
+                                    + ", targetNode = " + targetNode.getIdentifier().getValue());
+                            MNReplicationTask task = new MNReplicationTask(taskid.toString(), pid,
+                                    authoritativeNode.getIdentifier(), targetNode.getIdentifier());
+
+                            // this.replicationTasks.add(task);
+                            this.replicationTaskMap
+                                    .put(targetNode.getIdentifier().getValue(), task);
+
                             taskCount++;
-                            
+
                         } else {
-                            log.error("CN.updateReplicationMetadata() failed for " +
-                                "identifier " + pid.getValue() +
-                                ", node " + targetNode.getIdentifier().getValue() +
-                                ". Task not created.");
-                            
+                            log.error("CN.updateReplicationMetadata() failed for " + "identifier "
+                                    + pid.getValue() + ", node "
+                                    + targetNode.getIdentifier().getValue() + ". Task not created.");
+
                         }
                     }
                 } // end for()
-                
+
             } else {
-                log.info("Couldn't get a lock while evaluating identifier " +
-                        pid.getValue() + ". Assuming another CN handled it.");
-                //try {
-                //    if ( !this.replicationEvents.contains(pid) ) {
-                //        boolean taken = this.replicationEvents.offer(pid);
-                //        if (taken == false) {
-                //            log.error("ReplicationEvents.offer() returned false for pid: "
-                //                    + pid);
-                //        }
-                //    }
-                //    
-                //} catch (Exception e) {
-                //    log.error("Couldn't resubmit identifier " + pid.getValue() +
-                //        " back onto the hzReplicationEvents queue.");
-                //}
-                
+                log.info("Couldn't get a lock while evaluating identifier " + pid.getValue()
+                        + ". Assuming another CN handled it.");
+                // try {
+                // if ( !this.replicationEvents.contains(pid) ) {
+                // boolean taken = this.replicationEvents.offer(pid);
+                // if (taken == false) {
+                // log.error("ReplicationEvents.offer() returned false for pid: "
+                // + pid);
+                // }
+                // }
+                //
+                // } catch (Exception e) {
+                // log.error("Couldn't resubmit identifier " + pid.getValue() +
+                // " back onto the hzReplicationEvents queue.");
+                // }
+
             } // end if(isLocked)
-            
+
         } catch (InterruptedException ie) {
-            log.info("The lock was interrupted while evaluating identifier " +
-                pid.getValue() + ". Re-queuing the identifer.");
+            log.info("The lock was interrupted while evaluating identifier " + pid.getValue()
+                    + ". Re-queuing the identifer.");
             try {
-                if ( !this.replicationEvents.contains(pid) ) {
+                if (!this.replicationEvents.contains(pid)) {
                     boolean taken = this.replicationEvents.offer(pid);
                     if (taken == false) {
-                        log.error("ReplicationEvents.offer() returned false for pid: "
-                                + pid);
+                        log.error("ReplicationEvents.offer() returned false for pid: " + pid);
                     }
                 }
             } catch (Exception e) {
-                log.error("Couldn't resubmit identifier " + pid.getValue() +
-                    " back onto the hzReplicationEvents queue.");
+                log.error("Couldn't resubmit identifier " + pid.getValue()
+                        + " back onto the hzReplicationEvents queue.");
             }
         } catch (Exception e) {
-            log.error("Unhandled Exception for pid: " + pid.getValue()
-                    + ". Error is : " + e.getMessage(), e);
+            log.error(
+                    "Unhandled Exception for pid: " + pid.getValue() + ". Error is : "
+                            + e.getMessage(), e);
         } finally {
             // always unlock the identifier
-            if ( isLocked ) {
+            if (isLocked) {
                 lock.unlock();
             }
         }
 
         // return the number of replication tasks queued
-        log.info("Added " + taskCount + " MNReplicationTasks to the queue for "
-                + pid.getValue());
-        
+        log.info("Added " + taskCount + " MNReplicationTasks to the queue for " + pid.getValue());
+
         return taskCount;
 
     }
@@ -722,13 +691,16 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
      */
 
     /*
-     * Update the replica metadata against the CN router address rather than the 
+     * Update the replica metadata against the CN router address rather than the
      * local CN address. This only gets called if normal updates fail due to
      * local CN communication errors
      * 
      * @return true if the replica metadata are updated
+     * 
      * @param session - the session
+     * 
      * @param pid - the identifier of the object to be updated
+     * 
      * @param replicaMetadata
      */
     private boolean updateReplicationMetadata(Session session, Identifier pid,
@@ -738,57 +710,53 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         boolean updated = false;
         String baseURL = "https://" + this.cnRouterHostname + "/cn";
         cn = new CNode(baseURL);
-        
+
         // try multiple times since at this point we may be dealing with a lame
         // CN in the cluster and the RR may still point us to it
         for (int i = 0; i < 5; i++) {
             try {
                 // refresh the system metadata in case it changed
                 sysmeta = this.systemMetadata.get(pid);
-                updated = cn.updateReplicationMetadata(session, pid, replicaMetadata, 
-                        sysmeta.getSerialVersion().longValue());
-                if ( updated ) {
+                updated = cn.updateReplicationMetadata(session, pid, replicaMetadata, sysmeta
+                        .getSerialVersion().longValue());
+                if (updated) {
                     break;
                 }
-                
+
             } catch (BaseException be) {
-            	// the replica has already completed from a different task 
-            	if ( be instanceof InvalidRequest ) {
+                // the replica has already completed from a different task
+                if (be instanceof InvalidRequest) {
                     log.warn(
                             "Couldn't update replication metadata to "
-                                    + replicaMetadata.getReplicationStatus()
-                                            .toString()
+                                    + replicaMetadata.getReplicationStatus().toString()
                                     + ", it may have possibly already been updated for identifier "
-                                    + pid.getValue()
-                                    + " and target node "
-                                    + replicaMetadata.getReplicaMemberNode()
-                                            .getValue() + ". The error was: "
-                                    + be.getMessage(), be);
-            		return false;
-            		
-            	}
-                if ( log.isDebugEnabled() ) {
+                                    + pid.getValue() + " and target node "
+                                    + replicaMetadata.getReplicaMemberNode().getValue()
+                                    + ". The error was: " + be.getMessage(), be);
+                    return false;
+
+                }
+                if (log.isDebugEnabled()) {
                     log.debug(be);
-                    
+
                 }
-                log.error("Error in calling updateReplicationMetadata() " +
-                    "at " + baseURL + ": " + be.getMessage());
+                log.error("Error in calling updateReplicationMetadata() " + "at " + baseURL + ": "
+                        + be.getMessage());
                 continue;
-                
-            } catch ( RuntimeException re ) {
-                if ( log.isDebugEnabled() ) {
+
+            } catch (RuntimeException re) {
+                if (log.isDebugEnabled()) {
                     log.debug(re);
-                    
+
                 }
-                log.error("Error in getting sysyem metadata from the map: " +
-                    re.getMessage());
+                log.error("Error in getting sysyem metadata from the map: " + re.getMessage());
                 continue;
-                
+
             }
         }
-        
+
         return updated;
-        
+
     }
 
     /**
@@ -798,160 +766,95 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
      * @param task
      *            - the MNReplicationTask being added to the queue
      */
-    public void itemAdded(MNReplicationTask task) {
-
-        // When a task is added to the queue, attempt to handle the task. If
-        // successful, execute the task.
-        try {
-            task = this.replicationTasks.poll(3L, TimeUnit.SECONDS);
-
-            if (task != null) {
-                log.debug("Executing task id " + task.getTaskid()
-                        + "for identifier " + task.getPid().getValue()
-                        + " and target node " + task.getTargetNode().getValue());
-                try {
-                    String result = task.call();
-                    log.debug("Result of executing task id" + task.getTaskid()
-                            + " is identifier string: " + result);
-
-                } catch (Exception e) {
-                    log.debug("Caught exception executing task id "
-                            + task.getTaskid() + ": " + e.getMessage());
-                    if (log.isDebugEnabled()) {
-                        log.debug(e);
-                    }
-
-                }
-                // log.info("Submitting replication task id " + task.getTaskid()
-                // + " for execution with object identifier: "
-                // + task.getPid().getValue() + " on replica node "
-                // + task.getTargetNode().getValue());
-
-                // TODO: handle the case when a CN drops and the
-                // MNReplicationTask.call()
-                // ExecutorService executorService = this.hzMember
-                // .getExecutorService("ReplicationTasks");
-                // Future<String> future = executorService.submit(task);
-
-                // check for completion
-                // boolean isDone = false;
-                // String result = null;
-                //
-                // while (!isDone) {
-                //
-                // try {
-                // result = (String) future.get(5L, TimeUnit.SECONDS);
-                // log.trace("Task result for identifier "
-                // + task.getPid().getValue() + " is " + result);
-                // if (result != null) {
-                // log.debug("Task " + task.getTaskid()
-                // + " completed for identifier "
-                // + task.getPid().getValue());
-                //
-                // }
-                //
-                // } catch (ExecutionException e) {
-                // String msg = "";
-                // if (e.getCause() != null) {
-                // msg = e.getCause().getMessage();
-                //
-                // }
-                // log.info("MNReplicationTask id "
-                // + task.getTaskid()
-                // + " threw an execution execption on identifier "
-                // + task.getPid().getValue() + ": " + msg);
-                // if (task.getRetryCount() < 10) {
-                // task.setRetryCount(task.getRetryCount() + 1);
-                // future.cancel(true);
-                // this.replicationTasks.add(task);
-                // log.info("Retrying replication task id "
-                // + task.getTaskid() + " for identifier "
-                // + task.getPid().getValue()
-                // + " on replica node "
-                // + task.getTargetNode().getValue());
-                //
-                // } else {
-                // log.info("Replication task id"
-                // + task.getTaskid()
-                // + " failed, too many retries for identifier"
-                // + task.getPid().getValue()
-                // + " on replica node "
-                // + task.getTargetNode().getValue()
-                // + ". Not retrying.");
-                // }
-                //
-                // } catch (TimeoutException e) {
-                // String msg = e.getMessage();
-                // log.info("Replication task id " + task.getTaskid()
-                // + " timed out for identifier "
-                // + task.getPid().getValue()
-                // + " on replica node "
-                // + task.getTargetNode().getValue() + " : " + msg);
-                // future.cancel(true); // isDone() is now true
-                //
-                // } catch (InterruptedException e) {
-                // String msg = e.getMessage();
-                // log.info("Replication task id " + task.getTaskid()
-                // + " was interrupted for identifier "
-                // + task.getPid().getValue()
-                // + " on replica node "
-                // + task.getTargetNode().getValue() + " : " + msg);
-                // if (task.getRetryCount() < 10) {
-                // task.setRetryCount(task.getRetryCount() + 1);
-                // this.replicationTasks.add(task);
-                // log.info("Retrying replication task id "
-                // + task.getTaskid() + " for identifier "
-                // + task.getPid().getValue());
-                //
-                // } else {
-                // log.error("Replication task id"
-                // + task.getTaskid()
-                // + " failed, too many retries for identifier"
-                // + task.getPid().getValue()
-                // + " on replica node "
-                // + task.getTargetNode().getValue()
-                // + ". Not retrying.");
-                // }
-                //
-                // }
-                //
-                // isDone = future.isDone();
-                // log.debug("Task " + task.getTaskid()
-                // + " is done for identifier "
-                // + task.getPid().getValue() + " on replica node "
-                // + task.getTargetNode().getValue() + ": " + isDone);
-                //
-                // // handle canceled tasks (from the timeout period)
-                // if (future.isCancelled()) {
-                // log.info("Replication task id " + task.getTaskid()
-                // + " was cancelled for identifier "
-                // + task.getPid().getValue());
-                //
-                // // leave the Replica entry as QUEUED in system metadata
-                // // to be picked up later
-                // }
-                // }
-
-            }
-
-        } catch (InterruptedException e) {
-
-            String message = "Polling of the replication task queue was interrupted. "
-                    + "The message was: " + e.getMessage();
-            log.debug(message);
-        } catch (RuntimeInterruptedException rie) {
-            String message = "Hazelcast instance was lost due to cluster shutdown, "
-                    + rie.getMessage();
-            log.debug(message);
-
-        } catch (IllegalStateException ise) {
-            String message = "Hazelcast instance was lost due to cluster shutdown, "
-                    + ise.getMessage();
-            log.debug(message);
-        }
-
-    }
-
+    /*
+     * public void itemAdded(MNReplicationTask task) {
+     * 
+     * // When a task is added to the queue, attempt to handle the task. If //
+     * successful, execute the task. try { task = this.replicationTasks.poll(3L,
+     * TimeUnit.SECONDS);
+     * 
+     * if (task != null) { log.debug("Executing task id " + task.getTaskid() +
+     * "for identifier " + task.getPid().getValue() + " and target node " +
+     * task.getTargetNode().getValue()); try { String result = task.call();
+     * log.debug("Result of executing task id" + task.getTaskid() +
+     * " is identifier string: " + result);
+     * 
+     * } catch (Exception e) { log.debug("Caught exception executing task id " +
+     * task.getTaskid() + ": " + e.getMessage()); if (log.isDebugEnabled()) {
+     * log.debug(e); }
+     * 
+     * } // log.info("Submitting replication task id " + task.getTaskid() // +
+     * " for execution with object identifier: " // + task.getPid().getValue() +
+     * " on replica node " // + task.getTargetNode().getValue());
+     * 
+     * // TODO: handle the case when a CN drops and the //
+     * MNReplicationTask.call() // ExecutorService executorService =
+     * this.hzMember // .getExecutorService("ReplicationTasks"); //
+     * Future<String> future = executorService.submit(task);
+     * 
+     * // check for completion // boolean isDone = false; // String result =
+     * null; // // while (!isDone) { // // try { // result = (String)
+     * future.get(5L, TimeUnit.SECONDS); //
+     * log.trace("Task result for identifier " // + task.getPid().getValue() +
+     * " is " + result); // if (result != null) { // log.debug("Task " +
+     * task.getTaskid() // + " completed for identifier " // +
+     * task.getPid().getValue()); // // } // // } catch (ExecutionException e) {
+     * // String msg = ""; // if (e.getCause() != null) { // msg =
+     * e.getCause().getMessage(); // // } // log.info("MNReplicationTask id " //
+     * + task.getTaskid() // + " threw an execution execption on identifier " //
+     * + task.getPid().getValue() + ": " + msg); // if (task.getRetryCount() <
+     * 10) { // task.setRetryCount(task.getRetryCount() + 1); //
+     * future.cancel(true); // this.replicationTasks.add(task); //
+     * log.info("Retrying replication task id " // + task.getTaskid() +
+     * " for identifier " // + task.getPid().getValue() // + " on replica node "
+     * // + task.getTargetNode().getValue()); // // } else { //
+     * log.info("Replication task id" // + task.getTaskid() // +
+     * " failed, too many retries for identifier" // + task.getPid().getValue()
+     * // + " on replica node " // + task.getTargetNode().getValue() // +
+     * ". Not retrying."); // } // // } catch (TimeoutException e) { // String
+     * msg = e.getMessage(); // log.info("Replication task id " +
+     * task.getTaskid() // + " timed out for identifier " // +
+     * task.getPid().getValue() // + " on replica node " // +
+     * task.getTargetNode().getValue() + " : " + msg); // future.cancel(true);
+     * // isDone() is now true // // } catch (InterruptedException e) { //
+     * String msg = e.getMessage(); // log.info("Replication task id " +
+     * task.getTaskid() // + " was interrupted for identifier " // +
+     * task.getPid().getValue() // + " on replica node " // +
+     * task.getTargetNode().getValue() + " : " + msg); // if
+     * (task.getRetryCount() < 10) { // task.setRetryCount(task.getRetryCount()
+     * + 1); // this.replicationTasks.add(task); //
+     * log.info("Retrying replication task id " // + task.getTaskid() +
+     * " for identifier " // + task.getPid().getValue()); // // } else { //
+     * log.error("Replication task id" // + task.getTaskid() // +
+     * " failed, too many retries for identifier" // + task.getPid().getValue()
+     * // + " on replica node " // + task.getTargetNode().getValue() // +
+     * ". Not retrying."); // } // // } // // isDone = future.isDone(); //
+     * log.debug("Task " + task.getTaskid() // + " is done for identifier " // +
+     * task.getPid().getValue() + " on replica node " // +
+     * task.getTargetNode().getValue() + ": " + isDone); // // // handle
+     * canceled tasks (from the timeout period) // if (future.isCancelled()) {
+     * // log.info("Replication task id " + task.getTaskid() // +
+     * " was cancelled for identifier " // + task.getPid().getValue()); // // //
+     * leave the Replica entry as QUEUED in system metadata // // to be picked
+     * up later // } // }
+     * 
+     * }
+     * 
+     * } catch (InterruptedException e) {
+     * 
+     * String message =
+     * "Polling of the replication task queue was interrupted. " +
+     * "The message was: " + e.getMessage(); log.debug(message); } catch
+     * (RuntimeInterruptedException rie) { String message =
+     * "Hazelcast instance was lost due to cluster shutdown, " +
+     * rie.getMessage(); log.debug(message);
+     * 
+     * } catch (IllegalStateException ise) { String message =
+     * "Hazelcast instance was lost due to cluster shutdown, " +
+     * ise.getMessage(); log.debug(message); }
+     * 
+     * }
+     */
     /**
      * Implement the ItemListener interface, responding to items being removed
      * from the hzReplicationTasks queue.
@@ -986,16 +889,14 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         } catch (NullPointerException e) {
             log.error("NullPointerException caught in ReplicationManager.isAllowed() "
                     + "for identifier " + pid.getValue());
-            log.debug("ReplicationManager.isAllowed() = " + isAllowed + " for "
-                    + pid.getValue());
+            log.debug("ReplicationManager.isAllowed() = " + isAllowed + " for " + pid.getValue());
             isAllowed = false;
 
         } catch (RuntimeException re) {
             log.error("Runtime exception caught in ReplicationManager.isAllowed() "
-                    + "for identifier " + pid.getValue()
-                    + ". The error message was: " + re.getMessage());
-            log.debug("ReplicationManager.isAllowed() = " + isAllowed + " for "
-                    + pid.getValue());
+                    + "for identifier " + pid.getValue() + ". The error message was: "
+                    + re.getMessage());
+            log.debug("ReplicationManager.isAllowed() = " + isAllowed + " for " + pid.getValue());
             isAllowed = false;
         }
 
@@ -1028,11 +929,12 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
     }
 
     /**
-     * Given the current system metadata object, return a list of already
-     * listed replica entries that are in the queued, requested, or completed
-     * state.  
-     * @param sysmeta the system metadata object to evaluate
-     * @return listedReplicaNodes  the list of currently listed replica nodes
+     * Given the current system metadata object, return a list of already listed
+     * replica entries that are in the queued, requested, or completed state.
+     * 
+     * @param sysmeta
+     *            the system metadata object to evaluate
+     * @return listedReplicaNodes the list of currently listed replica nodes
      */
     public List<NodeReference> getCurrentReplicaList(SystemMetadata sysmeta) {
         List<NodeReference> listedReplicaNodes = new ArrayList<NodeReference>();
@@ -1044,33 +946,30 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         }
         for (Replica listedReplica : replicaList) {
             NodeReference nodeId = listedReplica.getReplicaMemberNode();
-            ReplicationStatus listedStatus = 
-                listedReplica.getReplicationStatus();
+            ReplicationStatus listedStatus = listedReplica.getReplicationStatus();
 
             Node node = new Node();
             NodeType nodeType = null;
             try {
                 node = this.nodes.get(nodeId);
                 if (node != null) {
-                    log.debug("The potential target node id is: "
-                            + node.getIdentifier().getValue());
+                    log.debug("The potential target node id is: " + node.getIdentifier().getValue());
                     nodeType = node.getType();
-                    if (nodeType == NodeType.CN || 
-                        nodeId.getValue().equals(
-                          sysmeta.getAuthoritativeMemberNode().getValue())) {
-                        continue; // don't count CNs or authoritative nodes as replicas
+                    if (nodeType == NodeType.CN
+                            || nodeId.getValue().equals(
+                                    sysmeta.getAuthoritativeMemberNode().getValue())) {
+                        continue; // don't count CNs or authoritative nodes as
+                                  // replicas
 
                     }
 
                 } else {
-                    log.debug("The potential target node id is null for "
-                            + nodeId.getValue());
+                    log.debug("The potential target node id is null for " + nodeId.getValue());
                     continue;
                 }
 
             } catch (Exception e) {
-                log.debug("There was an error getting the node type: "
-                                + e.getMessage(), e);
+                log.debug("There was an error getting the node type: " + e.getMessage(), e);
             }
 
             if (listedStatus == ReplicationStatus.QUEUED
@@ -1081,9 +980,9 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         }
 
         return listedReplicaNodes;
-        
+
     }
-    
+
     public void setCnReplication(CNReplication cnReplication) {
         this.cnReplication = cnReplication;
     }
@@ -1097,11 +996,10 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
      *            use the cached values if the cache hasn't expired
      * @return requestFactors the pending request factors of the nodes
      */
-    public Map<NodeReference, Float> getPendingRequestFactors(
-            List<NodeReference> nodeIdentifiers, boolean useCache) {
+    public Map<NodeReference, Float> getPendingRequestFactors(List<NodeReference> nodeIdentifiers,
+            boolean useCache) {
 
-        return prioritizationStrategy.getPendingRequestFactors(nodeIdentifiers,
-                useCache);
+        return prioritizationStrategy.getPendingRequestFactors(nodeIdentifiers, useCache);
     }
 
     /**
@@ -1114,8 +1012,8 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
      *            use the cached values if the cache hasn't expired
      * @return failureFactors the failure factors of the nodes
      */
-    public Map<NodeReference, Float> getFailureFactors(
-            List<NodeReference> nodeIdentifiers, boolean useCache) {
+    public Map<NodeReference, Float> getFailureFactors(List<NodeReference> nodeIdentifiers,
+            boolean useCache) {
         return prioritizationStrategy.getFailureFactors(nodeIdentifiers, useCache);
     }
 
@@ -1129,8 +1027,8 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
      *            use the cached values if the cache hasn't expired
      * @return bandwidthFactors the bandwidth factor of the node
      */
-    public Map<NodeReference, Float> getBandwidthFactors(
-            List<NodeReference> nodeIdentifiers, boolean useCache) {
+    public Map<NodeReference, Float> getBandwidthFactors(List<NodeReference> nodeIdentifiers,
+            boolean useCache) {
         HashMap<NodeReference, Float> bandwidthFactors = new HashMap<NodeReference, Float>();
 
         return prioritizationStrategy.getBandwidthFactors(nodeIdentifiers, useCache);
@@ -1138,32 +1036,30 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
 
     /*
      * Report replica counts by node status by querying the system metadata
-     * replication status tables on the CNs and push the results into a
-     * deicated hazelcast map
-     * 
+     * replication status tables on the CNs and push the results into a deicated
+     * hazelcast map
      */
     private void reportCountsByNodeStatus() {
-        
-        /* A map used to transfer records from the DAO query into hazelcast*/
+
+        /* A map used to transfer records from the DAO query into hazelcast */
         Map<String, Integer> countsByNodeStatusMap = new HashMap<String, Integer>();
-        
+
         try {
-            countsByNodeStatusMap = 
-                DaoFactory.getReplicationDao().getCountsByNodeStatus();
+            countsByNodeStatusMap = DaoFactory.getReplicationDao().getCountsByNodeStatus();
             log.debug("Counts by Node-Status map size: " + countsByNodeStatusMap.size());
-            
+
         } catch (DataAccessException e) {
-            log.info("There was an error getting node-status counts: " +
-                    e.getMessage());
+            log.info("There was an error getting node-status counts: " + e.getMessage());
             if (log.isDebugEnabled()) {
                 e.printStackTrace();
-                
+
             }
-            
+
         }
-        
+
         this.nodeReplicationStatus.putAll(countsByNodeStatusMap);
     }
+
     /**
      * Prioritize a list of potential replica target nodes based on a number of
      * factors including preferred/blocked node lists, pending request, failure,
@@ -1178,8 +1074,8 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
     public List<NodeReference> prioritizeNodes(int desiredReplicasLessListed,
             List<NodeReference> potentialNodeList, SystemMetadata sysmeta) {
 
-        List<NodeReference> nodesByPriority = 
-            prioritizationStrategy.prioritizeNodes(potentialNodeList, sysmeta);
+        List<NodeReference> nodesByPriority = prioritizationStrategy.prioritizeNodes(
+                potentialNodeList, sysmeta);
 
         // if the prioritization results cause the replication policy to not
         // be fulfilled immediately (lack of currently available target nodes),
@@ -1196,12 +1092,10 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
             if (!this.replicationEvents.contains(pid)) {
                 boolean resubmitted = this.replicationEvents.offer(pid);
                 if (resubmitted) {
-                    log.debug("Successfully resubmitted identifier "
-                            + pid.getValue());
+                    log.debug("Successfully resubmitted identifier " + pid.getValue());
 
                 } else {
-                    log.error("Couldn't resubmit identifier to ReplicationEvents "
-                            + pid.getValue());
+                    log.error("Couldn't resubmit identifier to ReplicationEvents " + pid.getValue());
 
                 }
 
@@ -1214,93 +1108,154 @@ public class ReplicationManager implements ItemListener<MNReplicationTask> {
         }
         return nodesByPriority;
     }
-    
+
     /*
      * An internal audit class used to periodically handle identifiers that are
-     * erroneously in a pending state (queued or requested).  This will likely be
+     * erroneously in a pending state (queued or requested). This will likely be
      * replaced by the MNAudit class.
      * 
      * @author cjones
-     *
      */
     class PendingReplicaAuditor implements Runnable {
 
         @Override
         public void run() {
-            /* the list of pending replicas in the queued or requested state before the cutoff date */
-            List<Entry<Identifier, NodeReference>> pendingReplicasByDate = 
-                new ArrayList<Entry<Identifier, NodeReference>>();
-            
+            /*
+             * the list of pending replicas in the queued or requested state
+             * before the cutoff date
+             */
+            List<Entry<Identifier, NodeReference>> pendingReplicasByDate = new ArrayList<Entry<Identifier, NodeReference>>();
+
             /* A reference to the Coordinating Node */
             int pageSize = 0;
             int pageNumber = 0;
             int auditSecondsBeforeNow = -3600;
             try {
-                auditSecondsBeforeNow = 
-                    Settings.getConfiguration().getInt("replication.audit.pending.window");
-                
+                auditSecondsBeforeNow = Settings.getConfiguration().getInt(
+                        "replication.audit.pending.window");
+
             } catch (ConversionException ce) {
-                log.error("Couldn't convert the replication.audit.pending.window" + 
-                          " property correctly: " + ce.getMessage());
-                
-             }
+                log.error("Couldn't convert the replication.audit.pending.window"
+                        + " property correctly: " + ce.getMessage());
+
+            }
             Calendar cal = Calendar.getInstance();
-            cal.add(Calendar.SECOND, auditSecondsBeforeNow);            
+            cal.add(Calendar.SECOND, auditSecondsBeforeNow);
             Date auditDate = cal.getTime();
-            
+
             try {
-                pendingReplicasByDate = 
-                    DaoFactory.getReplicationDao().getPendingReplicasByDate(auditDate);
+                pendingReplicasByDate = DaoFactory.getReplicationDao().getPendingReplicasByDate(
+                        auditDate);
             } catch (DataAccessException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
             }
-            
+
             log.debug("pendingReplicasByDate size is " + pendingReplicasByDate.size());
-            
+
             CNode cn = null;
             SystemMetadata sysmeta = null;
             long serialVersion = 0L;
             // get a reference to the CN to manage replica states
             try {
-                 cn = D1Client.getCN();
-                 
+                cn = D1Client.getCN();
+
             } catch (BaseException e) {
-                log.error("Couldn't connect to the CN to manage replica states: " +
-                        e.getMessage());
-                
-                if ( log.isDebugEnabled()) {
+                log.error("Couldn't connect to the CN to manage replica states: " + e.getMessage());
+
+                if (log.isDebugEnabled()) {
                     e.printStackTrace();
-                    
+
                 }
             }
 
-            Iterator<Entry<Identifier, NodeReference>> iterator = 
-                pendingReplicasByDate.iterator();
+            Iterator<Entry<Identifier, NodeReference>> iterator = pendingReplicasByDate.iterator();
             while (iterator.hasNext()) {
                 Entry entry = (Entry) iterator.next();
                 Identifier identifier = (Identifier) entry.getKey();
                 NodeReference nodeId = (NodeReference) entry.getValue();
-                
+
                 // Remove the replica to induce a replication policy evaluation
                 // and clear the pending replica list of overdue replicas
-                
+
                 try {
                     sysmeta = cn.getSystemMetadata(identifier);
                     serialVersion = sysmeta.getSerialVersion().longValue();
                     cn.deleteReplicationMetadata(identifier, nodeId, serialVersion);
-                    
+
                 } catch (BaseException e) {
-                    log.error("Couldn't remove the replica entry for " +
-                            identifier.getValue() + " at " +
-                            nodeId.getValue() + ": " + e.getMessage());
-                    if ( log.isDebugEnabled() ) {
+                    log.error("Couldn't remove the replica entry for " + identifier.getValue()
+                            + " at " + nodeId.getValue() + ": " + e.getMessage());
+                    if (log.isDebugEnabled()) {
                         e.printStackTrace();
-                        
+
                     }
                 }
             }
         }
-        
+
+    }
+
+    @Override
+    public void entryAdded(EntryEvent<String, MNReplicationTask> event) {
+        String mnId = event.getKey();
+        if (mnId != null) {
+            if (this.replicationTaskMap.valueCount(mnId) > 0) {
+                log.debug("ReplicationManager entryAdded.  Processing task for node: " + mnId + ".");
+                processMNReplicationTask(mnId);
+            } else {
+                log.debug("ReplicationManager entryAdded.  No tasks available for target member node");
+                for (String nodeId : this.replicationTaskMap.keySet()) {
+                    if (this.replicationTaskMap.valueCount(nodeId) > 0) {
+                        log.debug("ReplicationManager entryAdded.  Processing task for node: "
+                                + nodeId + " instead of events original node: " + mnId + ".");
+                        processMNReplicationTask(nodeId);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    private void processMNReplicationTask(String mnId) {
+        boolean locked = this.replicationTaskMap.tryLock(mnId, 3L, TimeUnit.SECONDS);
+        if (locked) {
+            Collection<MNReplicationTask> tasks = this.replicationTaskMap.get(mnId);
+            MNReplicationTask task = tasks.iterator().next();
+            if (task != null) {
+                this.replicationTaskMap.remove(mnId, task);
+                this.replicationTaskMap.unlock(mnId);
+                log.debug("Executing task id " + task.getTaskid() + "for identifier "
+                        + task.getPid().getValue() + " and target node "
+                        + task.getTargetNode().getValue());
+                try {
+                    String result = task.call();
+                    log.debug("Result of executing task id" + task.getTaskid()
+                            + " is identifier string: " + result);
+                } catch (Exception e) {
+                    log.debug("Caught exception executing task id " + task.getTaskid() + ": "
+                            + e.getMessage());
+                    if (log.isDebugEnabled()) {
+                        log.debug(e);
+                    }
+                }
+            }
+            this.replicationTaskMap.unlock(mnId);
+        }
+    }
+
+    @Override
+    public void entryRemoved(EntryEvent<String, MNReplicationTask> event) {
+        // Not implemented.
+    }
+
+    @Override
+    public void entryUpdated(EntryEvent<String, MNReplicationTask> event) {
+        // Not implemented.
+    }
+
+    @Override
+    public void entryEvicted(EntryEvent<String, MNReplicationTask> event) {
+        // Not implemented.
     }
 }

@@ -53,8 +53,8 @@ import com.hazelcast.config.Config;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IMap;
-import com.hazelcast.core.IQueue;
 import com.hazelcast.core.Member;
+import com.hazelcast.core.MultiMap;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/org/dataone/configuration/testApplicationContext.xml" })
@@ -66,7 +66,7 @@ public class ReplicationManagerTest {
     private ReplicationManager replicationManager;
     private Config hzConfig;
     private IMap<Identifier, SystemMetadata> sysMetaMap;
-    private IQueue<MNReplicationTask> replicationTasks;
+    private MultiMap<String, MNReplicationTask> replicationTaskMap;
     private NodeLdapPopulation cnLdapPopulation;
 
     @Resource
@@ -158,7 +158,7 @@ public class ReplicationManagerTest {
         nodes = hzMember.getMap(nodeMapName);
         sysMetaMap = hzMember.getMap(systemMetadataMapName);
         sysMetaMap.putAsync(sysmeta.getIdentifier(), sysmeta);
-        replicationTasks = hzMember.getQueue(tasksQueueName);
+        replicationTaskMap = hzMember.getMultiMap(tasksQueueName);
 
         try {
             // replicationManager.createAndQueueTasks(pid);
