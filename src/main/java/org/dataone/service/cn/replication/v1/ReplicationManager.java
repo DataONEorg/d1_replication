@@ -1109,6 +1109,78 @@ public class ReplicationManager implements EntryListener<String, MNReplicationTa
         return nodesByPriority;
     }
 
+    @Override
+    public void entryAdded(EntryEvent<String, MNReplicationTask> event) {
+        String mnId = event.getKey();
+        if (mnId != null) {
+            if (this.replicationTaskMap.valueCount(mnId) > 0) {
+                log.debug("ReplicationManager entryAdded.  Processing task for node: " + mnId + ".");
+                processMNReplicationTask(mnId);
+            } else {
+                log.debug("ReplicationManager entryAdded.  No tasks available for target member node, processing any task.");
+                processAnyReplicationTask();
+            }
+        }
+    }
+
+    private void processAnyReplicationTask() {
+        boolean processedTask = false;
+        for (String nodeId : this.replicationTaskMap.keySet()) {
+            if (this.replicationTaskMap.valueCount(nodeId) > 0) {
+                log.debug("Processing any task for node: " + nodeId + ".");
+                processedTask = processMNReplicationTask(nodeId);
+                if (processedTask) {
+                    break;
+                }
+            }
+        }
+    }
+
+    private boolean processMNReplicationTask(String mnId) {
+        boolean processedTask = false;
+        boolean locked = this.replicationTaskMap.tryLock(mnId, 3L, TimeUnit.SECONDS);
+        if (locked) {
+            Collection<MNReplicationTask> tasks = this.replicationTaskMap.get(mnId);
+            MNReplicationTask task = tasks.iterator().next();
+            if (task != null) {
+                this.replicationTaskMap.remove(mnId, task);
+                this.replicationTaskMap.unlock(mnId);
+                log.debug("Executing task id " + task.getTaskid() + "for identifier "
+                        + task.getPid().getValue() + " and target node "
+                        + task.getTargetNode().getValue());
+                try {
+                    String result = task.call();
+                    processedTask = true;
+                    log.debug("Result of executing task id" + task.getTaskid()
+                            + " is identifier string: " + result);
+                } catch (Exception e) {
+                    log.debug("Caught exception executing task id " + task.getTaskid() + ": "
+                            + e.getMessage());
+                    if (log.isDebugEnabled()) {
+                        log.debug(e);
+                    }
+                }
+            }
+            this.replicationTaskMap.unlock(mnId);
+        }
+        return processedTask;
+    }
+
+    @Override
+    public void entryRemoved(EntryEvent<String, MNReplicationTask> event) {
+        // Not implemented.
+    }
+
+    @Override
+    public void entryUpdated(EntryEvent<String, MNReplicationTask> event) {
+        // Not implemented.
+    }
+
+    @Override
+    public void entryEvicted(EntryEvent<String, MNReplicationTask> event) {
+        // Not implemented.
+    }
+
     /*
      * An internal audit class used to periodically handle identifiers that are
      * erroneously in a pending state (queued or requested). This will likely be
@@ -1194,68 +1266,5 @@ public class ReplicationManager implements EntryListener<String, MNReplicationTa
             }
         }
 
-    }
-
-    @Override
-    public void entryAdded(EntryEvent<String, MNReplicationTask> event) {
-        String mnId = event.getKey();
-        if (mnId != null) {
-            if (this.replicationTaskMap.valueCount(mnId) > 0) {
-                log.debug("ReplicationManager entryAdded.  Processing task for node: " + mnId + ".");
-                processMNReplicationTask(mnId);
-            } else {
-                log.debug("ReplicationManager entryAdded.  No tasks available for target member node");
-                for (String nodeId : this.replicationTaskMap.keySet()) {
-                    if (this.replicationTaskMap.valueCount(nodeId) > 0) {
-                        log.debug("ReplicationManager entryAdded.  Processing task for node: "
-                                + nodeId + " instead of events original node: " + mnId + ".");
-                        processMNReplicationTask(nodeId);
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    private void processMNReplicationTask(String mnId) {
-        boolean locked = this.replicationTaskMap.tryLock(mnId, 3L, TimeUnit.SECONDS);
-        if (locked) {
-            Collection<MNReplicationTask> tasks = this.replicationTaskMap.get(mnId);
-            MNReplicationTask task = tasks.iterator().next();
-            if (task != null) {
-                this.replicationTaskMap.remove(mnId, task);
-                this.replicationTaskMap.unlock(mnId);
-                log.debug("Executing task id " + task.getTaskid() + "for identifier "
-                        + task.getPid().getValue() + " and target node "
-                        + task.getTargetNode().getValue());
-                try {
-                    String result = task.call();
-                    log.debug("Result of executing task id" + task.getTaskid()
-                            + " is identifier string: " + result);
-                } catch (Exception e) {
-                    log.debug("Caught exception executing task id " + task.getTaskid() + ": "
-                            + e.getMessage());
-                    if (log.isDebugEnabled()) {
-                        log.debug(e);
-                    }
-                }
-            }
-            this.replicationTaskMap.unlock(mnId);
-        }
-    }
-
-    @Override
-    public void entryRemoved(EntryEvent<String, MNReplicationTask> event) {
-        // Not implemented.
-    }
-
-    @Override
-    public void entryUpdated(EntryEvent<String, MNReplicationTask> event) {
-        // Not implemented.
-    }
-
-    @Override
-    public void entryEvicted(EntryEvent<String, MNReplicationTask> event) {
-        // Not implemented.
     }
 }
