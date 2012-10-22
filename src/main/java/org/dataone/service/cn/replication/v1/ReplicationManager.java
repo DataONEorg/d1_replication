@@ -1115,7 +1115,10 @@ public class ReplicationManager implements EntryListener<String, MNReplicationTa
         if (mnId != null) {
             if (this.replicationTaskMap.valueCount(mnId) > 0) {
                 log.debug("ReplicationManager entryAdded.  Processing task for node: " + mnId + ".");
-                processMNReplicationTask(mnId);
+                boolean processedTask = processMNReplicationTask(mnId);
+                if (!processedTask) {
+                    processAnyReplicationTask();
+                }
             } else {
                 log.debug("ReplicationManager entryAdded.  No tasks available for target member node, processing any task.");
                 processAnyReplicationTask();
