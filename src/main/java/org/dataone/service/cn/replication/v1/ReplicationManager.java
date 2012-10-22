@@ -215,7 +215,7 @@ public class ReplicationManager implements EntryListener<String, MNReplicationTa
         this.nodes = this.hzMember.getMap(this.nodeMap);
         this.systemMetadata = this.hzClient.getMap(this.systemMetadataMap);
         this.replicationEvents = this.hzMember.getQueue(eventsQueue);
-        this.replicationTaskMap = this.hzMember.getMultiMap(this.tasksQueue);
+        this.replicationTaskMap = this.hzMember.getMultiMap("hzReplicationTaskMultiMap");
         this.taskIdGenerator = this.hzMember.getIdGenerator(this.taskIds);
         this.nodeReplicationStatus = this.hzMember.getMap(this.nodeReplicationStatusMap);
 
