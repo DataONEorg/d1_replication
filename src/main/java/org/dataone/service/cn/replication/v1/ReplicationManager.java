@@ -1113,14 +1113,11 @@ public class ReplicationManager implements EntryListener<String, MNReplicationTa
     public void entryAdded(EntryEvent<String, MNReplicationTask> event) {
         String mnId = event.getKey();
         if (mnId != null) {
-            if (this.replicationTaskMap.valueCount(mnId) > 0) {
-                log.debug("ReplicationManager entryAdded.  Processing task for node: " + mnId + ".");
-                boolean processedTask = processMNReplicationTask(mnId);
-                if (!processedTask) {
-                    processAnyReplicationTask();
-                }
-            } else {
-                log.debug("ReplicationManager entryAdded.  No tasks available for target member node, processing any task.");
+            log.debug("ReplicationManager entryAdded.  Processing task for node: " + mnId + ".");
+            boolean processedTask = processMNReplicationTask(mnId);
+            if (!processedTask) {
+                log.debug("ReplicationManager entryAdded - cannot process task for node: " + mnId
+                        + ". Processing any task.");
                 processAnyReplicationTask();
             }
         }
@@ -1129,42 +1126,48 @@ public class ReplicationManager implements EntryListener<String, MNReplicationTa
     private void processAnyReplicationTask() {
         boolean processedTask = false;
         for (String nodeId : this.replicationTaskMap.keySet()) {
-            if (this.replicationTaskMap.valueCount(nodeId) > 0) {
-                log.debug("Processing any task for node: " + nodeId + ".");
-                processedTask = processMNReplicationTask(nodeId);
-                if (processedTask) {
-                    break;
-                }
+            processedTask = processMNReplicationTask(nodeId);
+            if (processedTask) {
+                break;
             }
         }
     }
 
     private boolean processMNReplicationTask(String mnId) {
         boolean processedTask = false;
-        boolean locked = this.replicationTaskMap.tryLock(mnId, 3L, TimeUnit.SECONDS);
-        if (locked) {
-            Collection<MNReplicationTask> tasks = this.replicationTaskMap.get(mnId);
-            MNReplicationTask task = tasks.iterator().next();
-            if (task != null) {
-                this.replicationTaskMap.remove(mnId, task);
-                this.replicationTaskMap.unlock(mnId);
-                log.debug("Executing task id " + task.getTaskid() + "for identifier "
-                        + task.getPid().getValue() + " and target node "
-                        + task.getTargetNode().getValue());
-                try {
-                    String result = task.call();
-                    processedTask = true;
-                    log.debug("Result of executing task id" + task.getTaskid()
-                            + " is identifier string: " + result);
-                } catch (Exception e) {
-                    log.debug("Caught exception executing task id " + task.getTaskid() + ": "
-                            + e.getMessage());
-                    if (log.isDebugEnabled()) {
-                        log.debug(e);
-                    }
+        if (this.replicationTaskMap.valueCount(mnId) > 0) {
+            boolean locked = this.replicationTaskMap.tryLock(mnId, 3L, TimeUnit.SECONDS);
+            if (locked) {
+                Collection<MNReplicationTask> tasks = this.replicationTaskMap.get(mnId);
+                MNReplicationTask task = null;
+                if (tasks != null && tasks.iterator().hasNext()) {
+                    task = tasks.iterator().next();
                 }
+                if (task != null) {
+                    this.replicationTaskMap.remove(mnId, task);
+                    this.replicationTaskMap.unlock(mnId);
+                    log.debug("Executing task id " + task.getTaskid() + "for identifier "
+                            + task.getPid().getValue() + " and target node "
+                            + task.getTargetNode().getValue());
+                    try {
+                        String result = task.call();
+                        processedTask = true;
+                        log.debug("Result of executing task id" + task.getTaskid()
+                                + " is identifier string: " + result);
+                    } catch (Exception e) {
+                        log.debug("Caught exception executing task id " + task.getTaskid() + ": "
+                                + e.getMessage());
+                        if (log.isDebugEnabled()) {
+                            log.debug(e);
+                        }
+                    }
+                } else {
+                    this.replicationTaskMap.unlock(mnId);
+                }
+            } else {
+                log.debug("ReplicationManager processMNReplicationTask - unable to aquire map lock for MN: "
+                        + mnId);
             }
-            this.replicationTaskMap.unlock(mnId);
         }
         return processedTask;
     }
