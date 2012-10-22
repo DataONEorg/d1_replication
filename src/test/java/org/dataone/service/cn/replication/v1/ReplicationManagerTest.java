@@ -158,7 +158,7 @@ public class ReplicationManagerTest {
         nodes = hzMember.getMap(nodeMapName);
         sysMetaMap = hzMember.getMap(systemMetadataMapName);
         sysMetaMap.putAsync(sysmeta.getIdentifier(), sysmeta);
-        replicationTaskMap = hzMember.getMultiMap(tasksQueueName);
+        replicationTaskMap = hzMember.getMultiMap("hzReplicationTaskMultiMap");
 
         try {
             // replicationManager.createAndQueueTasks(pid);
