@@ -216,6 +216,7 @@ public class ReplicationManager {
         this.nodeReplicationStatus = this.hzMember.getMap(this.nodeReplicationStatusMap);
 
         // monitor the replication structures
+        this.replicationTaskQueue = new ReplicationTaskQueue();
         this.replicationTaskQueue.registerListener();
 
         // TODO: use a more comprehensive MNAuditTask to fix problem replicas
