@@ -1,0 +1,117 @@
+package org.dataone.service.cn.replication.v1;
+
+import java.util.Collection;
+import java.util.concurrent.TimeUnit;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import com.hazelcast.core.EntryEvent;
+import com.hazelcast.core.EntryListener;
+import com.hazelcast.core.Hazelcast;
+import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.MultiMap;
+
+public class ReplicationTaskQueue implements EntryListener<String, MNReplicationTask> {
+
+    private static Log log = LogFactory.getLog(ReplicationTaskQueue.class);
+    private HazelcastInstance hzMember;
+    private MultiMap<String, MNReplicationTask> replicationTaskMap;
+
+    public ReplicationTaskQueue() {
+        this.hzMember = Hazelcast.getDefaultInstance();
+        this.replicationTaskMap = this.hzMember.getMultiMap("hzReplicationTaskMultiMap");
+    }
+
+    public void registerListener() {
+        this.replicationTaskMap.addEntryListener(this, true);
+        log.info("Added a listener to the " + this.replicationTaskMap.getName() + " queue.");
+    }
+
+    public void addTask(MNReplicationTask task) {
+        this.replicationTaskMap.put(task.getTargetNode().getValue(), task);
+    }
+
+    public Collection<MNReplicationTask> getAllTasks() {
+        return this.replicationTaskMap.values();
+    }
+
+    @Override
+    public void entryAdded(EntryEvent<String, MNReplicationTask> event) {
+        String mnId = event.getKey();
+        if (mnId != null) {
+            log.debug("ReplicationManager entryAdded.  Processing task for node: " + mnId + ".");
+            boolean processedTask = processMNReplicationTask(mnId);
+            if (!processedTask) {
+                log.debug("ReplicationManager entryAdded - cannot process task for node: " + mnId
+                        + ". Processing any task.");
+                processAnyReplicationTask();
+            }
+        }
+    }
+
+    private void processAnyReplicationTask() {
+        boolean processedTask = false;
+        for (String nodeId : this.replicationTaskMap.keySet()) {
+            processedTask = processMNReplicationTask(nodeId);
+            if (processedTask) {
+                break;
+            }
+        }
+    }
+
+    private boolean processMNReplicationTask(String mnId) {
+        boolean processedTask = false;
+        if (this.replicationTaskMap.valueCount(mnId) > 0) {
+            boolean locked = this.replicationTaskMap.tryLock(mnId, 3L, TimeUnit.SECONDS);
+            if (locked) {
+                Collection<MNReplicationTask> tasks = this.replicationTaskMap.get(mnId);
+                MNReplicationTask task = null;
+                if (tasks != null && tasks.iterator().hasNext()) {
+                    task = tasks.iterator().next();
+                }
+                if (task != null) {
+                    this.replicationTaskMap.remove(mnId, task);
+                    this.replicationTaskMap.unlock(mnId);
+                    log.debug("Executing task id " + task.getTaskid() + "for identifier "
+                            + task.getPid().getValue() + " and target node "
+                            + task.getTargetNode().getValue());
+                    try {
+                        String result = task.call();
+                        processedTask = true;
+                        log.debug("Result of executing task id" + task.getTaskid()
+                                + " is identifier string: " + result);
+                    } catch (Exception e) {
+                        log.debug("Caught exception executing task id " + task.getTaskid() + ": "
+                                + e.getMessage());
+                        if (log.isDebugEnabled()) {
+                            log.debug(e);
+                        }
+                    }
+                } else {
+                    this.replicationTaskMap.unlock(mnId);
+                }
+            } else {
+                log.debug("ReplicationManager processMNReplicationTask - unable to aquire map lock for MN: "
+                        + mnId);
+            }
+        }
+        return processedTask;
+    }
+
+    @Override
+    public void entryRemoved(EntryEvent<String, MNReplicationTask> event) {
+        // Not implemented.
+    }
+
+    @Override
+    public void entryUpdated(EntryEvent<String, MNReplicationTask> event) {
+        // Not implemented.
+    }
+
+    @Override
+    public void entryEvicted(EntryEvent<String, MNReplicationTask> event) {
+        // Not implemented.
+    }
+
+}
