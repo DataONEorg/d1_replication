@@ -132,9 +132,6 @@ public class ReplicationManager {
     /* The Hazelcast distributed system metadata map */
     private IMap<Identifier, SystemMetadata> systemMetadata;
 
-    /* The Hazelcast distributed replication tasks queue */
-    // private IQueue<MNReplicationTask> replicationTasks;
-    // private MultiMap<String, MNReplicationTask> replicationTaskMap;
     private ReplicationTaskQueue replicationTaskQueue;
 
     /* The Hazelcast distributed replication events queue */

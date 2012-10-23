@@ -38,14 +38,38 @@ public class ReplicationTaskQueue implements EntryListener<String, MNReplication
 
     @Override
     public void entryAdded(EntryEvent<String, MNReplicationTask> event) {
+        processAllTasksForMN(event);
+    }
+
+    private void processAllTasksForMN(EntryEvent<String, MNReplicationTask> event) {
         String mnId = event.getKey();
         if (mnId != null) {
-            log.debug("ReplicationManager entryAdded.  Processing task for node: " + mnId + ".");
-            boolean processedTask = processMNReplicationTask(mnId);
-            if (!processedTask) {
-                log.debug("ReplicationManager entryAdded - cannot process task for node: " + mnId
-                        + ". Processing any task.");
-                processAnyReplicationTask();
+            log.debug("ReplicationManager entryAdded.  Processing all tasks for node: " + mnId
+                    + ".");
+            if (this.replicationTaskMap.valueCount(mnId) > 0) {
+                boolean locked = this.replicationTaskMap.tryLock(mnId, 3L, TimeUnit.SECONDS);
+                if (locked) {
+                    Collection<MNReplicationTask> tasks = this.replicationTaskMap.remove(mnId);
+                    this.replicationTaskMap.unlock(mnId);
+                    for (MNReplicationTask task : tasks) {
+                        if (task != null) {
+                            log.debug("Executing task id " + task.getTaskid() + "for identifier "
+                                    + task.getPid().getValue() + " and target node "
+                                    + task.getTargetNode().getValue());
+                            try {
+                                String result = task.call();
+                                log.debug("Result of executing task id" + task.getTaskid()
+                                        + " is identifier string: " + result);
+                            } catch (Exception e) {
+                                log.debug("Caught exception executing task id " + task.getTaskid()
+                                        + ": " + e.getMessage());
+                                if (log.isDebugEnabled()) {
+                                    log.debug(e);
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
