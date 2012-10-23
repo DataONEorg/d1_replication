@@ -25,7 +25,6 @@ package org.dataone.service.cn.replication.v1;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -69,15 +68,12 @@ import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.SystemMetadata;
 
 import com.hazelcast.client.HazelcastClient;
-import com.hazelcast.core.EntryEvent;
-import com.hazelcast.core.EntryListener;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.ILock;
 import com.hazelcast.core.IMap;
 import com.hazelcast.core.IQueue;
 import com.hazelcast.core.IdGenerator;
-import com.hazelcast.core.MultiMap;
 
 /**
  * A DataONE Coordinating Node implementation which manages replication queues
@@ -89,7 +85,7 @@ import com.hazelcast.core.MultiMap;
  * @author cjones
  * 
  */
-public class ReplicationManager implements EntryListener<String, MNReplicationTask> {
+public class ReplicationManager {
 
     /* Get a Log instance */
     public static Log log = LogFactory.getLog(ReplicationManager.class);
@@ -138,7 +134,8 @@ public class ReplicationManager implements EntryListener<String, MNReplicationTa
 
     /* The Hazelcast distributed replication tasks queue */
     // private IQueue<MNReplicationTask> replicationTasks;
-    private MultiMap<String, MNReplicationTask> replicationTaskMap;
+    // private MultiMap<String, MNReplicationTask> replicationTaskMap;
+    private ReplicationTaskQueue replicationTaskQueue;
 
     /* The Hazelcast distributed replication events queue */
     private IQueue<Identifier> replicationEvents;
@@ -215,14 +212,11 @@ public class ReplicationManager implements EntryListener<String, MNReplicationTa
         this.nodes = this.hzMember.getMap(this.nodeMap);
         this.systemMetadata = this.hzClient.getMap(this.systemMetadataMap);
         this.replicationEvents = this.hzMember.getQueue(eventsQueue);
-        this.replicationTaskMap = this.hzMember.getMultiMap("hzReplicationTaskMultiMap");
         this.taskIdGenerator = this.hzMember.getIdGenerator(this.taskIds);
         this.nodeReplicationStatus = this.hzMember.getMap(this.nodeReplicationStatusMap);
 
         // monitor the replication structures
-        this.replicationTaskMap.addEntryListener(this, true);
-
-        log.info("Added a listener to the " + this.replicationTaskMap.getName() + " queue.");
+        this.replicationTaskQueue.registerListener();
 
         // TODO: use a more comprehensive MNAuditTask to fix problem replicas
         // For now, every hour, clear problematic replica entries that are
@@ -347,7 +341,7 @@ public class ReplicationManager implements EntryListener<String, MNReplicationTa
                 if (!isPending(pid)) {
                     log.debug("Replication is not pending for identifier " + pid.getValue());
                     // check for already queued tasks for this pid
-                    for (MNReplicationTask task : this.replicationTaskMap.values()) {
+                    for (MNReplicationTask task : this.replicationTaskQueue.getAllTasks()) {
                         // if the task's pid is equal to the event's pid
                         if (task.getPid().getValue().equals(pid.getValue())) {
                             no_task_with_pid = false;
@@ -596,8 +590,7 @@ public class ReplicationManager implements EntryListener<String, MNReplicationTa
                                     authoritativeNode.getIdentifier(), targetNode.getIdentifier());
 
                             // this.replicationTasks.add(task);
-                            this.replicationTaskMap
-                                    .put(targetNode.getIdentifier().getValue(), task);
+                            this.replicationTaskQueue.addTask(task);
 
                             taskCount++;
 
@@ -1107,84 +1100,6 @@ public class ReplicationManager implements EntryListener<String, MNReplicationTa
 
         }
         return nodesByPriority;
-    }
-
-    @Override
-    public void entryAdded(EntryEvent<String, MNReplicationTask> event) {
-        String mnId = event.getKey();
-        if (mnId != null) {
-            log.debug("ReplicationManager entryAdded.  Processing task for node: " + mnId + ".");
-            boolean processedTask = processMNReplicationTask(mnId);
-            if (!processedTask) {
-                log.debug("ReplicationManager entryAdded - cannot process task for node: " + mnId
-                        + ". Processing any task.");
-                processAnyReplicationTask();
-            }
-        }
-    }
-
-    private void processAnyReplicationTask() {
-        boolean processedTask = false;
-        for (String nodeId : this.replicationTaskMap.keySet()) {
-            processedTask = processMNReplicationTask(nodeId);
-            if (processedTask) {
-                break;
-            }
-        }
-    }
-
-    private boolean processMNReplicationTask(String mnId) {
-        boolean processedTask = false;
-        if (this.replicationTaskMap.valueCount(mnId) > 0) {
-            boolean locked = this.replicationTaskMap.tryLock(mnId, 3L, TimeUnit.SECONDS);
-            if (locked) {
-                Collection<MNReplicationTask> tasks = this.replicationTaskMap.get(mnId);
-                MNReplicationTask task = null;
-                if (tasks != null && tasks.iterator().hasNext()) {
-                    task = tasks.iterator().next();
-                }
-                if (task != null) {
-                    this.replicationTaskMap.remove(mnId, task);
-                    this.replicationTaskMap.unlock(mnId);
-                    log.debug("Executing task id " + task.getTaskid() + "for identifier "
-                            + task.getPid().getValue() + " and target node "
-                            + task.getTargetNode().getValue());
-                    try {
-                        String result = task.call();
-                        processedTask = true;
-                        log.debug("Result of executing task id" + task.getTaskid()
-                                + " is identifier string: " + result);
-                    } catch (Exception e) {
-                        log.debug("Caught exception executing task id " + task.getTaskid() + ": "
-                                + e.getMessage());
-                        if (log.isDebugEnabled()) {
-                            log.debug(e);
-                        }
-                    }
-                } else {
-                    this.replicationTaskMap.unlock(mnId);
-                }
-            } else {
-                log.debug("ReplicationManager processMNReplicationTask - unable to aquire map lock for MN: "
-                        + mnId);
-            }
-        }
-        return processedTask;
-    }
-
-    @Override
-    public void entryRemoved(EntryEvent<String, MNReplicationTask> event) {
-        // Not implemented.
-    }
-
-    @Override
-    public void entryUpdated(EntryEvent<String, MNReplicationTask> event) {
-        // Not implemented.
-    }
-
-    @Override
-    public void entryEvicted(EntryEvent<String, MNReplicationTask> event) {
-        // Not implemented.
     }
 
     /*
