@@ -41,6 +41,7 @@ import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.exceptions.VersionMismatch;
 import org.dataone.service.types.v1.Checksum;
+import org.dataone.service.types.v1.DescribeResponse;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.Replica;
@@ -390,9 +391,13 @@ public class MNReplicationTask
                     
                     // check if the object exists on the target MN already
                     try {
-                        Checksum checksum = this.targetMN.getChecksum(getPid(),
-                                sysmeta.getChecksum().getAlgorithm());
-                        exists = checksum.equals(sysmeta.getChecksum());
+                        DescribeResponse description = 
+                            this.targetMN.describe(getPid());
+                            if ( description.getDataONE_Checksum().equals(
+                                 sysmeta.getChecksum())) {
+                                exists = true;
+                                
+                            }
 
                     } catch (NotFound nfe) {
                         // set the status to REQUESTED to avoid race conditions 
