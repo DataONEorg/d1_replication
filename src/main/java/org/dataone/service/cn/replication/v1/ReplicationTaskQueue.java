@@ -69,18 +69,16 @@ public class ReplicationTaskQueue implements EntryListener<String, MNReplication
     @Override
     public void entryAdded(EntryEvent<String, MNReplicationTask> event) {
         processAllTasksForMN(event.getKey());
+        log.debug("ReplicationTaskQueue. Handling item added event.");
     }
 
     private void processAllTasksForMN(String memberNodeIdentifierValue) {
         String mnId = memberNodeIdentifierValue;
         if (mnId != null) {
-            log.debug("ReplicationManager entryAdded.  Processing all tasks for node: " + mnId
-                    + ".");
+            log.debug("ReplicationTaskQueue. Processing all tasks for node: " + mnId + ".");
             if (this.replicationTaskMap.valueCount(mnId) > 0) {
-                boolean locked = this.replicationTaskMap.tryLock(mnId, 3L, TimeUnit.SECONDS);
-                if (locked) {
-                    Collection<MNReplicationTask> tasks = this.replicationTaskMap.remove(mnId);
-                    this.replicationTaskMap.unlock(mnId);
+                Collection<MNReplicationTask> tasks = removeTasksForMemberNode(mnId);
+                if (tasks != null && tasks.isEmpty() == false) {
                     for (MNReplicationTask task : tasks) {
                         if (task != null) {
                             log.debug("Executing task id " + task.getTaskid() + "for identifier "
@@ -104,6 +102,24 @@ public class ReplicationTaskQueue implements EntryListener<String, MNReplication
         }
     }
 
+    private Collection<MNReplicationTask> removeTasksForMemberNode(String memberNodeId) {
+        Collection<MNReplicationTask> tasks = null;
+        boolean locked = false;
+        try {
+            locked = this.replicationTaskMap.tryLock(memberNodeId, 3L, TimeUnit.SECONDS);
+            if (locked) {
+                tasks = this.replicationTaskMap.remove(memberNodeId);
+            }
+        } catch (Exception e) {
+            log.debug("Caught exception trying to use mn replication task map", e);
+        } finally {
+            if (locked) {
+                this.replicationTaskMap.unlock(memberNodeId);
+            }
+        }
+        return tasks;
+    }
+
     private void processAnyReplicationTask() {
         boolean processedTask = false;
         for (String nodeId : this.replicationTaskMap.keySet()) {
@@ -114,6 +130,8 @@ public class ReplicationTaskQueue implements EntryListener<String, MNReplication
         }
     }
 
+    // TODO - if pressed back into service, update handling of lock cleanup to
+    // use finally.
     private boolean processMNReplicationTask(String mnId) {
         boolean processedTask = false;
         if (this.replicationTaskMap.valueCount(mnId) > 0) {
