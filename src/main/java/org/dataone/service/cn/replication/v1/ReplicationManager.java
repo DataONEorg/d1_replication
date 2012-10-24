@@ -17,7 +17,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  * 
- * $Id$
  */
 
 package org.dataone.service.cn.replication.v1;
@@ -214,7 +213,7 @@ public class ReplicationManager {
 
         // monitor the replication structures
         this.replicationTaskQueue = new ReplicationTaskQueue();
-        this.replicationTaskQueue.registerListener();
+        this.replicationTaskQueue.registerAsEntryListener();
 
         // TODO: use a more comprehensive MNAuditTask to fix problem replicas
         // For now, every hour, clear problematic replica entries that are
