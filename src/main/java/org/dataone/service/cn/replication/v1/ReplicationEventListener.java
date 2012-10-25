@@ -182,7 +182,7 @@ public class ReplicationEventListener implements EntryListener<Identifier, Syste
     }
 
     private boolean replicationIsActive() {
-        return Boolean.parseBoolean(Settings.getConfiguration().getString("Replication.active"));
+        return Settings.getConfiguration().getBoolean("Replication.active");
     }
 
     /**
