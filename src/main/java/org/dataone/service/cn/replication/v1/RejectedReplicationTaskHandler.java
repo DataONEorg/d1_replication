@@ -25,11 +25,9 @@ import java.util.concurrent.ThreadPoolExecutor;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.dataone.configuration.Settings;
-
-import com.hazelcast.core.Hazelcast;
-import com.hazelcast.core.HazelcastInstance;
-import com.hazelcast.core.IQueue;
+import org.dataone.client.CNode;
+import org.dataone.client.D1Client;
+import org.dataone.service.exceptions.BaseException;
 
 /**
  * A class used to handle rejected replication tasks that were submitted to the 
@@ -44,26 +42,14 @@ public class RejectedReplicationTaskHandler implements RejectedExecutionHandler 
     /* Get a Log instance */
     public static Log log = LogFactory.getLog(RejectedReplicationTaskHandler.class);
 
-    /* the instance of the Hazelcast processing cluster member */
-    private HazelcastInstance hzMember;
-
-    /* The name of the replication tasks queue */
-    private String tasksQueue;
-
-    /* The Hazelcast distributed replication tasks queue*/
-    private IQueue<MNReplicationTask> replicationTasks;
-
+    /* a reference to the coordinating node */
+    private CNode cn;
+    
     /**
      * Constructor to create a rejected replication task handler instance
      */
     public RejectedReplicationTaskHandler() {
         
-        // get the default cluster instance and a replication task queue reference
-        this.tasksQueue = 
-            Settings.getConfiguration().getString("dataone.hazelcast.replicationQueuedTasks");
-        this.hzMember = Hazelcast.getDefaultInstance();
-        this.replicationTasks = this.hzMember.getQueue(tasksQueue);
-
     }
     
     /**
@@ -71,7 +57,10 @@ public class RejectedReplicationTaskHandler implements RejectedExecutionHandler 
      * Hazelcast replication task queue to be completed later or by another 
      * coordinating node that may pick it up from the queue.
      */
-    public void rejectedExecution(Runnable replicationTask, ThreadPoolExecutor executor) {
+    public void rejectedExecution(Runnable replicationTask, 
+            ThreadPoolExecutor executor) {
+
+        boolean deleted = false;
 
         MNReplicationTask task = (MNReplicationTask) replicationTask;
         
@@ -80,19 +69,23 @@ public class RejectedReplicationTaskHandler implements RejectedExecutionHandler 
         log.warn(msg);
         
         try {
-            // add it back to the queue for re-execution by one of the
-            // coordinating nodes
-            this.replicationTasks.add(task);
-            log.info("Added task id" + task.getTaskid() + " for identifier " + 
-                task.getPid().getValue() + " back to the replication task queue.");
-
-        } catch (RuntimeException e) {
-            String message = "Failed to add task id " + task.getTaskid() +
-                " back to the replication task queue for identifier " +
-                task.getPid().getValue() + ". The error message was " +
-                e.getCause().getMessage();
-            log.error(message);
+            this.cn = D1Client.getCN();
+            long serialVersion = this.cn.getSystemMetadata(
+                    task.getPid()).getSerialVersion().longValue();
+            deleted = this.cn.deleteReplicationMetadata(
+                    task.getPid(), task.getTargetNode(), serialVersion);
+            log.info("Deleted replica entry for" + 
+                task.getTargetNode().getValue() + " and identifier " + 
+                task.getPid().getValue() + " from the replica list.");
             
+        } catch (BaseException e) {
+            log.error("Unable to delete the replica entry for identifier " +
+                task.getPid().getValue() +
+                ": " + e.getMessage());
+            if ( log.isDebugEnabled() ) {
+                e.printStackTrace();
+                
+            }
         }
         
     }
