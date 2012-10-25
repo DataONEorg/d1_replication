@@ -23,17 +23,13 @@ package org.dataone.service.cn.replication.v1;
 import java.util.Collection;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.dataone.configuration.Settings;
 
 import com.hazelcast.core.EntryEvent;
 import com.hazelcast.core.EntryListener;
@@ -51,47 +47,53 @@ import com.hazelcast.core.MultiMap;
 public class ReplicationTaskQueue implements EntryListener<String, MNReplicationTask> {
 
     private static Log log = LogFactory.getLog(ReplicationTaskQueue.class);
-    private MultiMap<String, MNReplicationTask> replicationTaskMap;
-    private boolean listening = false;
+    private static MultiMap<String, MNReplicationTask> replicationTaskMap;
 
     /* The Replication task thread queue */
     private static BlockingQueue<Runnable> taskThreadQueue;
-    
+
     /* The handler instance for rejected tasks */
     private static RejectedExecutionHandler handler;
-    
+
     /* The thread pool executor instance for executing tasks */
     private static ThreadPoolExecutor executor;
-        
-    /* Minimum threads in the pool */
-    private static int corePoolSize = 5;
-    
-    /* Maximum threads in the pool */
-    private static int maximumPoolSize = 8;
-    
-    /* The timeout period for tasks submitted to the executor service */
-    private static long keepAliveTime = 60L;
-    
+    private static int executorThreadPoolMinSize = 5;
+    private static int executorThreadPoolMaxSize = 8;
+    private static long executorSubmissionTimeoutPeriod = 60L;
+
+    /*
+     * has this instance of replication task queue been registered as a entry
+     * listener
+     */
+    private boolean listening = false;
+
+    static {
+        taskThreadQueue = new ArrayBlockingQueue<Runnable>(5);
+        handler = new RejectedReplicationTaskHandler();
+        executor = new ThreadPoolExecutor(executorThreadPoolMinSize, executorThreadPoolMaxSize,
+                executorSubmissionTimeoutPeriod, TimeUnit.SECONDS, taskThreadQueue, handler);
+        executor.allowCoreThreadTimeOut(true);
+        replicationTaskMap = Hazelcast.getDefaultInstance()
+                .getMultiMap("hzReplicationTaskMultiMap");
+    }
 
     public ReplicationTaskQueue() {
-        this.replicationTaskMap = Hazelcast.getDefaultInstance().getMultiMap(
-                "hzReplicationTaskMultiMap");
     }
 
     public void registerAsEntryListener() {
         if (!this.listening) {
-            this.replicationTaskMap.addEntryListener(this, true);
+            replicationTaskMap.addEntryListener(this, true);
             this.listening = true;
-            log.info("Added a listener to the " + this.replicationTaskMap.getName() + " queue.");
+            log.info("Added a listener to the " + replicationTaskMap.getName() + " queue.");
         }
     }
 
     public void addTask(MNReplicationTask task) {
-        this.replicationTaskMap.put(task.getTargetNode().getValue(), task);
+        replicationTaskMap.put(task.getTargetNode().getValue(), task);
     }
 
     public Collection<MNReplicationTask> getAllTasks() {
-        return this.replicationTaskMap.values();
+        return replicationTaskMap.values();
     }
 
     @Override
@@ -104,7 +106,7 @@ public class ReplicationTaskQueue implements EntryListener<String, MNReplication
         String mnId = memberNodeIdentifierValue;
         if (mnId != null) {
             log.debug("ReplicationTaskQueue. Processing all tasks for node: " + mnId + ".");
-            if (this.replicationTaskMap.valueCount(mnId) > 0) {
+            if (replicationTaskMap.valueCount(mnId) > 0) {
                 Collection<MNReplicationTask> tasks = removeTasksForMemberNode(mnId);
                 if (tasks != null && tasks.isEmpty() == false) {
                     for (MNReplicationTask task : tasks) {
@@ -113,9 +115,7 @@ public class ReplicationTaskQueue implements EntryListener<String, MNReplication
                                     + task.getPid().getValue() + " and target node "
                                     + task.getTargetNode().getValue());
                             try {
-                                String result = task.call();
-                                log.debug("Result of executing task id" + task.getTaskid()
-                                        + " is identifier string: " + result);
+                                this.executeTask(task);
                             } catch (Exception e) {
                                 log.debug("Caught exception executing task id " + task.getTaskid()
                                         + ": " + e.getMessage());
@@ -134,79 +134,31 @@ public class ReplicationTaskQueue implements EntryListener<String, MNReplication
         Collection<MNReplicationTask> tasks = null;
         boolean locked = false;
         try {
-            locked = this.replicationTaskMap.tryLock(memberNodeId, 3L, TimeUnit.SECONDS);
+            locked = replicationTaskMap.tryLock(memberNodeId, 3L, TimeUnit.SECONDS);
             if (locked) {
-                tasks = this.replicationTaskMap.remove(memberNodeId);
+                tasks = replicationTaskMap.remove(memberNodeId);
             }
         } catch (Exception e) {
             log.debug("Caught exception trying to use mn replication task map", e);
         } finally {
             if (locked) {
-                this.replicationTaskMap.unlock(memberNodeId);
+                replicationTaskMap.unlock(memberNodeId);
             }
         }
         return tasks;
     }
 
-    private void processAnyReplicationTask() {
-        boolean processedTask = false;
-        for (String nodeId : this.replicationTaskMap.keySet()) {
-            processedTask = submitMNReplicationTask(nodeId);
-            if (processedTask) {
-                break;
-            }
-        }
-    }
-
-    // TODO - if pressed back into service, update handling of lock cleanup to
-    // use finally.
-    private boolean submitMNReplicationTask(String mnId) {
-        boolean submittedTask = false;
-        boolean isDone = false;
-        if (this.replicationTaskMap.valueCount(mnId) > 0) {
-            boolean locked = this.replicationTaskMap.tryLock(mnId, 3L, TimeUnit.SECONDS);
-            if (locked) {
-                Collection<MNReplicationTask> tasks = this.replicationTaskMap.get(mnId);
-                MNReplicationTask task = null;
-                if (tasks != null && tasks.iterator().hasNext()) {
-                    task = tasks.iterator().next();
-                }
-                if (task != null) {
-                    this.replicationTaskMap.remove(mnId, task);
-                    this.replicationTaskMap.unlock(mnId);
-                    log.debug("Executing task id " + task.getTaskid() + "for identifier "
-                            + task.getPid().getValue() + " and target node "
-                            + task.getTargetNode().getValue());
-                    try {
-                        ThreadPoolExecutor executor = 
-                            ReplicationTaskQueue.getExecutorService();
-                        Future<String> future = executor.submit(task);
-                        
-                        // TODO: Could monitor future.isDone() here
-                        
-                        submittedTask = true;
-                        log.debug("Submitted task id" + task.getTaskid()
-                                + " for identifier string: " + 
-                                task.getPid().getValue());
-                        
-                    } catch (Exception e) {
-                        log.debug("Caught exception executing task id " + 
-                                task.getTaskid() + ": " + e.getMessage());
-                        if (log.isDebugEnabled()) {
-                            log.debug(e);
-                        }
-
-                    }
-                } else {
-                    this.replicationTaskMap.unlock(mnId);
-                    
-                }
-            } else {
-                log.debug("ReplicationManager processMNReplicationTask - unable to aquire map lock for MN: "
-                        + mnId);
-            }
-        }
-        return submittedTask;
+    /**
+     * Encapsulates implementation details on how a replication task is
+     * executed.
+     * 
+     * @param task
+     */
+    private void executeTask(MNReplicationTask task) {
+        Future<String> future = executor.submit(task);
+        // TODO: Could monitor future.isDone() here
+        log.debug("Submitted task id" + task.getTaskid() + " for identifier string: "
+                + task.getPid().getValue());
     }
 
     @Override
@@ -222,21 +174,5 @@ public class ReplicationTaskQueue implements EntryListener<String, MNReplication
     @Override
     public void entryEvicted(EntryEvent<String, MNReplicationTask> event) {
         // Not implemented.
-    }
-
-    /*
-     *  Return the thread pool executor used to submit replication tasks
-     *  to be executed
-     *  
-     * @return executor  the thread pool executor
-     */
-    private static ThreadPoolExecutor getExecutorService() {
-        taskThreadQueue = new ArrayBlockingQueue<Runnable>(5);
-        handler = new RejectedReplicationTaskHandler();
-        executor = new ThreadPoolExecutor(corePoolSize, maximumPoolSize, 
-                keepAliveTime, TimeUnit.SECONDS, taskThreadQueue, handler);
-        executor.allowCoreThreadTimeOut(true);
-        
-        return executor;
     }
 }
