@@ -413,101 +413,136 @@ public class ReplicationManager {
                 // TODO: This may be removed in favor of scheduled reporting.
                 reportCountsByNodeStatus();
 
-                // parse the sysmeta.ReplicationPolicy
-                ReplicationPolicy replicationPolicy = sysmeta.getReplicationPolicy();
+                if (!potentialNodeList.isEmpty()) {
 
-                // set the desired replicas if present
-                if (replicationPolicy.getNumberReplicas() != null) {
-                    desiredReplicas = replicationPolicy.getNumberReplicas().intValue();
+                    // parse the sysmeta.ReplicationPolicy
+                    ReplicationPolicy replicationPolicy = sysmeta.getReplicationPolicy();
 
-                }
-                log.info("Desired replicas for identifier " + pid.getValue() + " is "
-                        + desiredReplicas);
-                log.info("Potential target node list size for " + pid.getValue() + " is "
-                        + potentialNodeList.size());
-                // can't have more replicas than MNs
-                if (desiredReplicas > potentialNodeList.size()) {
-                    desiredReplicas = potentialNodeList.size(); // yikes
-                    log.info("Changed the desired replicas for identifier " + pid.getValue()
-                            + " to the size of the potential target node list: "
+                    // set the desired replicas if present
+                    if (replicationPolicy.getNumberReplicas() != null) {
+                        desiredReplicas = replicationPolicy.getNumberReplicas().intValue();
+
+                    }
+                    log.info("Desired replicas for identifier " + pid.getValue() + " is "
+                            + desiredReplicas);
+                    log.info("Potential target node list size for " + pid.getValue() + " is "
                             + potentialNodeList.size());
+                    // can't have more replicas than MNs
+                    if (desiredReplicas > potentialNodeList.size()) {
+                        desiredReplicas = potentialNodeList.size(); // yikes
+                        log.info("Changed the desired replicas for identifier " + pid.getValue()
+                                + " to the size of the potential target node list: "
+                                + potentialNodeList.size());
 
-                }
+                    }
 
-                // reset desiredReplicasLessListed to avoid task creation
-                // in the ' 0 > any negative nuber' scenario
-                if (desiredReplicasLessListed < 0) {
-                    desiredReplicasLessListed = 0;
-                }
+                    // reset desiredReplicasLessListed to avoid task creation
+                    // in the ' 0 > any negative nuber' scenario
+                    if (desiredReplicasLessListed < 0) {
+                        desiredReplicasLessListed = 0;
+                    }
 
-                // for each node in the potential node list up to the desired
-                // replicas
-                // (less the pending/completed replicas)
-                for (int j = 0; j < desiredReplicasLessListed; j++) {
+                    // for each node in the potential node list up to the
+                    // desired replicas
+                    // (less the pending/completed replicas)
+                    for (int j = 0; j < desiredReplicasLessListed; j++) {
 
-                    log.debug("Evaluating item " + j + " of " + desiredReplicasLessListed
-                            + " in the potential node list.");
-                    NodeReference potentialNode = potentialNodeList.get(j);
+                        log.debug("Evaluating item " + j + " of " + desiredReplicasLessListed
+                                + " in the potential node list.");
+                        NodeReference potentialNode = potentialNodeList.get(j);
 
-                    targetNode = this.nodes.get(potentialNode);
-                    log.debug("currently evaluating " + targetNode.getIdentifier().getValue()
-                            + " for task creation " + "for identifier " + pid.getValue());
+                        targetNode = this.nodes.get(potentialNode);
+                        log.debug("currently evaluating " + targetNode.getIdentifier().getValue()
+                                + " for task creation " + "for identifier " + pid.getValue());
 
-                    // may be more than one version of MNReplication
-                    List<String> implementedVersions = new ArrayList<String>();
-                    List<Service> origServices = authoritativeNode.getServices().getServiceList();
-                    for (Service service : origServices) {
-                        if (service.getName().equals("MNReplication") && service.getAvailable()) {
-                            implementedVersions.add(service.getVersion());
+                        // may be more than one version of MNReplication
+                        List<String> implementedVersions = new ArrayList<String>();
+                        List<Service> origServices = authoritativeNode.getServices()
+                                .getServiceList();
+                        for (Service service : origServices) {
+                            if (service.getName().equals("MNReplication") && service.getAvailable()) {
+                                implementedVersions.add(service.getVersion());
+                            }
                         }
-                    }
-                    if (implementedVersions.isEmpty()) {
-                        continue; // this node is not replicable
-                    }
-
-                    boolean replicable = false;
-
-                    for (Service service : targetNode.getServices().getServiceList()) {
-                        if (service.getName().equals("MNReplication")
-                                && implementedVersions.contains(service.getVersion())
-                                && service.getAvailable()) {
-                            replicable = true;
+                        if (implementedVersions.isEmpty()) {
+                            continue; // this node is not replicable
                         }
-                    }
-                    log.debug("Based on evaluating the target node services, node id "
-                            + targetNode.getIdentifier().getValue() + " is replicable: "
-                            + replicable + " (during evaluation for " + pid.getValue() + ")");
 
-                    // a replica doesn't exist. add it
-                    boolean updated = false;
-                    if (replicable) {
-                        Replica replicaMetadata = new Replica();
-                        replicaMetadata.setReplicaMemberNode(targetNode.getIdentifier());
-                        replicaMetadata.setReplicationStatus(ReplicationStatus.QUEUED);
-                        replicaMetadata.setReplicaVerified(Calendar.getInstance().getTime());
+                        boolean replicable = false;
 
-                        try {
-                            sysmeta = this.systemMetadata.get(pid); // refresh
-                                                                    // sysmeta
-                                                                    // to avoid
-                                                                    // VersionMismatch
-                            updated = this.cnReplication.updateReplicationMetadata(pid,
-                                    replicaMetadata, sysmeta.getSerialVersion().longValue());
+                        for (Service service : targetNode.getServices().getServiceList()) {
+                            if (service.getName().equals("MNReplication")
+                                    && implementedVersions.contains(service.getVersion())
+                                    && service.getAvailable()) {
+                                replicable = true;
+                            }
+                        }
+                        log.debug("Based on evaluating the target node services, node id "
+                                + targetNode.getIdentifier().getValue() + " is replicable: "
+                                + replicable + " (during evaluation for " + pid.getValue() + ")");
 
-                        } catch (VersionMismatch e) {
+                        // a replica doesn't exist. add it
+                        boolean updated = false;
+                        if (replicable) {
+                            Replica replicaMetadata = new Replica();
+                            replicaMetadata.setReplicaMemberNode(targetNode.getIdentifier());
+                            replicaMetadata.setReplicationStatus(ReplicationStatus.QUEUED);
+                            replicaMetadata.setReplicaVerified(Calendar.getInstance().getTime());
 
-                            // retry if the serialVersion is wrong
                             try {
-                                sysmeta = this.systemMetadata.get(pid);
+                                sysmeta = this.systemMetadata.get(pid); // refresh
+                                                                        // sysmeta
+                                                                        // to
+                                                                        // avoid
+                                                                        // VersionMismatch
                                 updated = this.cnReplication.updateReplicationMetadata(pid,
                                         replicaMetadata, sysmeta.getSerialVersion().longValue());
 
-                            } catch (VersionMismatch e1) {
-                                String msg = "Couldn't get the correct serialVersion to update "
-                                        + "the replica metadata for identifier " + pid.getValue()
-                                        + " and target node "
-                                        + targetNode.getIdentifier().getValue();
-                                log.error(msg);
+                            } catch (VersionMismatch e) {
+
+                                // retry if the serialVersion is wrong
+                                try {
+                                    sysmeta = this.systemMetadata.get(pid);
+                                    updated = this.cnReplication
+                                            .updateReplicationMetadata(pid, replicaMetadata,
+                                                    sysmeta.getSerialVersion().longValue());
+
+                                } catch (VersionMismatch e1) {
+                                    String msg = "Couldn't get the correct serialVersion to update "
+                                            + "the replica metadata for identifier "
+                                            + pid.getValue()
+                                            + " and target node "
+                                            + targetNode.getIdentifier().getValue();
+                                    log.error(msg);
+
+                                } catch (BaseException be) {
+                                    // the replica has already completed from a
+                                    // different task
+                                    if (be instanceof InvalidRequest) {
+                                        log.warn(
+                                                "Couldn't update replication metadata to "
+                                                        + replicaMetadata.getReplicationStatus()
+                                                                .toString()
+                                                        + ", it may have possibly already been updated for identifier "
+                                                        + pid.getValue()
+                                                        + " and target node "
+                                                        + replicaMetadata.getReplicaMemberNode()
+                                                                .getValue() + ". The error was: "
+                                                        + be.getMessage(), be);
+                                    } else {
+                                        if (log.isDebugEnabled()) {
+                                            log.debug(be);
+                                        }
+                                        // something is very wrong with CN self
+                                        // communication
+                                        // try the round robin address multiple
+                                        // times
+                                        updated = updateReplicationMetadata(session, pid,
+                                                replicaMetadata);
+
+                                    }
+
+                                }
 
                             } catch (BaseException be) {
                                 // the replica has already completed from a
@@ -526,6 +561,7 @@ public class ReplicationManager {
                                 } else {
                                     if (log.isDebugEnabled()) {
                                         log.debug(be);
+
                                     }
                                     // something is very wrong with CN self
                                     // communication
@@ -536,70 +572,47 @@ public class ReplicationManager {
 
                                 }
 
+                            } catch (RuntimeException re) {
+                                log.error(
+                                        "Couldn't get system metadata for identifier "
+                                                + pid.getValue()
+                                                + " while trying to update replica "
+                                                + "metadata entry for node "
+                                                + replicaMetadata.getReplicaMemberNode().getValue(),
+                                        re);
+
                             }
 
-                        } catch (BaseException be) {
-                            // the replica has already completed from a
-                            // different task
-                            if (be instanceof InvalidRequest) {
-                                log.warn(
-                                        "Couldn't update replication metadata to "
-                                                + replicaMetadata.getReplicationStatus().toString()
-                                                + ", it may have possibly already been updated for identifier "
-                                                + pid.getValue() + " and target node "
-                                                + replicaMetadata.getReplicaMemberNode().getValue()
-                                                + ". The error was: " + be.getMessage(), be);
+                            // create the task if the update succeeded
+                            if (updated) {
+                                log.info("Updated system metadata for identifier " + pid.getValue()
+                                        + " with QUEUED replication status.");
+                                log.trace("METRICS:\tREPLICATION:\tQUEUE:\tPID:\t" + pid.getValue()
+                                        + "\tNODE:\t" + targetNode.getIdentifier().getValue()
+                                        + "\tSIZE:\t" + sysmeta.getSize().intValue());
+                                Long taskid = taskIdGenerator.newId();
+                                // add the task to the task list
+                                log.info("Adding a new MNReplicationTask to the queue where "
+                                        + "pid = " + pid.getValue() + ", originatingNode = "
+                                        + authoritativeNode.getIdentifier().getValue()
+                                        + ", targetNode = " + targetNode.getIdentifier().getValue());
+                                MNReplicationTask task = new MNReplicationTask(taskid.toString(),
+                                        pid, authoritativeNode.getIdentifier(),
+                                        targetNode.getIdentifier());
+
+                                this.replicationTaskQueue.addTask(task);
+                                taskCount++;
+
                             } else {
-                                if (log.isDebugEnabled()) {
-                                    log.debug(be);
-
-                                }
-                                // something is very wrong with CN self
-                                // communication
-                                // try the round robin address multiple times
-                                updated = updateReplicationMetadata(session, pid, replicaMetadata);
+                                log.error("CN.updateReplicationMetadata() failed for "
+                                        + "identifier " + pid.getValue() + ", node "
+                                        + targetNode.getIdentifier().getValue()
+                                        + ". Task not created.");
 
                             }
-
-                        } catch (RuntimeException re) {
-                            log.error(
-                                    "Couldn't get system metadata for identifier " + pid.getValue()
-                                            + " while trying to update replica "
-                                            + "metadata entry for node "
-                                            + replicaMetadata.getReplicaMemberNode().getValue(), re);
-
                         }
-
-                        // create the task if the update succeeded
-                        if (updated) {
-                            log.info("Updated system metadata for identifier " + pid.getValue()
-                                    + " with QUEUED replication status.");
-                            log.trace("METRICS:\tREPLICATION:\tQUEUE:\tPID:\t" + pid.getValue()
-                                    + "\tNODE:\t" + targetNode.getIdentifier().getValue()
-                                    + "\tSIZE:\t" + sysmeta.getSize().intValue());
-                            Long taskid = taskIdGenerator.newId();
-                            // add the task to the task list
-                            log.info("Adding a new MNReplicationTask to the queue where "
-                                    + "pid = " + pid.getValue() + ", originatingNode = "
-                                    + authoritativeNode.getIdentifier().getValue()
-                                    + ", targetNode = " + targetNode.getIdentifier().getValue());
-                            MNReplicationTask task = new MNReplicationTask(taskid.toString(), pid,
-                                    authoritativeNode.getIdentifier(), targetNode.getIdentifier());
-
-                            // this.replicationTasks.add(task);
-                            this.replicationTaskQueue.addTask(task);
-
-                            taskCount++;
-
-                        } else {
-                            log.error("CN.updateReplicationMetadata() failed for " + "identifier "
-                                    + pid.getValue() + ", node "
-                                    + targetNode.getIdentifier().getValue() + ". Task not created.");
-
-                        }
-                    }
-                } // end for()
-
+                    } // end for()
+                } // end if potentialNodeList is NOT empty
             } else {
                 log.info("Couldn't get a lock while evaluating identifier " + pid.getValue()
                         + ". Assuming another CN handled it.");
