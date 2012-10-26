@@ -1027,79 +1027,84 @@ public class ReplicationManager {
 
         @Override
         public void run() {
-            /*
-             * the list of pending replicas in the queued or requested state
-             * before the cutoff date
-             */
-            List<Entry<Identifier, NodeReference>> pendingReplicasByDate = new ArrayList<Entry<Identifier, NodeReference>>();
 
-            /* A reference to the Coordinating Node */
-            int pageSize = 0;
-            int pageNumber = 0;
-            int auditSecondsBeforeNow = -3600;
-            try {
-                auditSecondsBeforeNow = Settings.getConfiguration().getInt(
-                        "replication.audit.pending.window");
+            if (ReplicationUtil.replicationIsActive()) {
+                /*
+                 * the list of pending replicas in the queued or requested state
+                 * before the cutoff date
+                 */
+                List<Entry<Identifier, NodeReference>> pendingReplicasByDate = new ArrayList<Entry<Identifier, NodeReference>>();
 
-            } catch (ConversionException ce) {
-                log.error("Couldn't convert the replication.audit.pending.window"
-                        + " property correctly: " + ce.getMessage());
+                /* A reference to the Coordinating Node */
+                int pageSize = 0;
+                int pageNumber = 0;
+                int auditSecondsBeforeNow = -3600;
+                try {
+                    auditSecondsBeforeNow = Settings.getConfiguration().getInt(
+                            "replication.audit.pending.window");
 
-            }
-            Calendar cal = Calendar.getInstance();
-            cal.add(Calendar.SECOND, auditSecondsBeforeNow);
-            Date auditDate = cal.getTime();
-
-            try {
-                pendingReplicasByDate = DaoFactory.getReplicationDao().getPendingReplicasByDate(
-                        auditDate);
-            } catch (DataAccessException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
-
-            log.debug("pendingReplicasByDate size is " + pendingReplicasByDate.size());
-
-            CNode cn = null;
-            SystemMetadata sysmeta = null;
-            long serialVersion = 0L;
-            // get a reference to the CN to manage replica states
-            try {
-                cn = D1Client.getCN();
-
-            } catch (BaseException e) {
-                log.error("Couldn't connect to the CN to manage replica states: " + e.getMessage());
-
-                if (log.isDebugEnabled()) {
-                    e.printStackTrace();
+                } catch (ConversionException ce) {
+                    log.error("Couldn't convert the replication.audit.pending.window"
+                            + " property correctly: " + ce.getMessage());
 
                 }
-            }
-
-            Iterator<Entry<Identifier, NodeReference>> iterator = pendingReplicasByDate.iterator();
-            while (iterator.hasNext()) {
-                Entry entry = (Entry) iterator.next();
-                Identifier identifier = (Identifier) entry.getKey();
-                NodeReference nodeId = (NodeReference) entry.getValue();
-
-                // Remove the replica to induce a replication policy evaluation
-                // and clear the pending replica list of overdue replicas
+                Calendar cal = Calendar.getInstance();
+                cal.add(Calendar.SECOND, auditSecondsBeforeNow);
+                Date auditDate = cal.getTime();
 
                 try {
-                    sysmeta = cn.getSystemMetadata(identifier);
-                    serialVersion = sysmeta.getSerialVersion().longValue();
-                    cn.deleteReplicationMetadata(identifier, nodeId, serialVersion);
+                    pendingReplicasByDate = DaoFactory.getReplicationDao()
+                            .getPendingReplicasByDate(auditDate);
+                } catch (DataAccessException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+
+                log.debug("pendingReplicasByDate size is " + pendingReplicasByDate.size());
+
+                CNode cn = null;
+                SystemMetadata sysmeta = null;
+                long serialVersion = 0L;
+                // get a reference to the CN to manage replica states
+                try {
+                    cn = D1Client.getCN();
 
                 } catch (BaseException e) {
-                    log.error("Couldn't remove the replica entry for " + identifier.getValue()
-                            + " at " + nodeId.getValue() + ": " + e.getMessage());
+                    log.error("Couldn't connect to the CN to manage replica states: "
+                            + e.getMessage());
+
                     if (log.isDebugEnabled()) {
                         e.printStackTrace();
 
                     }
                 }
+
+                Iterator<Entry<Identifier, NodeReference>> iterator = pendingReplicasByDate
+                        .iterator();
+                while (iterator.hasNext()) {
+                    Entry entry = (Entry) iterator.next();
+                    Identifier identifier = (Identifier) entry.getKey();
+                    NodeReference nodeId = (NodeReference) entry.getValue();
+
+                    // Remove the replica to induce a replication policy
+                    // evaluation
+                    // and clear the pending replica list of overdue replicas
+
+                    try {
+                        sysmeta = cn.getSystemMetadata(identifier);
+                        serialVersion = sysmeta.getSerialVersion().longValue();
+                        cn.deleteReplicationMetadata(identifier, nodeId, serialVersion);
+
+                    } catch (BaseException e) {
+                        log.error("Couldn't remove the replica entry for " + identifier.getValue()
+                                + " at " + nodeId.getValue() + ": " + e.getMessage());
+                        if (log.isDebugEnabled()) {
+                            e.printStackTrace();
+
+                        }
+                    }
+                }
             }
         }
-
     }
 }
