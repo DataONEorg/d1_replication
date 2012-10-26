@@ -21,11 +21,6 @@
 package org.dataone.service.cn.replication.v1;
 
 import java.util.Collection;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Future;
-import java.util.concurrent.RejectedExecutionHandler;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
@@ -49,18 +44,6 @@ public class ReplicationTaskQueue implements EntryListener<String, MNReplication
     private static Log log = LogFactory.getLog(ReplicationTaskQueue.class);
     private static MultiMap<String, MNReplicationTask> replicationTaskMap;
 
-    /* The Replication task thread queue */
-    private static BlockingQueue<Runnable> taskThreadQueue;
-
-    /* The handler instance for rejected tasks */
-    private static RejectedExecutionHandler handler;
-
-    /* The thread pool executor instance for executing tasks */
-    private static ThreadPoolExecutor executor;
-    private static int executorThreadPoolMinSize = 5;
-    private static int executorThreadPoolMaxSize = 8;
-    private static long executorSubmissionTimeoutPeriod = 60L;
-
     /*
      * has this instance of replication task queue been registered as a entry
      * listener
@@ -68,11 +51,6 @@ public class ReplicationTaskQueue implements EntryListener<String, MNReplication
     private boolean listening = false;
 
     static {
-        taskThreadQueue = new ArrayBlockingQueue<Runnable>(5);
-        handler = new RejectedReplicationTaskHandler();
-        executor = new ThreadPoolExecutor(executorThreadPoolMinSize, executorThreadPoolMaxSize,
-                executorSubmissionTimeoutPeriod, TimeUnit.SECONDS, taskThreadQueue, handler);
-        executor.allowCoreThreadTimeOut(true);
         replicationTaskMap = Hazelcast.getDefaultInstance()
                 .getMultiMap("hzReplicationTaskMultiMap");
     }
@@ -98,8 +76,10 @@ public class ReplicationTaskQueue implements EntryListener<String, MNReplication
 
     @Override
     public void entryAdded(EntryEvent<String, MNReplicationTask> event) {
-        processAllTasksForMN(event.getKey());
-        log.debug("ReplicationTaskQueue. Handling item added event.");
+        if (ReplicationUtil.replicationIsActive()) {
+            processAllTasksForMN(event.getKey());
+            log.debug("ReplicationTaskQueue. Handling item added event.");
+        }
     }
 
     private void processAllTasksForMN(String memberNodeIdentifierValue) {
@@ -111,9 +91,6 @@ public class ReplicationTaskQueue implements EntryListener<String, MNReplication
                 if (tasks != null && tasks.isEmpty() == false) {
                     for (MNReplicationTask task : tasks) {
                         if (task != null) {
-                            log.debug("Executing task id " + task.getTaskid() + "for identifier "
-                                    + task.getPid().getValue() + " and target node "
-                                    + task.getTargetNode().getValue());
                             try {
                                 this.executeTask(task);
                             } catch (Exception e) {
@@ -155,10 +132,9 @@ public class ReplicationTaskQueue implements EntryListener<String, MNReplication
      * @param task
      */
     private void executeTask(MNReplicationTask task) {
-        Future<String> future = executor.submit(task);
-        // TODO: Could monitor future.isDone() here
-        log.debug("Submitted task id" + task.getTaskid() + " for identifier string: "
-                + task.getPid().getValue());
+        log.debug("Executing task id " + task.getTaskid() + "for identifier "
+                + task.getPid().getValue() + " and target node " + task.getTargetNode().getValue());
+        task.call();
     }
 
     @Override

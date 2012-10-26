@@ -122,54 +122,58 @@ public class ReplicationEventListener implements EntryListener<Identifier, Syste
      * replicationManager to evaluate the replication policy for the identifier
      */
     public void itemAdded(Identifier identifier) {
-        log.info("Item added event received on the [end of] hzReplicationEvents queue for "
-                + identifier.getValue());
-        Identifier pid = null;
-        boolean isLocked = false;
-        ILock lock = null;
-        String lockPrefix = "handled-replication-events-";
+        if (ReplicationUtil.replicationIsActive()) {
+            log.info("Item added event received on the [end of] hzReplicationEvents queue for "
+                    + identifier.getValue());
+            Identifier pid = null;
+            boolean isLocked = false;
+            ILock lock = null;
+            String lockPrefix = "handled-replication-events-";
 
-        try {
-            // poll the queue to pop the most recent event off of the queue
-            pid = this.replicationEvents.poll(3L, TimeUnit.SECONDS);
-            if (pid != null) {
-                log.info("Won the replication events queue poll [top of] for " + pid.getValue());
-                String lockString = lockPrefix + pid.getValue();
-                lock = this.hzMember.getLock(lockString);
-                // lock the string across CN ReplicationEventListener instances
-                isLocked = lock.tryLock(1L, TimeUnit.SECONDS);
+            try {
+                // poll the queue to pop the most recent event off of the queue
+                pid = this.replicationEvents.poll(3L, TimeUnit.SECONDS);
+                if (pid != null) {
+                    log.info("Won the replication events queue poll [top of] for " + pid.getValue());
+                    String lockString = lockPrefix + pid.getValue();
+                    lock = this.hzMember.getLock(lockString);
+                    // lock the string across CN ReplicationEventListener
+                    // instances
+                    isLocked = lock.tryLock(1L, TimeUnit.SECONDS);
+                    if (isLocked) {
+                        log.debug("Gained the event lock " + lockString);
+                        log.trace("METRICS:\tREPLICATION:\tEVALUATE:\tPID:\t" + pid.getValue());
+
+                        // evaluate the object's replication policy for
+                        // potential
+                        // task creation
+                        this.replicationManager.createAndQueueTasks(pid);
+
+                        log.trace("METRICS:\tREPLICATION:\tEND EVALUATE:\tPID:\t" + pid.getValue());
+
+                    } else {
+                        log.debug("Didn't gain the event lock " + lockString);
+
+                    }
+                }
+
+            } catch (BaseException e) {
+                log.error("There was a problem handling task creation for " + pid.getValue()
+                        + ". The error message was " + e.getMessage(), e);
+                // something went very wrong trying to create tasks for this
+                // pid. Resubmit it to evaluate again.
+                queueEvent(pid);
+
+            } catch (InterruptedException e) {
+                log.error("Polling of the hzReplicationEvents queue was interrupted.", e);
+
+            } finally {
                 if (isLocked) {
-                    log.debug("Gained the event lock " + lockString);
-                    log.trace("METRICS:\tREPLICATION:\tEVALUATE:\tPID:\t" + pid.getValue());
-
-                    // evaluate the object's replication policy for potential
-                    // task creation
-                    this.replicationManager.createAndQueueTasks(pid);
-
-                    log.trace("METRICS:\tREPLICATION:\tEND EVALUATE:\tPID:\t" + pid.getValue());
-
-                } else {
-                    log.debug("Didn't gain the event lock " + lockString);
+                    lock.unlock();
 
                 }
-            }
-
-        } catch (BaseException e) {
-            log.error("There was a problem handling task creation for " + pid.getValue()
-                    + ". The error message was " + e.getMessage(), e);
-            // something went very wrong trying to create tasks for this
-            // pid. Resubmit it to evaluate again.
-            queueEvent(pid);
-
-        } catch (InterruptedException e) {
-            log.error("Polling of the hzReplicationEvents queue was interrupted.", e);
-
-        } finally {
-            if (isLocked) {
-                lock.unlock();
 
             }
-
         }
     }
 
@@ -181,10 +185,6 @@ public class ReplicationEventListener implements EntryListener<Identifier, Syste
 
     }
 
-    private boolean replicationIsActive() {
-        return Settings.getConfiguration().getBoolean("Replication.active");
-    }
-
     /**
      * Implement the EntryListener interface, responding to entries being added
      * to the hzSystemMetadata map.
@@ -194,7 +194,7 @@ public class ReplicationEventListener implements EntryListener<Identifier, Syste
      */
     public void entryAdded(EntryEvent<Identifier, SystemMetadata> event) {
 
-        if (replicationIsActive()) {
+        if (ReplicationUtil.replicationIsActive()) {
             log.info("Received entry added event on the hzSystemMetadata map. Queueing "
                     + event.getKey().getValue());
 
@@ -258,7 +258,7 @@ public class ReplicationEventListener implements EntryListener<Identifier, Syste
      */
     public void entryUpdated(EntryEvent<Identifier, SystemMetadata> event) {
 
-        if (replicationIsActive()) {
+        if (ReplicationUtil.replicationIsActive()) {
             log.info("Received entry updated event on the hzSystemMetadata map. Queueing "
                     + event.getKey().getValue());
 
