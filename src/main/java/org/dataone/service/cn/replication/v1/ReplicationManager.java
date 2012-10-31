@@ -24,19 +24,15 @@ package org.dataone.service.cn.replication.v1;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Date;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.configuration.ConversionException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.dataone.client.CNode;
@@ -1014,97 +1010,5 @@ public class ReplicationManager {
 
         }
         return nodesByPriority;
-    }
-
-    /*
-     * An internal audit class used to periodically handle identifiers that are
-     * erroneously in a pending state (queued or requested). This will likely be
-     * replaced by the MNAudit class.
-     * 
-     * @author cjones
-     */
-    class PendingReplicaAuditor implements Runnable {
-
-        @Override
-        public void run() {
-
-            if (ReplicationUtil.replicationIsActive()) {
-                /*
-                 * the list of pending replicas in the queued or requested state
-                 * before the cutoff date
-                 */
-                List<Entry<Identifier, NodeReference>> pendingReplicasByDate = new ArrayList<Entry<Identifier, NodeReference>>();
-
-                /* A reference to the Coordinating Node */
-                int pageSize = 0;
-                int pageNumber = 0;
-                int auditSecondsBeforeNow = -3600;
-                try {
-                    auditSecondsBeforeNow = Settings.getConfiguration().getInt(
-                            "replication.audit.pending.window");
-
-                } catch (ConversionException ce) {
-                    log.error("Couldn't convert the replication.audit.pending.window"
-                            + " property correctly: " + ce.getMessage());
-
-                }
-                Calendar cal = Calendar.getInstance();
-                cal.add(Calendar.SECOND, auditSecondsBeforeNow);
-                Date auditDate = cal.getTime();
-
-                try {
-                    pendingReplicasByDate = DaoFactory.getReplicationDao()
-                            .getPendingReplicasByDate(auditDate);
-                } catch (DataAccessException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                }
-
-                log.debug("pendingReplicasByDate size is " + pendingReplicasByDate.size());
-
-                CNode cn = null;
-                SystemMetadata sysmeta = null;
-                long serialVersion = 0L;
-                // get a reference to the CN to manage replica states
-                try {
-                    cn = D1Client.getCN();
-
-                } catch (BaseException e) {
-                    log.error("Couldn't connect to the CN to manage replica states: "
-                            + e.getMessage());
-
-                    if (log.isDebugEnabled()) {
-                        e.printStackTrace();
-
-                    }
-                }
-
-                Iterator<Entry<Identifier, NodeReference>> iterator = pendingReplicasByDate
-                        .iterator();
-                while (iterator.hasNext()) {
-                    Entry entry = (Entry) iterator.next();
-                    Identifier identifier = (Identifier) entry.getKey();
-                    NodeReference nodeId = (NodeReference) entry.getValue();
-
-                    // Remove the replica to induce a replication policy
-                    // evaluation
-                    // and clear the pending replica list of overdue replicas
-
-                    try {
-                        sysmeta = cn.getSystemMetadata(identifier);
-                        serialVersion = sysmeta.getSerialVersion().longValue();
-                        cn.deleteReplicationMetadata(identifier, nodeId, serialVersion);
-
-                    } catch (BaseException e) {
-                        log.error("Couldn't remove the replica entry for " + identifier.getValue()
-                                + " at " + nodeId.getValue() + ": " + e.getMessage());
-                        if (log.isDebugEnabled()) {
-                            e.printStackTrace();
-
-                        }
-                    }
-                }
-            }
-        }
     }
 }
