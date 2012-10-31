@@ -96,7 +96,6 @@ public class StaleReplicationRequestAuditor implements Runnable {
         } catch (ConversionException ce) {
             log.error("Couldn't convert the replication.audit.pending.window"
                     + " property correctly: " + ce.getMessage());
-
         }
         Calendar cal = Calendar.getInstance();
         cal.add(Calendar.SECOND, auditSecondsBeforeNow);
