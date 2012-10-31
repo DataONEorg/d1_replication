@@ -62,7 +62,7 @@ public class StaleReplicationRequestAuditor implements Runnable {
 
     @Override
     public void run() {
-
+        log.debug("Stale Replication Request Auditor running.");
         Date auditDate = calculateAuditDate();
         List<ReplicaResult> requestedReplicas = getReplicasToAudit(auditDate);
         CNode cn = getCNode();
@@ -86,6 +86,7 @@ public class StaleReplicationRequestAuditor implements Runnable {
                 updateReplicaToComplete(cn, identifier, nodeId, sysmeta);
             }
         }
+        log.debug("Stale Replication Request Auditor finished.");
     }
 
     private Date calculateAuditDate() {
@@ -111,7 +112,8 @@ public class StaleReplicationRequestAuditor implements Runnable {
         } catch (DataAccessException e) {
             e.printStackTrace();
         }
-        log.debug("pendingReplicasByDate size is " + requestedReplicas.size());
+        log.debug("Stale Replication Request Auditor - pendingReplicasByDate size is "
+                + requestedReplicas.size());
         return requestedReplicas;
     }
 
@@ -185,6 +187,8 @@ public class StaleReplicationRequestAuditor implements Runnable {
                 replicaToUpdate.setReplicationStatus(ReplicationStatus.COMPLETED);
                 long serialVersion = sysmeta.getSerialVersion().longValue();
                 cn.updateReplicationMetadata(identifier, replicaToUpdate, serialVersion);
+                log.debug("Stale Replication Request Auditor setting replica complete for pid: "
+                        + identifier.getValue() + " for target mn: " + nodeId);
             }
         } catch (BaseException e) {
             log.error("Stale Replica Audit - cannot update replica for pid: "
