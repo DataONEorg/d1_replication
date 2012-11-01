@@ -96,7 +96,7 @@ public class StaleReplicationRequestAuditor implements Runnable {
                     "replication.audit.pending.window");
         } catch (ConversionException ce) {
             log.error("Couldn't convert the replication.audit.pending.window"
-                    + " property correctly: " + ce.getMessage());
+                    + " property correctly: " + ce.getMessage(), ce);
         }
         Calendar cal = Calendar.getInstance();
         cal.add(Calendar.SECOND, auditSecondsBeforeNow);
@@ -136,7 +136,7 @@ public class StaleReplicationRequestAuditor implements Runnable {
             sysmeta = cn.getSystemMetadata(identifier);
         } catch (BaseException be) {
             log.error("Stale Replica Status: cannot get system metadata from CN for id: "
-                    + identifier.getValue());
+                    + identifier.getValue(), be);
         }
         return sysmeta;
     }
@@ -167,8 +167,9 @@ public class StaleReplicationRequestAuditor implements Runnable {
         try {
             mnChecksum = mn.getChecksum(identifier, sysmeta.getChecksum().getAlgorithm());
         } catch (BaseException e) {
-            log.debug("Stale Replica Status Audit: Cannot get checksum from MN: "
-                    + nodeId.getValue() + " for pid: " + identifier.getValue());
+            log.debug(
+                    "Stale Replica Status Audit: Cannot get checksum from MN: " + nodeId.getValue()
+                            + " for pid: " + identifier.getValue(), e);
         }
         return mnChecksum;
     }
@@ -191,8 +192,9 @@ public class StaleReplicationRequestAuditor implements Runnable {
                         + identifier.getValue() + " for target mn: " + nodeId);
             }
         } catch (BaseException e) {
-            log.error("Stale Replica Audit - cannot update replica for pid: "
-                    + identifier.getValue());
+            log.error(
+                    "Stale Replica Audit - cannot update replica for pid: " + identifier.getValue(),
+                    e);
         }
     }
 }
