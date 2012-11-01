@@ -35,7 +35,7 @@ import org.dataone.client.CNode;
 import org.dataone.client.D1Client;
 import org.dataone.client.MNode;
 import org.dataone.cn.dao.DaoFactory;
-import org.dataone.cn.dao.ReplicationDao.ReplicaResult;
+import org.dataone.cn.dao.ReplicationDao.ReplicaDto;
 import org.dataone.cn.dao.exceptions.DataAccessException;
 import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.BaseException;
@@ -62,31 +62,33 @@ public class StaleReplicationRequestAuditor implements Runnable {
 
     @Override
     public void run() {
-        log.debug("Stale Replication Request Auditor running.");
-        Date auditDate = calculateAuditDate();
-        List<ReplicaResult> requestedReplicas = getReplicasToAudit(auditDate);
-        CNode cn = getCNode();
-        if (cn != null) {
-            Map<String, MNode> memberNodes = new HashMap<String, MNode>();
-            for (ReplicaResult result : requestedReplicas) {
-                Identifier identifier = result.identifier;
-                NodeReference nodeId = result.memberNode;
-                SystemMetadata sysmeta = getSystemMetadata(cn, identifier);
-                if (sysmeta == null) {
-                    continue;
+        if (ReplicationUtil.replicationIsActive()) {
+            log.debug("Stale Replication Request Auditor running.");
+            Date auditDate = calculateAuditDate();
+            List<ReplicaDto> requestedReplicas = getReplicasToAudit(auditDate);
+            CNode cn = getCNode();
+            if (cn != null) {
+                Map<String, MNode> memberNodes = new HashMap<String, MNode>();
+                for (ReplicaDto result : requestedReplicas) {
+                    Identifier identifier = result.identifier;
+                    NodeReference nodeId = result.replica.getReplicaMemberNode();
+                    SystemMetadata sysmeta = getSystemMetadata(cn, identifier);
+                    if (sysmeta == null) {
+                        continue;
+                    }
+                    MNode mn = getMemberNode(memberNodes, nodeId);
+                    if (mn == null) {
+                        continue;
+                    }
+                    Checksum mnChecksum = getChecksumFromMN(identifier, nodeId, sysmeta, mn);
+                    if (mnChecksum == null) {
+                        continue;
+                    }
+                    updateReplicaToComplete(cn, identifier, nodeId, sysmeta);
                 }
-                MNode mn = getMemberNode(memberNodes, nodeId);
-                if (mn == null) {
-                    continue;
-                }
-                Checksum mnChecksum = getChecksumFromMN(identifier, nodeId, sysmeta, mn);
-                if (mnChecksum == null) {
-                    continue;
-                }
-                updateReplicaToComplete(cn, identifier, nodeId, sysmeta);
             }
+            log.debug("Stale Replication Request Auditor finished.");
         }
-        log.debug("Stale Replication Request Auditor finished.");
     }
 
     private Date calculateAuditDate() {
@@ -104,8 +106,8 @@ public class StaleReplicationRequestAuditor implements Runnable {
         return auditDate;
     }
 
-    private List<ReplicaResult> getReplicasToAudit(Date auditDate) {
-        List<ReplicaResult> requestedReplicas = new ArrayList<ReplicaResult>();
+    private List<ReplicaDto> getReplicasToAudit(Date auditDate) {
+        List<ReplicaDto> requestedReplicas = new ArrayList<ReplicaDto>();
         try {
             requestedReplicas = DaoFactory.getReplicationDao()
                     .getRequestedReplicasByDate(auditDate);
