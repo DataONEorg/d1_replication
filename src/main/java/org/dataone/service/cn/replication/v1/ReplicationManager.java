@@ -358,6 +358,15 @@ public class ReplicationManager {
                 // add already listed replicas to listedReplicaNodes
                 listedReplicaNodes = getCurrentReplicaList(sysmeta);
                 int currentListedReplicaCount = listedReplicaNodes.size();
+
+                // parse the sysmeta.ReplicationPolicy
+                ReplicationPolicy replicationPolicy = sysmeta.getReplicationPolicy();
+
+                // set the desired replicas if present
+                if (replicationPolicy.getNumberReplicas() != null) {
+                    desiredReplicas = replicationPolicy.getNumberReplicas().intValue();
+                }
+
                 int desiredReplicasLessListed = desiredReplicas - currentListedReplicaCount;
                 log.debug("Desired replica count less already listed replica count is "
                         + desiredReplicasLessListed);
@@ -375,7 +384,6 @@ public class ReplicationManager {
                 } catch (NullPointerException npe) {
                     throw new InvalidRequest("1080", "Object " + pid.getValue()
                             + " has no authoritative Member Node in its SystemMetadata");
-
                 }
 
                 // build the potential list of target nodes
@@ -410,26 +418,16 @@ public class ReplicationManager {
                 reportCountsByNodeStatus();
 
                 if (!potentialNodeList.isEmpty()) {
-
-                    // parse the sysmeta.ReplicationPolicy
-                    ReplicationPolicy replicationPolicy = sysmeta.getReplicationPolicy();
-
-                    // set the desired replicas if present
-                    if (replicationPolicy.getNumberReplicas() != null) {
-                        desiredReplicas = replicationPolicy.getNumberReplicas().intValue();
-
-                    }
                     log.info("Desired replicas for identifier " + pid.getValue() + " is "
-                            + desiredReplicas);
+                            + desiredReplicasLessListed);
                     log.info("Potential target node list size for " + pid.getValue() + " is "
                             + potentialNodeList.size());
                     // can't have more replicas than MNs
-                    if (desiredReplicas > potentialNodeList.size()) {
-                        desiredReplicas = potentialNodeList.size(); // yikes
+                    if (desiredReplicasLessListed > potentialNodeList.size()) {
+                        desiredReplicasLessListed = potentialNodeList.size(); // yikes
                         log.info("Changed the desired replicas for identifier " + pid.getValue()
                                 + " to the size of the potential target node list: "
                                 + potentialNodeList.size());
-
                     }
 
                     // reset desiredReplicasLessListed to avoid task creation
