@@ -216,7 +216,7 @@ public class ReplicationManager {
         // causing a given node to have too many pending replica requests
         pendingReplicaAuditScheduler = Executors.newSingleThreadScheduledExecutor();
         pendingReplicaAuditTask = pendingReplicaAuditScheduler.scheduleAtFixedRate(
-                new StaleReplicationRequestAuditor(), 0L, 8L, TimeUnit.HOURS);
+                new StaleReplicationRequestAuditor(), 0L, 1L, TimeUnit.HOURS);
 
         // Report node status statistics on a scheduled basis
         // TODO: hold off on scheduling code for now
