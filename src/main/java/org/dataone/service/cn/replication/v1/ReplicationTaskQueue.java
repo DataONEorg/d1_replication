@@ -21,10 +21,14 @@
 package org.dataone.service.cn.replication.v1;
 
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.dataone.client.D1TypeBuilder;
+import org.dataone.service.types.v1.NodeReference;
 
 import com.hazelcast.core.EntryEvent;
 import com.hazelcast.core.EntryListener;
@@ -74,6 +78,18 @@ public class ReplicationTaskQueue implements EntryListener<String, MNReplication
         return replicationTaskMap.values();
     }
 
+    public Collection<NodeReference> getMemberNodesInQueue() {
+        Set<NodeReference> memberNodes = new HashSet<NodeReference>();
+        for (String nodeId : replicationTaskMap.keySet()) {
+            memberNodes.add(D1TypeBuilder.buildNodeReference(nodeId));
+        }
+        return memberNodes;
+    }
+
+    public int getCountOfTasksForNode(String nodeId) {
+        return replicationTaskMap.valueCount(nodeId);
+    }
+
     @Override
     public void entryAdded(EntryEvent<String, MNReplicationTask> event) {
         if (ReplicationUtil.replicationIsActive()) {
@@ -82,7 +98,7 @@ public class ReplicationTaskQueue implements EntryListener<String, MNReplication
         }
     }
 
-    private void processAllTasksForMN(String memberNodeIdentifierValue) {
+    public void processAllTasksForMN(String memberNodeIdentifierValue) {
         String mnId = memberNodeIdentifierValue;
         if (mnId != null) {
             log.debug("ReplicationTaskQueue. Processing all tasks for node: " + mnId + ".");
