@@ -150,8 +150,14 @@ public class ReplicationManager {
     /* A scheduler for pending replica auditing */
     private ScheduledExecutorService pendingReplicaAuditScheduler;
 
+    /* A scheduler for queued replica auditing */
+    private ScheduledExecutorService queuedReplicaAuditScheduler;
+
     /* The future result of reporting counts by node status to hazelcast */
     private Future<?> pendingReplicaAuditTask;
+
+    /* The future result of reporting counts by node status to hazelcast */
+    private Future<?> queuedReplicaAuditTask;
 
     /*
      * The timeout period for tasks submitted to the executor service to
@@ -217,6 +223,10 @@ public class ReplicationManager {
         pendingReplicaAuditScheduler = Executors.newSingleThreadScheduledExecutor();
         pendingReplicaAuditTask = pendingReplicaAuditScheduler.scheduleAtFixedRate(
                 new StaleReplicationRequestAuditor(), 0L, 1L, TimeUnit.HOURS);
+
+        queuedReplicaAuditScheduler = Executors.newSingleThreadScheduledExecutor();
+        queuedReplicaAuditTask = queuedReplicaAuditScheduler.scheduleAtFixedRate(
+                new QueuedReplicationAuditor(), 0L, 1L, TimeUnit.HOURS);
 
         // Report node status statistics on a scheduled basis
         // TODO: hold off on scheduling code for now
