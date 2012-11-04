@@ -150,7 +150,11 @@ public class ReplicationTaskQueue implements EntryListener<String, MNReplication
     private void executeTask(MNReplicationTask task) {
         log.debug("Executing task id " + task.getTaskid() + "for identifier "
                 + task.getPid().getValue() + " and target node " + task.getTargetNode().getValue());
-        task.call();
+        try {
+            task.call();
+        } catch (Exception e) {
+            log.error("Error executing task: " + task.getTaskid(), e);
+        }
     }
 
     @Override
@@ -166,5 +170,17 @@ public class ReplicationTaskQueue implements EntryListener<String, MNReplication
     @Override
     public void entryEvicted(EntryEvent<String, MNReplicationTask> event) {
         // Not implemented.
+    }
+
+    public boolean containsTask(String nodeId, String identifier) {
+        if (nodeId == null || identifier == null) {
+            return false;
+        }
+        for (MNReplicationTask task : replicationTaskMap.get(nodeId)) {
+            if (task.getPid().getValue().equals(identifier)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
