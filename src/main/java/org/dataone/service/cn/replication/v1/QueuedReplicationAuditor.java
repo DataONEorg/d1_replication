@@ -56,35 +56,41 @@ public class QueuedReplicationAuditor implements Runnable {
     public void run() {
         if (ReplicationUtil.replicationIsActive()) {
             log.debug("Queued Request Auditor running.");
-
             Date auditDate = calculateAuditDate();
-            List<ReplicaDto> replicas = getReplicasToAudit(auditDate);
-            log.debug("Stale queued replicas size: " + replicas.size());
-            for (ReplicaDto replica : replicas) {
-                if (replicationTaskQueue.containsTask(replica.replica.getReplicaMemberNode()
-                        .getValue(), replica.identifier.getValue()) == false) {
-                    log.debug("Stale queued replica is not in task queue, deleting. id: "
-                            + replica.identifier.getValue() + " for node "
-                            + replica.replica.getReplicaMemberNode().getValue());
-                    deleteReplica(replica.identifier, replica.replica.getReplicaMemberNode());
-                }
-            }
+            deleteStaleQueuedReplicas(auditDate);
+            runQueuedTasks();
+            log.debug("Queued Replication Auditor finished.");
+        }
+    }
 
-            for (NodeReference nodeRef : replicationTaskQueue.getMemberNodesInQueue()) {
-                int sizeOfQueue = replicationTaskQueue.getCountOfTasksForNode(nodeRef.getValue());
-                log.debug("Queued tasks for member node: " + nodeRef.getValue() + " has: "
-                        + sizeOfQueue + " tasks in queue.");
-                if (sizeOfQueue > 0) {
-                    int sizeOfRequested = getRequestedCount(nodeRef);
-                    if (sizeOfRequested > -1) {
-                        if (sizeOfRequested == 0
-                                || (requestLimit > (sizeOfQueue + sizeOfRequested))) {
-                            replicationTaskQueue.processAllTasksForMN(nodeRef.getValue());
-                        }
+    private void runQueuedTasks() {
+        for (NodeReference nodeRef : replicationTaskQueue.getMemberNodesInQueue()) {
+            int sizeOfQueue = replicationTaskQueue.getCountOfTasksForNode(nodeRef.getValue());
+            log.debug("Queued tasks for member node: " + nodeRef.getValue() + " has: "
+                    + sizeOfQueue + " tasks in queue.");
+            if (sizeOfQueue > 0) {
+                int sizeOfRequested = getRequestedCount(nodeRef);
+                if (sizeOfRequested > -1) {
+                    if (sizeOfRequested == 0 || (requestLimit > (sizeOfQueue + sizeOfRequested))) {
+                        replicationTaskQueue.processAllTasksForMN(nodeRef.getValue());
                     }
                 }
             }
-            log.debug("Queued Replication Auditor finished.");
+        }
+    }
+
+    public void deleteStaleQueuedReplicas(Date auditDate) {
+        List<ReplicaDto> replicas = getReplicasToAudit(auditDate);
+        log.debug("Stale queued replicas size: " + replicas.size());
+        for (ReplicaDto replica : replicas) {
+            if (replicationTaskQueue.containsTask(
+                    replica.replica.getReplicaMemberNode().getValue(),
+                    replica.identifier.getValue()) == false) {
+                log.debug("Stale queued replica is not in task queue, deleting. id: "
+                        + replica.identifier.getValue() + " for node "
+                        + replica.replica.getReplicaMemberNode().getValue());
+                deleteReplica(replica.identifier, replica.replica.getReplicaMemberNode());
+            }
         }
     }
 
