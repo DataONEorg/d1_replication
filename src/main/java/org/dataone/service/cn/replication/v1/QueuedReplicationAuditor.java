@@ -56,8 +56,8 @@ public class QueuedReplicationAuditor implements Runnable {
     public void run() {
         if (ReplicationUtil.replicationIsActive()) {
             log.debug("Queued Request Auditor running.");
-            Date auditDate = calculateAuditDate();
-            deleteStaleQueuedReplicas(auditDate);
+            // Date auditDate = calculateAuditDate();
+            // deleteStaleQueuedReplicas(auditDate);
             runQueuedTasks();
             log.debug("Queued Replication Auditor finished.");
         }
