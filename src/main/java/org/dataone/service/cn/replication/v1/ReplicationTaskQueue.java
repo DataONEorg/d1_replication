@@ -62,6 +62,14 @@ public class ReplicationTaskQueue implements EntryListener<String, MNReplication
     public ReplicationTaskQueue() {
     }
 
+    public void logState() {
+        log.debug("logging replication task queue state:");
+        for (String nodeId : replicationTaskMap.keySet()) {
+            log.debug("Member Node: " + nodeId + " has " + replicationTaskMap.valueCount(nodeId));
+        }
+        log.debug("finished reporting replication task queue state");
+    }
+
     public void registerAsEntryListener() {
         if (!this.listening) {
             replicationTaskMap.addEntryListener(this, true);
@@ -177,14 +185,17 @@ public class ReplicationTaskQueue implements EntryListener<String, MNReplication
     }
 
     public boolean containsTask(String nodeId, String identifier) {
+        log.debug("invoking contains task");
         if (nodeId == null || identifier == null) {
             return false;
         }
         for (MNReplicationTask task : replicationTaskMap.get(nodeId)) {
             if (task.getPid().getValue().equals(identifier)) {
+                log.debug("found task for pid: " + identifier);
                 return true;
             }
         }
+        log.debug("did not find task for pid: " + identifier + " for mn: " + nodeId);
         return false;
     }
 }

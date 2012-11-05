@@ -308,6 +308,9 @@ public class ReplicationManager {
     public int createAndQueueTasks(Identifier pid) throws NotImplemented, InvalidRequest {
 
         log.debug("ReplicationManager.createAndQueueTasks called.");
+
+        replicationTaskQueue.logState();
+
         ILock lock;
         boolean allowed;
         int taskCount = 0;
