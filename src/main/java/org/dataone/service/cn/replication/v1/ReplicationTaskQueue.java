@@ -72,6 +72,8 @@ public class ReplicationTaskQueue implements EntryListener<String, MNReplication
 
     public void addTask(MNReplicationTask task) {
         replicationTaskMap.put(task.getTargetNode().getValue(), task);
+        log.debug("Adding task to replication queue for node: " + task.getTargetNode().getValue()
+                + " which has: " + replicationTaskMap.valueCount(task.getTargetNode().getValue()));
     }
 
     public Collection<MNReplicationTask> getAllTasks() {
@@ -103,8 +105,10 @@ public class ReplicationTaskQueue implements EntryListener<String, MNReplication
         if (mnId != null) {
             log.debug("ReplicationTaskQueue. Processing all tasks for node: " + mnId + ".");
             if (replicationTaskMap.valueCount(mnId) > 0) {
+                log.debug(replicationTaskMap.valueCount(mnId) + " tasks for mn: " + mnId);
                 Collection<MNReplicationTask> tasks = removeTasksForMemberNode(mnId);
                 if (tasks != null && tasks.isEmpty() == false) {
+                    log.debug("removed " + tasks.size() + " tasks from replication queue.");
                     for (MNReplicationTask task : tasks) {
                         if (task != null) {
                             try {
