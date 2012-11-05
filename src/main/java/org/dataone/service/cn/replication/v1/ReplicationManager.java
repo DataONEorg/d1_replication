@@ -24,7 +24,6 @@ package org.dataone.service.cn.replication.v1;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -215,8 +214,9 @@ public class ReplicationManager {
         this.nodeReplicationStatus = this.hzMember.getMap(this.nodeReplicationStatusMap);
 
         // initialize replication task queue by removing old queued tasks
-        new QueuedReplicationAuditor().deleteStaleQueuedReplicas(new Date(System
-                .currentTimeMillis()));
+        // new QueuedReplicationAuditor().deleteStaleQueuedReplicas(new
+        // Date(System
+        // .currentTimeMillis()));
         // monitor the replication structures
         this.replicationTaskQueue = new ReplicationTaskQueue();
         this.replicationTaskQueue.registerAsEntryListener();
