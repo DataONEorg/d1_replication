@@ -20,20 +20,17 @@
  */
 package org.dataone.service.cn.replication.v1;
 
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.dataone.client.D1TypeBuilder;
+import org.dataone.cn.dao.DaoFactory;
+import org.dataone.cn.dao.ReplicationDao;
+import org.dataone.cn.dao.ReplicationDao.ReplicaDto;
+import org.dataone.cn.dao.exceptions.DataAccessException;
+import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
-
-import com.hazelcast.core.EntryEvent;
-import com.hazelcast.core.EntryListener;
-import com.hazelcast.core.Hazelcast;
-import com.hazelcast.core.MultiMap;
 
 /**
  * Abstract member node replication task work queue. Provides interface for
@@ -43,114 +40,86 @@ import com.hazelcast.core.MultiMap;
  * @author sroseboo
  * 
  */
-public class ReplicationTaskQueue implements EntryListener<String, MNReplicationTask> {
+public class ReplicationTaskQueue {
 
     private static Log log = LogFactory.getLog(ReplicationTaskQueue.class);
-    private static MultiMap<String, MNReplicationTask> replicationTaskMap;
-
-    /*
-     * has this instance of replication task queue been registered as a entry
-     * listener
-     */
-    private boolean listening = false;
-
-    static {
-        replicationTaskMap = Hazelcast.getDefaultInstance()
-                .getMultiMap("hzReplicationTaskMultiMap");
-    }
+    private static ReplicationDao replicationDao = DaoFactory.getReplicationDao();
+    private static ReplicationService replicationService = new ReplicationService();
 
     public ReplicationTaskQueue() {
     }
 
     public void logState() {
         log.debug("logging replication task queue state:");
-        for (String nodeId : replicationTaskMap.keySet()) {
-            log.debug("Member Node: " + nodeId + " has " + replicationTaskMap.valueCount(nodeId));
+        for (NodeReference nodeReference : getMemberNodesInQueue()) {
+            log.debug("Member Node: " + nodeReference.getValue() + " has "
+                    + getCountOfTasksForNode(nodeReference.getValue()));
         }
         log.debug("finished reporting replication task queue state");
     }
 
-    public void registerAsEntryListener() {
-        if (!this.listening) {
-            replicationTaskMap.addEntryListener(this, true);
-            this.listening = true;
-            log.info("Added a listener to the " + replicationTaskMap.getName() + " queue.");
-        }
-    }
-
-    public void addTask(MNReplicationTask task) {
-        replicationTaskMap.put(task.getTargetNode().getValue(), task);
-        log.debug("Adding task to replication queue for node: " + task.getTargetNode().getValue()
-                + " which has: " + replicationTaskMap.valueCount(task.getTargetNode().getValue()));
-    }
-
-    public Collection<MNReplicationTask> getAllTasks() {
-        return replicationTaskMap.values();
-    }
-
     public Collection<NodeReference> getMemberNodesInQueue() {
-        Set<NodeReference> memberNodes = new HashSet<NodeReference>();
-        for (String nodeId : replicationTaskMap.keySet()) {
-            memberNodes.add(D1TypeBuilder.buildNodeReference(nodeId));
+        Collection<NodeReference> nodes = new ArrayList<NodeReference>();
+        try {
+            nodes = replicationDao.getMemberNodesWithQueuedReplica();
+        } catch (DataAccessException dae) {
+            log.error("Cannot get member nodes in queue.", dae);
         }
-        return memberNodes;
+        return nodes;
     }
 
     public int getCountOfTasksForNode(String nodeId) {
-        return replicationTaskMap.valueCount(nodeId);
+        int count = 0;
+        try {
+            count = replicationDao.getQueuedReplicaCountByNode(nodeId);
+        } catch (DataAccessException dae) {
+            log.error("Cannot get count of tasks for node: " + nodeId, dae);
+        }
+        return count;
     }
 
-    @Override
-    public void entryAdded(EntryEvent<String, MNReplicationTask> event) {
-        if (ReplicationUtil.replicationIsActive()) {
-            processAllTasksForMN(event.getKey());
-            log.debug("ReplicationTaskQueue. Handling item added event.");
+    public boolean containsTask(String nodeId, String identifier) {
+        log.debug("invoking contains task");
+        if (nodeId == null || identifier == null) {
+            return false;
         }
+        boolean contains = false;
+        try {
+            contains = replicationDao.queuedReplicaExists(identifier, nodeId);
+        } catch (DataAccessException dae) {
+            log.error("Error executing queuedReplicaExists", dae);
+        }
+        return contains;
     }
 
     public void processAllTasksForMN(String memberNodeIdentifierValue) {
         String mnId = memberNodeIdentifierValue;
         if (mnId != null) {
             log.debug("ReplicationTaskQueue. Processing all tasks for node: " + mnId + ".");
-            if (replicationTaskMap.valueCount(mnId) > 0) {
-                log.debug(replicationTaskMap.valueCount(mnId) + " tasks for mn: " + mnId);
-                Collection<MNReplicationTask> tasks = removeTasksForMemberNode(mnId);
-                if (tasks != null && tasks.isEmpty() == false) {
-                    log.debug("removed " + tasks.size() + " tasks from replication queue.");
-                    for (MNReplicationTask task : tasks) {
-                        if (task != null) {
+            Collection<ReplicaDto> queuedReplicas = getQueuedReplicas(mnId);
+            int queuedCount = queuedReplicas.size();
+            if (queuedCount > 0) {
+                log.debug(queuedCount + " tasks for mn: " + mnId);
+                // TODO: LOCK THIS MEMBER NODE FOR PROCESSING
+                try {
+
+                    for (ReplicaDto replica : queuedReplicas) {
+                        if (replica != null) {
                             try {
-                                this.executeTask(task);
+                                this.executeTask(replica.identifier,
+                                        replica.replica.getReplicaMemberNode());
                             } catch (Exception e) {
-                                log.debug("Caught exception executing task id " + task.getTaskid()
-                                        + ": " + e.getMessage());
-                                if (log.isDebugEnabled()) {
-                                    log.debug(e);
-                                }
+                                log.error("Caught exception requesting replica", e);
                             }
                         }
                     }
+                } catch (Exception e) {
+                    log.error("Error requesting replica for queued replica", e);
+                } finally {
+                    // TODO: UNLOCK MEMBER NODE FOR PROCESSING
                 }
             }
         }
-    }
-
-    private Collection<MNReplicationTask> removeTasksForMemberNode(String memberNodeId) {
-        Collection<MNReplicationTask> tasks = null;
-        boolean locked = false;
-        try {
-            locked = replicationTaskMap.tryLock(memberNodeId, 3L, TimeUnit.SECONDS);
-            if (locked) {
-                tasks = replicationTaskMap.remove(memberNodeId);
-            }
-        } catch (Exception e) {
-            log.debug("Caught exception trying to use mn replication task map", e);
-        } finally {
-            if (locked) {
-                replicationTaskMap.unlock(memberNodeId);
-            }
-        }
-        return tasks;
     }
 
     /**
@@ -159,43 +128,27 @@ public class ReplicationTaskQueue implements EntryListener<String, MNReplication
      * 
      * @param task
      */
-    private void executeTask(MNReplicationTask task) {
-        log.debug("Executing task id " + task.getTaskid() + "for identifier "
-                + task.getPid().getValue() + " and target node " + task.getTargetNode().getValue());
+    private void executeTask(Identifier identifier, NodeReference targetNode) {
+        if (identifier == null || targetNode == null) {
+            return;
+        }
+        log.debug("Requesting replica for id " + identifier.getValue() + " and target node "
+                + targetNode.getValue());
         try {
-            task.call();
+            replicationService.requestReplica(identifier, targetNode);
         } catch (Exception e) {
-            log.error("Error executing task: " + task.getTaskid(), e);
+            log.error("Error requesting replica", e);
         }
     }
 
-    @Override
-    public void entryRemoved(EntryEvent<String, MNReplicationTask> event) {
-        // Not implemented.
-    }
-
-    @Override
-    public void entryUpdated(EntryEvent<String, MNReplicationTask> event) {
-        // Not implemented.
-    }
-
-    @Override
-    public void entryEvicted(EntryEvent<String, MNReplicationTask> event) {
-        // Not implemented.
-    }
-
-    public boolean containsTask(String nodeId, String identifier) {
-        log.debug("invoking contains task");
-        if (nodeId == null || identifier == null) {
-            return false;
+    private Collection<ReplicaDto> getQueuedReplicas(String mnId) {
+        Collection<ReplicaDto> queuedReplicas = new ArrayList<ReplicaDto>();
+        try {
+            queuedReplicas = replicationDao.getQueuedReplicasByNode(mnId);
+        } catch (DataAccessException dae) {
+            log.error("unable to get queue replicas for node: " + mnId, dae);
         }
-        for (MNReplicationTask task : replicationTaskMap.get(nodeId)) {
-            if (task.getPid().getValue().equals(identifier)) {
-                log.debug("found task for pid: " + identifier);
-                return true;
-            }
-        }
-        log.debug("did not find task for pid: " + identifier + " for mn: " + nodeId);
-        return false;
+        return queuedReplicas;
     }
+
 }

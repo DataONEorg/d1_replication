@@ -219,7 +219,7 @@ public class ReplicationManager {
         // .currentTimeMillis()));
         // monitor the replication structures
         this.replicationTaskQueue = new ReplicationTaskQueue();
-        this.replicationTaskQueue.registerAsEntryListener();
+        // this.replicationTaskQueue.registerAsEntryListener();
 
         // TODO: use a more comprehensive MNAuditTask to fix problem replicas
         // For now, every hour, clear problematic replica entries that are
@@ -344,30 +344,32 @@ public class ReplicationManager {
                     return 0;
 
                 }
-                boolean no_task_with_pid = true;
-                // check if there are pending tasks or tasks recently put into
-                // the task
-                // queue
-                if (!isPending(pid)) {
-                    log.debug("Replication is not pending for identifier " + pid.getValue());
-                    // check for already queued tasks for this pid
-                    for (MNReplicationTask task : this.replicationTaskQueue.getAllTasks()) {
-                        // if the task's pid is equal to the event's pid
-                        if (task.getPid().getValue().equals(pid.getValue())) {
-                            no_task_with_pid = false;
-                            log.debug("An MNReplicationTask is already queued for identifier "
-                                    + pid.getValue());
-                            break;
 
-                        }
-                    }
-                    if (!no_task_with_pid) {
-                        log.debug("A replication task for the object identified by "
-                                + pid.getValue() + " has already been queued.");
-                        return 0;
-
-                    }
-                }
+                /*
+                 * NO LONGER CALLING THIS CODE WITH DB BACKED WORK QUEUE
+                 * 
+                 * 
+                 * boolean no_task_with_pid = true; // check if there are
+                 * pending tasks or tasks recently put into // the task // queue
+                 * if (!isPending(pid)) {
+                 * log.debug("Replication is not pending for identifier " +
+                 * pid.getValue()); // check for already queued tasks for this
+                 * pid
+                 * 
+                 * for (MNReplicationTask task :
+                 * this.replicationTaskQueue.getAllTasks()) { // if the task's
+                 * pid is equal to the event's pid if
+                 * (task.getPid().getValue().equals(pid.getValue())) {
+                 * no_task_with_pid = false; log.debug(
+                 * "An MNReplicationTask is already queued for identifier " +
+                 * pid.getValue()); break;
+                 * 
+                 * } } if (!no_task_with_pid) {
+                 * log.debug("A replication task for the object identified by "
+                 * + pid.getValue() + " has already been queued."); return 0;
+                 * 
+                 * } }
+                 */
                 // get the system metadata for the pid
                 log.debug("Getting the replica list for identifier " + pid.getValue());
                 sysmeta = this.systemMetadata.get(pid);
@@ -593,33 +595,48 @@ public class ReplicationManager {
                                         re);
 
                             }
-
-                            // create the task if the update succeeded
+                            /*
+                             * // create the task if the update succeeded if
+                             * (updated) {
+                             * log.info("Updated system metadata for identifier "
+                             * + pid.getValue() +
+                             * " with QUEUED replication status.");
+                             * log.trace("METRICS:\tREPLICATION:\tQUEUE:\tPID:\t"
+                             * + pid.getValue() + "\tNODE:\t" +
+                             * targetNode.getIdentifier().getValue() +
+                             * "\tSIZE:\t" + sysmeta.getSize().intValue()); Long
+                             * taskid = taskIdGenerator.newId(); // add the task
+                             * to the task list log.info(
+                             * "Adding a new MNReplicationTask to the queue where "
+                             * + "pid = " + pid.getValue() +
+                             * ", originatingNode = " +
+                             * authoritativeNode.getIdentifier().getValue() +
+                             * ", targetNode = " +
+                             * targetNode.getIdentifier().getValue());
+                             * MNReplicationTask task = new
+                             * MNReplicationTask(taskid.toString(), pid,
+                             * authoritativeNode.getIdentifier(),
+                             * targetNode.getIdentifier());
+                             * 
+                             * this.replicationTaskQueue.addTask(task);
+                             * taskCount++;
+                             * 
+                             * } else { log.error(
+                             * "CN.updateReplicationMetadata() failed for " +
+                             * "identifier " + pid.getValue() + ", node " +
+                             * targetNode.getIdentifier().getValue() +
+                             * ". Task not created.");
+                             * 
+                             * }
+                             */
                             if (updated) {
-                                log.info("Updated system metadata for identifier " + pid.getValue()
-                                        + " with QUEUED replication status.");
-                                log.trace("METRICS:\tREPLICATION:\tQUEUE:\tPID:\t" + pid.getValue()
-                                        + "\tNODE:\t" + targetNode.getIdentifier().getValue()
-                                        + "\tSIZE:\t" + sysmeta.getSize().intValue());
-                                Long taskid = taskIdGenerator.newId();
-                                // add the task to the task list
-                                log.info("Adding a new MNReplicationTask to the queue where "
-                                        + "pid = " + pid.getValue() + ", originatingNode = "
-                                        + authoritativeNode.getIdentifier().getValue()
-                                        + ", targetNode = " + targetNode.getIdentifier().getValue());
-                                MNReplicationTask task = new MNReplicationTask(taskid.toString(),
-                                        pid, authoritativeNode.getIdentifier(),
-                                        targetNode.getIdentifier());
-
-                                this.replicationTaskQueue.addTask(task);
-                                taskCount++;
-
+                                this.replicationTaskQueue.processAllTasksForMN(targetNode
+                                        .getIdentifier().getValue());
                             } else {
                                 log.error("CN.updateReplicationMetadata() failed for "
                                         + "identifier " + pid.getValue() + ", node "
                                         + targetNode.getIdentifier().getValue()
                                         + ". Task not created.");
-
                             }
                         }
                     } // end for()
