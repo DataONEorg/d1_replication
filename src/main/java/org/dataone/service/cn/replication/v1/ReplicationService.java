@@ -12,7 +12,6 @@ import org.dataone.service.exceptions.InvalidRequest;
 import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.exceptions.VersionMismatch;
-import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v1.DescribeResponse;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
@@ -140,7 +139,7 @@ public class ReplicationService {
                 try {
                     DescribeResponse description = targetMN.describe(identifier);
                     if (description.getDataONE_Checksum().equals(sysmeta.getChecksum())) {
-                    	exists = true;
+                        exists = true;
                     }
 
                 } catch (NotFound nf) {

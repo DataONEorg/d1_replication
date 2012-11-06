@@ -38,8 +38,8 @@ import com.hazelcast.core.ILock;
 
 /**
  * Abstract member node replication task work queue. Provides interface for
- * registering an entry listener, adding tasks, getting tasks. Encapsulates
- * entry listening strategies.
+ * working with queued replication objects which represent a replication that
+ * needs to be performed.
  * 
  * @author sroseboo
  * 
@@ -55,12 +55,14 @@ public class ReplicationTaskQueue {
     }
 
     public void logState() {
-        log.debug("logging replication task queue state:");
-        for (NodeReference nodeReference : getMemberNodesInQueue()) {
-            log.debug("Member Node: " + nodeReference.getValue() + " has "
-                    + getCountOfTasksForNode(nodeReference.getValue()));
+        if (log.isDebugEnabled()) {
+            log.debug("logging replication task queue state:");
+            for (NodeReference nodeReference : getMemberNodesInQueue()) {
+                log.debug("Member Node: " + nodeReference.getValue() + " has "
+                        + getCountOfTasksForNode(nodeReference.getValue()));
+            }
+            log.debug("finished reporting replication task queue state");
         }
-        log.debug("finished reporting replication task queue state");
     }
 
     public Collection<NodeReference> getMemberNodesInQueue() {
@@ -100,7 +102,7 @@ public class ReplicationTaskQueue {
     public void processAllTasksForMN(String memberNodeIdentifierValue) {
         String mnId = memberNodeIdentifierValue;
         boolean isLocked = false;
-        
+
         if (mnId != null) {
             log.debug("ReplicationTaskQueue. Processing all tasks for node: " + mnId + ".");
             Collection<ReplicaDto> queuedReplicas = getQueuedReplicas(mnId);
@@ -110,33 +112,29 @@ public class ReplicationTaskQueue {
                 // LOCK THIS MEMBER NODE FOR PROCESSING
                 ILock lock = hzMember.getLock(memberNodeIdentifierValue);
                 try {
-                	isLocked = lock.tryLock();
-                	
+                    isLocked = lock.tryLock();
+
                     if (isLocked) {
-						for (ReplicaDto replica : queuedReplicas) {
-							if (replica != null) {
-								try {
-									this.executeTask(replica.identifier,
-											replica.replica
-													.getReplicaMemberNode());
-								} catch (Exception e) {
-									log.error(
-											"Caught exception requesting replica",
-											e);
-								}
-							}
-						}
-					} else {
-						log.warn("Didn't get the lock for node id " + 
-							memberNodeIdentifierValue);
-					}
+                        for (ReplicaDto replica : queuedReplicas) {
+                            if (replica != null) {
+                                try {
+                                    this.executeTask(replica.identifier,
+                                            replica.replica.getReplicaMemberNode());
+                                } catch (Exception e) {
+                                    log.error("Caught exception requesting replica", e);
+                                }
+                            }
+                        }
+                    } else {
+                        log.warn("Didn't get the lock for node id " + memberNodeIdentifierValue);
+                    }
                 } catch (Exception e) {
                     log.error("Error requesting replica for queued replica", e);
                 } finally {
                     // UNLOCK MEMBER NODE FOR PROCESSING
-                	if ( isLocked ) {
-                		lock.unlock();
-                	}
+                    if (isLocked) {
+                        lock.unlock();
+                    }
                 }
             }
         }
@@ -146,7 +144,6 @@ public class ReplicationTaskQueue {
      * Encapsulates implementation details on how a replication task is
      * executed.
      * 
-     * @param task
      */
     private void executeTask(Identifier identifier, NodeReference targetNode) {
         if (identifier == null || targetNode == null) {
