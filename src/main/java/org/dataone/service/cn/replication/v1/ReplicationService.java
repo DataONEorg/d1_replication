@@ -138,9 +138,10 @@ public class ReplicationService {
                         + targetNode.getValue() + ". Trying again in 5 seconds.");
                 Thread.sleep(5000L);
                 try {
-                    Checksum checksum = targetMN.getChecksum(identifier, sysmeta.getChecksum()
-                            .getAlgorithm());
-                    exists = checksum.equals(sysmeta.getChecksum());
+                    DescribeResponse description = targetMN.describe(identifier);
+                    if (description.getDataONE_Checksum().equals(sysmeta.getChecksum())) {
+                    	exists = true;
+                    }
 
                 } catch (NotFound nf) {
                     sysmeta = cn.getSystemMetadata(session, identifier);
