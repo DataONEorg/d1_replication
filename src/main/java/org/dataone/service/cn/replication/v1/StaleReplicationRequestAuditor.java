@@ -59,6 +59,7 @@ import org.dataone.service.types.v1.SystemMetadata;
 public class StaleReplicationRequestAuditor implements Runnable {
 
     private static Log log = LogFactory.getLog(StaleReplicationRequestAuditor.class);
+    private static ReplicationService replicationService = new ReplicationService();
 
     @Override
     public void run() {
@@ -82,9 +83,10 @@ public class StaleReplicationRequestAuditor implements Runnable {
                     }
                     Checksum mnChecksum = getChecksumFromMN(identifier, nodeId, sysmeta, mn);
                     if (mnChecksum == null) {
-                        continue;
+                        deleteReplica(identifier, nodeId);
+                    } else {
+                        updateReplicaToComplete(cn, identifier, nodeId, sysmeta);
                     }
-                    updateReplicaToComplete(cn, identifier, nodeId, sysmeta);
                 }
             }
             log.debug("Stale Replication Request Auditor finished.");
@@ -198,5 +200,9 @@ public class StaleReplicationRequestAuditor implements Runnable {
                     "Stale Replica Audit - cannot update replica for pid: " + identifier.getValue(),
                     e);
         }
+    }
+
+    private void deleteReplica(Identifier identifier, NodeReference nodeRef) {
+        replicationService.deleteReplicationMetadata(identifier, nodeRef);
     }
 }

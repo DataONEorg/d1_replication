@@ -9,10 +9,8 @@ import org.dataone.client.D1Client;
 import org.dataone.client.MNode;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.InvalidRequest;
-import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.exceptions.VersionMismatch;
-import org.dataone.service.types.v1.DescribeResponse;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.Replica;
@@ -91,30 +89,14 @@ public class ReplicationService {
                 }
                 // call for the replication
                 if (!handled) {
+                    status = ReplicationStatus.REQUESTED;
+                    updated = this.cn.setReplicationStatus(identifier, targetNode, status, null);
+                    log.debug("Called setReplicationStatus() for identifier "
+                            + identifier.getValue() + ". updated result: " + updated);
 
-                    // check if the object exists on the target MN already
-                    try {
-                        DescribeResponse description = targetMN.describe(identifier);
-                        if (description.getDataONE_Checksum().equals(sysmeta.getChecksum())) {
-                            exists = true;
-
-                        }
-
-                    } catch (NotFound nfe) {
-                        // set the status to REQUESTED to avoid race conditions
-                        // across CN threads handling replication tasks
-                        status = ReplicationStatus.REQUESTED;
-
-                        updated = this.cn
-                                .setReplicationStatus(identifier, targetNode, status, null);
-                        log.debug("Called setReplicationStatus() for identifier "
-                                + identifier.getValue() + ". updated result: " + updated);
-
-                        success = targetMN.replicate(session, sysmeta, originatingNode);
-                        log.info("Called replicate() at targetNode " + targetNode.getValue()
-                                + ", identifier " + identifier.getValue() + ". Success: " + success);
-                    }
-
+                    success = targetMN.replicate(session, sysmeta, originatingNode);
+                    log.info("Called replicate() at targetNode " + targetNode.getValue()
+                            + ", identifier " + identifier.getValue() + ". Success: " + success);
                 } else {
                     log.info("Replica is already handled for " + targetNode.getValue()
                             + ", identifier " + identifier.getValue());
@@ -136,18 +118,10 @@ public class ReplicationService {
                 log.info("The call to MN.replicate() failed for " + identifier.getValue() + " on "
                         + targetNode.getValue() + ". Trying again in 5 seconds.");
                 Thread.sleep(5000L);
-                try {
-                    DescribeResponse description = targetMN.describe(identifier);
-                    if (description.getDataONE_Checksum().equals(sysmeta.getChecksum())) {
-                        exists = true;
-                    }
-
-                } catch (NotFound nf) {
-                    sysmeta = cn.getSystemMetadata(session, identifier);
-                    success = targetMN.replicate(session, sysmeta, originatingNode);
-                    log.info("Called replicate() at targetNode " + targetNode.getValue()
-                            + ", identifier " + identifier.getValue() + ". Success: " + success);
-                }
+                sysmeta = cn.getSystemMetadata(session, identifier);
+                success = targetMN.replicate(session, sysmeta, originatingNode);
+                log.info("Called replicate() at targetNode " + targetNode.getValue()
+                        + ", identifier " + identifier.getValue() + ". Success: " + success);
             } catch (BaseException e1) {
                 log.error("Caught base exception attempting to call replicate for pid: "
                         + identifier.getValue() + " with exception: " + e.getDescription()
@@ -248,7 +222,7 @@ public class ReplicationService {
                             } catch (BaseException e) {
                                 // we're really having difficulties. try the
                                 // round robin CN address
-                                deleted = deleteReplicationMetadata(session, identifier, targetNode);
+                                deleted = deleteReplicationMetadata(identifier, targetNode);
                             }
                         }
                     }
@@ -274,7 +248,7 @@ public class ReplicationService {
                             + identifier.getValue() + " and node " + targetNode.getValue()
                             + ". CNode reference is null, trying the router address.");
                     // try deleting the entry against the router address
-                    deleted = deleteReplicationMetadata(session, identifier, targetNode);
+                    deleted = deleteReplicationMetadata(identifier, targetNode);
 
                 }
             }
@@ -374,8 +348,7 @@ public class ReplicationService {
      * @param serialVersion - the serialVersion of the system metadata being
      * operated on
      */
-    private boolean deleteReplicationMetadata(Session session, Identifier pid,
-            NodeReference targetNode) {
+    public boolean deleteReplicationMetadata(Identifier pid, NodeReference targetNode) {
 
         if (this.cn == null) {
             log.error("cannot set replication status, no CN object");
