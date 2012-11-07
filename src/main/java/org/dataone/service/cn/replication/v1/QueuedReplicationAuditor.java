@@ -21,6 +21,9 @@ package org.dataone.service.cn.replication.v1;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.dataone.cn.dao.DaoFactory;
+import org.dataone.cn.dao.ReplicationDao;
+import org.dataone.cn.dao.exceptions.DataAccessException;
 import org.dataone.service.types.v1.NodeReference;
 
 public class QueuedReplicationAuditor implements Runnable {
@@ -28,6 +31,8 @@ public class QueuedReplicationAuditor implements Runnable {
     private static Log log = LogFactory.getLog(QueuedReplicationAuditor.class);
 
     private ReplicationTaskQueue replicationTaskQueue = new ReplicationTaskQueue();
+
+    private ReplicationDao replicationDao = DaoFactory.getReplicationDao();
 
     public QueuedReplicationAuditor() {
     }
@@ -47,8 +52,22 @@ public class QueuedReplicationAuditor implements Runnable {
             log.debug("Queued tasks for member node: " + nodeRef.getValue() + " has: "
                     + sizeOfQueue + " tasks in queue.");
             if (sizeOfQueue > 0) {
+                int sizeOfRequested = getRequestedCount(nodeRef);
+                log.debug("Queued Auditor report for mn: " + nodeRef.getValue() + " has: "
+                        + sizeOfRequested + " requested replicas and: " + sizeOfQueue
+                        + " requested replicas.");
                 replicationTaskQueue.processAllTasksForMN(nodeRef.getValue());
             }
         }
+    }
+
+    private int getRequestedCount(NodeReference nodeRef) {
+        int sizeOfRequested = -1;
+        try {
+            sizeOfRequested = replicationDao.getRequestedReplicationCount(nodeRef);
+        } catch (DataAccessException e) {
+            log.error("Unable to get oustanding rplication count for mn: " + nodeRef.getValue(), e);
+        }
+        return sizeOfRequested;
     }
 }
