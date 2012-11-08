@@ -213,13 +213,7 @@ public class ReplicationManager {
         this.taskIdGenerator = this.hzMember.getIdGenerator(this.taskIds);
         this.nodeReplicationStatus = this.hzMember.getMap(this.nodeReplicationStatusMap);
 
-        // initialize replication task queue by removing old queued tasks
-        // new QueuedReplicationAuditor().deleteStaleQueuedReplicas(new
-        // Date(System
-        // .currentTimeMillis()));
-        // monitor the replication structures
         this.replicationTaskQueue = new ReplicationTaskQueue();
-        // this.replicationTaskQueue.registerAsEntryListener();
 
         // TODO: use a more comprehensive MNAuditTask to fix problem replicas
         // For now, every hour, clear problematic replica entries that are
@@ -344,32 +338,6 @@ public class ReplicationManager {
                     return 0;
 
                 }
-
-                /*
-                 * NO LONGER CALLING THIS CODE WITH DB BACKED WORK QUEUE
-                 * 
-                 * 
-                 * boolean no_task_with_pid = true; // check if there are
-                 * pending tasks or tasks recently put into // the task // queue
-                 * if (!isPending(pid)) {
-                 * log.debug("Replication is not pending for identifier " +
-                 * pid.getValue()); // check for already queued tasks for this
-                 * pid
-                 * 
-                 * for (MNReplicationTask task :
-                 * this.replicationTaskQueue.getAllTasks()) { // if the task's
-                 * pid is equal to the event's pid if
-                 * (task.getPid().getValue().equals(pid.getValue())) {
-                 * no_task_with_pid = false; log.debug(
-                 * "An MNReplicationTask is already queued for identifier " +
-                 * pid.getValue()); break;
-                 * 
-                 * } } if (!no_task_with_pid) {
-                 * log.debug("A replication task for the object identified by "
-                 * + pid.getValue() + " has already been queued."); return 0;
-                 * 
-                 * } }
-                 */
                 // get the system metadata for the pid
                 log.debug("Getting the replica list for identifier " + pid.getValue());
                 sysmeta = this.systemMetadata.get(pid);
@@ -595,40 +563,6 @@ public class ReplicationManager {
                                         re);
 
                             }
-                            /*
-                             * // create the task if the update succeeded if
-                             * (updated) {
-                             * log.info("Updated system metadata for identifier "
-                             * + pid.getValue() +
-                             * " with QUEUED replication status.");
-                             * log.trace("METRICS:\tREPLICATION:\tQUEUE:\tPID:\t"
-                             * + pid.getValue() + "\tNODE:\t" +
-                             * targetNode.getIdentifier().getValue() +
-                             * "\tSIZE:\t" + sysmeta.getSize().intValue()); Long
-                             * taskid = taskIdGenerator.newId(); // add the task
-                             * to the task list log.info(
-                             * "Adding a new MNReplicationTask to the queue where "
-                             * + "pid = " + pid.getValue() +
-                             * ", originatingNode = " +
-                             * authoritativeNode.getIdentifier().getValue() +
-                             * ", targetNode = " +
-                             * targetNode.getIdentifier().getValue());
-                             * MNReplicationTask task = new
-                             * MNReplicationTask(taskid.toString(), pid,
-                             * authoritativeNode.getIdentifier(),
-                             * targetNode.getIdentifier());
-                             * 
-                             * this.replicationTaskQueue.addTask(task);
-                             * taskCount++;
-                             * 
-                             * } else { log.error(
-                             * "CN.updateReplicationMetadata() failed for " +
-                             * "identifier " + pid.getValue() + ", node " +
-                             * targetNode.getIdentifier().getValue() +
-                             * ". Task not created.");
-                             * 
-                             * }
-                             */
                             if (updated) {
                                 this.replicationTaskQueue.processAllTasksForMN(targetNode
                                         .getIdentifier().getValue());
@@ -693,47 +627,20 @@ public class ReplicationManager {
     }
 
     /**
-     * Regular replication sweep over all of the objects on MNs
-     * 
-     * public void auditReplicas() { try{ // get lock on hzAuditString
-     * Hazelcast.getLock(this.hzAuditString);
-     * 
-     * CNode cn = null;
-     * 
-     * log.info("Getting the CNode reference for the audit list query."); cn =
-     * D1Client.getCN();
-     * 
-     * // call against the SOLR Indexer to receive a short list of identifiers
-     * // which have replicas unchecked in > shortListAge SolrDocumentList
-     * shortList = cn.getAuditShortList(this.shortListAge,
-     * Integer.parseInt(this.shortListNumRows));
-     * 
-     * SystemMetadata sysmeta = null;
-     * 
-     * // bin the tasks by NodeReference for bulk processing by MNAuditTask for
-     * (SolrDocument doc : shortList) { sysmeta =
-     * this.systemMetadata.get(doc.get("id")); for (Replica replica :
-     * sysmeta.getReplicaList()) { if (replica.getReplicaVerified()) { // } else
-     * { // } } } } catch (ServiceFailure sf) {
-     * log.error("Failed to get the CNode for the audit list query."); } catch
-     * (SolrServerException sse) {
-     * log.error("Failed to perform query on SOLR Index for audit short list");
-     * } }
-     */
-
-    /*
      * Update the replica metadata against the CN router address rather than the
      * local CN address. This only gets called if normal updates fail due to
      * local CN communication errors
      * 
      * @return true if the replica metadata are updated
      * 
-     * @param session - the session
+     * @param session
+     *            - the session
      * 
-     * @param pid - the identifier of the object to be updated
+     * @param pid
+     *            - the identifier of the object to be updated
      * 
      * @param replicaMetadata
-     */
+     **/
     private boolean updateReplicationMetadata(Session session, Identifier pid,
             Replica replicaMetadata) {
         SystemMetadata sysmeta;
@@ -895,27 +802,21 @@ public class ReplicationManager {
                                     sysmeta.getAuthoritativeMemberNode().getValue())) {
                         continue; // don't count CNs or authoritative nodes as
                                   // replicas
-
                     }
-
                 } else {
                     log.debug("The potential target node id is null for " + nodeId.getValue());
                     continue;
                 }
-
             } catch (Exception e) {
                 log.debug("There was an error getting the node type: " + e.getMessage(), e);
             }
-
             if (listedStatus == ReplicationStatus.QUEUED
                     || listedStatus == ReplicationStatus.REQUESTED
                     || listedStatus == ReplicationStatus.COMPLETED) {
                 listedReplicaNodes.add(nodeId);
             }
         }
-
         return listedReplicaNodes;
-
     }
 
     public void setCnReplication(CNReplication cnReplication) {
@@ -969,29 +870,24 @@ public class ReplicationManager {
         return prioritizationStrategy.getBandwidthFactors(nodeIdentifiers, useCache);
     }
 
-    /*
+    /**
      * Report replica counts by node status by querying the system metadata
      * replication status tables on the CNs and push the results into a deicated
      * hazelcast map
-     */
+     **/
     private void reportCountsByNodeStatus() {
 
         /* A map used to transfer records from the DAO query into hazelcast */
         Map<String, Integer> countsByNodeStatusMap = new HashMap<String, Integer>();
-
         try {
             countsByNodeStatusMap = DaoFactory.getReplicationDao().getCountsByNodeStatus();
             log.debug("Counts by Node-Status map size: " + countsByNodeStatusMap.size());
-
         } catch (DataAccessException e) {
             log.info("There was an error getting node-status counts: " + e.getMessage());
             if (log.isDebugEnabled()) {
                 e.printStackTrace();
-
             }
-
         }
-
         this.nodeReplicationStatus.putAll(countsByNodeStatusMap);
     }
 
