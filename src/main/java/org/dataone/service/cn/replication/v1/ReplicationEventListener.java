@@ -38,6 +38,7 @@ import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.ILock;
 import com.hazelcast.core.IMap;
 import com.hazelcast.core.IQueue;
+import com.hazelcast.core.ItemEvent;
 import com.hazelcast.core.ItemListener;
 
 /**
@@ -121,8 +122,11 @@ public class ReplicationEventListener implements EntryListener<Identifier, Syste
      * Listen for item added events on the hzReplicationEvents queue. Call the
      * replicationManager to evaluate the replication policy for the identifier
      */
-    public void itemAdded(Identifier identifier) {
+    public void itemAdded(ItemEvent<Identifier> item) {
         if (ReplicationUtil.replicationIsActive()) {
+
+            Identifier identifier = item.getItem();
+
             log.info("Item added event received on the [end of] hzReplicationEvents queue for "
                     + identifier.getValue());
             Identifier pid = null;
@@ -180,9 +184,8 @@ public class ReplicationEventListener implements EntryListener<Identifier, Syste
     /**
      * Listen for item removed events on the hzReplicationEvents queue.
      */
-    public void itemRemoved(Identifier identifier) {
+    public void itemRemoved(ItemEvent<Identifier> item) {
         // nothing to do
-
     }
 
     /**
@@ -360,5 +363,4 @@ public class ReplicationEventListener implements EntryListener<Identifier, Syste
         this.replicationManager = replicationManager;
 
     }
-
 }

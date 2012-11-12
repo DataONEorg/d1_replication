@@ -100,7 +100,7 @@ public class ReplicationManagerTest {
             System.out.print(queueName + " ");
         }
         System.out.println();
-        hzMember = Hazelcast.init(hzConfig);
+        hzMember = Hazelcast.newHazelcastInstance(hzConfig);
         h1 = Hazelcast.newHazelcastInstance(hzConfig);
         h2 = Hazelcast.newHazelcastInstance(hzConfig);
         System.out.println("Hazelcast member hzMember name: " + hzMember.getName());
