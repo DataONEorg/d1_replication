@@ -22,8 +22,8 @@ package org.dataone.service.cn.replication.v1;
 
 import java.io.File;
 import java.io.Serializable;
-import java.util.Calendar;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.concurrent.Callable;
 
 import org.apache.commons.logging.Log;
@@ -31,13 +31,14 @@ import org.apache.commons.logging.LogFactory;
 import org.dataone.client.D1Client;
 import org.dataone.client.MNode;
 import org.dataone.client.auth.CertificateManager;
+import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.InvalidRequest;
+import org.dataone.service.exceptions.InvalidToken;
 import org.dataone.service.exceptions.NotAuthorized;
+import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
-import org.dataone.service.exceptions.InvalidToken;
-import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.Node;
@@ -48,255 +49,275 @@ import org.dataone.service.types.v1.SystemMetadata;
 
 import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.core.IMap;
-import org.dataone.cn.hazelcast.HazelcastClientInstance;
 
 /**
- * A single audit task to be queued and executed by the Replication Service.
- * The audit task is generated from the result of a query on objects with 
- * replicas that haven't been verified in 2 or more months.
+ * A single audit task to be queued and executed by the Replication Service. The
+ * audit task is generated from the result of a query on objects with replicas
+ * that haven't been verified in 2 or more months.
  * 
  * @author dexternc
- *
+ * 
  */
 public class MNAuditTask implements Serializable, Callable<String> {
 
-  /* Get a Log instance */
-  public static Log log = LogFactory.getLog(MNAuditTask.class);
-  
-  /* The identifier of this task */
-  private String taskid;
-  
-  /* The identifier of the system metadata map event that precipitated this task */
-  private String eventid;
-  
-  /* The target Node object */
-  private Node auditTargetNode;
-  
-  /* The subject of the originating node, extracted from the Node object */
-  private String auditTargetNodeSubject;
-  
-  /* List of identifiers whose objects need to be checksummed on the target Node */
-  private ArrayList<Identifier> auditIDs;
+    /* Get a Log instance */
+    public static Log log = LogFactory.getLog(MNAuditTask.class);
 
-  private Identifier last_pid;
+    /* The identifier of this task */
+    private String taskid;
 
-  /**
-   * Constructor - create an empty audit task instance
-   */
-  public MNAuditTask() {
-  }
+    /*
+     * The identifier of the system metadata map event that precipitated this
+     * task
+     */
+    private String eventid;
 
-  /**
-   * Constructor - create a audit task instance
-   * 
-   * @param taskid              task ID for this task
-   * @param auditTargetNode     target Node to check
-   * @param auditIDs            list of IDs to check
-   */
-  public MNAuditTask(String taskid, Node auditTargetNode, 
-    ArrayList<Identifier> auditIDs) {
-    this.taskid = taskid;
-    this.auditTargetNode = auditTargetNode;
-    this.auditTargetNodeSubject = auditTargetNode.getSubject(0).getValue();
-    this.auditIDs = auditIDs;
-  }
+    /* The target Node object */
+    private Node auditTargetNode;
 
-  /**
-   * Get the task identifier for this task
-   * @return the taskid
-   */
-  public String getTaskid() {
-    return taskid;
-  }
+    /* The subject of the originating node, extracted from the Node object */
+    private String auditTargetNodeSubject;
 
-  /**
-   * Set the task identifier for this task
-   * @param taskid the taskid to set
-   */
-  public void setTaskid(String taskid) {
-    this.taskid = taskid;
-  }
+    /*
+     * List of identifiers whose objects need to be checksummed on the target
+     * Node
+     */
+    private ArrayList<Identifier> auditIDs;
 
-  /**
-   * Get the event identifier 
-   * @return the eventid
-   */
-  public String getEventid() {
-    return eventid;
-  }
+    private Identifier last_pid;
 
-  /**
-   * Set the event identifier 
-   * @param eventid the eventid to set
-   */
-  public void setEventid(String eventid) {
-    this.eventid = eventid;
-  }
+    /**
+     * Constructor - create an empty audit task instance
+     */
+    public MNAuditTask() {
+    }
 
-  /**
-   * Get the target node
-   * @return the targetNode
-   */
-  public Node getAuditTargetNode() {
-    return auditTargetNode;
-  }
+    /**
+     * Constructor - create a audit task instance
+     * 
+     * @param taskid
+     *            task ID for this task
+     * @param auditTargetNode
+     *            target Node to check
+     * @param auditIDs
+     *            list of IDs to check
+     */
+    public MNAuditTask(String taskid, Node auditTargetNode, ArrayList<Identifier> auditIDs) {
+        this.taskid = taskid;
+        this.auditTargetNode = auditTargetNode;
+        this.auditTargetNodeSubject = auditTargetNode.getSubject(0).getValue();
+        this.auditIDs = auditIDs;
+    }
 
-  /**
-   * Set the target node
-   * @param targetNode the targetNode to set
-   */
-  public void setAuditTargetNode(Node auditTargetNode) {
-    this.auditTargetNode = auditTargetNode;
-  }
+    /**
+     * Get the task identifier for this task
+     * 
+     * @return the taskid
+     */
+    public String getTaskid() {
+        return taskid;
+    }
 
-  /**
-   * For the given Audit task, return the Subject listed in the audit 
-   * target node. Usually used in authorizing an audit event.
-   * 
-   * @return subject - the subject listed in the audit target Node object as a string
-   */
-  public String getAuditTargetNodeSubject() {
-    return this.auditTargetNodeSubject;
-  }
-  
-  /**
-   * Set the target node subject identifying the node
-   * @param subject the targetNode subject
-   */
-  public void setAuditTargetNodeSubject(String subject) {
-    this.auditTargetNodeSubject = subject;
-  }
-  
-  /**
-   * Implement the Callable interface, providing code that initiates auditing.
-   * 
-   * @return pid - the identifier of the replicated object upon success
-   */
-  public String call() throws IllegalStateException {
+    /**
+     * Set the task identifier for this task
+     * 
+     * @param taskid
+     *            the taskid to set
+     */
+    public void setTaskid(String taskid) {
+        this.taskid = taskid;
+    }
 
-      MNode targetMN = null;
+    /**
+     * Get the event identifier
+     * 
+     * @return the eventid
+     */
+    public String getEventid() {
+        return eventid;
+    }
 
-      // Get an target MNode reference to communicate with
-      try {
-          // set up the certificate location
-          String clientCertificateLocation =
-              Settings.getConfiguration().getString("D1Client.certificate.directory")
-              + File.separator + Settings.getConfiguration().getString("D1Client.certificate.filename");
-          CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
-          log.debug("MNReplicationTask task id " + this.taskid + "is using an X509 certificate " +
-                  "from " + clientCertificateLocation);
-          log.debug("Getting the MNode reference for " + 
-                  auditTargetNode.getIdentifier().getValue());
-          targetMN = D1Client.getMN(auditTargetNode.getIdentifier());
+    /**
+     * Set the event identifier
+     * 
+     * @param eventid
+     *            the eventid to set
+     */
+    public void setEventid(String eventid) {
+        this.eventid = eventid;
+    }
 
-      } catch (ServiceFailure e) {
-          log.debug("Failed to get the target MNode reference for " + 
-                    auditTargetNode.getIdentifier().getValue() + 
-                    " while executing MNAuditTask id " +
-                    this.taskid);
-      }
+    /**
+     * Get the target node
+     * 
+     * @return the targetNode
+     */
+    public Node getAuditTargetNode() {
+        return auditTargetNode;
+    }
 
-      // Get the D1 Hazelcast configuration parameters
-      String hzSystemMetadata = 
-          Settings.getConfiguration().getString("dataone.hazelcast.systemMetadata");
+    /**
+     * Set the target node
+     * 
+     * @param targetNode
+     *            the targetNode to set
+     */
+    public void setAuditTargetNode(Node auditTargetNode) {
+        this.auditTargetNode = auditTargetNode;
+    }
 
-      // get the system metadata for the pid
-      HazelcastClient hzClient = HazelcastClientInstance.getHazelcastClient();
+    /**
+     * For the given Audit task, return the Subject listed in the audit target
+     * node. Usually used in authorizing an audit event.
+     * 
+     * @return subject - the subject listed in the audit target Node object as a
+     *         string
+     */
+    public String getAuditTargetNodeSubject() {
+        return this.auditTargetNodeSubject;
+    }
 
-      IMap<String, SystemMetadata> sysMetaMap = hzClient.getMap(hzSystemMetadata);
+    /**
+     * Set the target node subject identifying the node
+     * 
+     * @param subject
+     *            the targetNode subject
+     */
+    public void setAuditTargetNodeSubject(String subject) {
+        this.auditTargetNodeSubject = subject;
+    }
 
-      // Initiate the MN checksum verification 
-      try {
+    /**
+     * Implement the Callable interface, providing code that initiates auditing.
+     * 
+     * @return pid - the identifier of the replicated object upon success
+     */
+    public String call() throws IllegalStateException {
 
-          // the system metadata for the object to be checked.
-          SystemMetadata sysmeta;
+        MNode targetMN = null;
 
-          // for each pid in the list of pids to be checked on this node
-          for (Identifier pid : auditIDs) {
+        // Get an target MNode reference to communicate with
+        try {
+            // set up the certificate location
+            String clientCertificateLocation = Settings.getConfiguration().getString(
+                    "D1Client.certificate.directory")
+                    + File.separator
+                    + Settings.getConfiguration().getString("D1Client.certificate.filename");
+            CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
+            log.debug("MNReplicationTask task id " + this.taskid + "is using an X509 certificate "
+                    + "from " + clientCertificateLocation);
+            log.debug("Getting the MNode reference for "
+                    + auditTargetNode.getIdentifier().getValue());
+            targetMN = D1Client.getMN(auditTargetNode.getIdentifier());
 
-              this.last_pid = pid;
+        } catch (ServiceFailure e) {
+            log.debug("Failed to get the target MNode reference for "
+                    + auditTargetNode.getIdentifier().getValue()
+                    + " while executing MNAuditTask id " + this.taskid);
+        }
 
-              // lock the pid we are going to check
-              sysMetaMap.lock(pid.getValue());
+        // Get the D1 Hazelcast configuration parameters
+        String hzSystemMetadata = Settings.getConfiguration().getString(
+                "dataone.hazelcast.systemMetadata");
 
-              // get the system metadata to modify ReplicationStatus and Replica for 
-              // this identifier
-              sysmeta = sysMetaMap.get(pid);
+        // get the system metadata for the pid
+        HazelcastClient hzClient = HazelcastClientFactory.getStorageClient();
 
-              // list of replicas to check
-              ArrayList<Replica> replicaList = 
-                  (ArrayList<Replica>) sysmeta.getReplicaList();
+        IMap<String, SystemMetadata> sysMetaMap = hzClient.getMap(hzSystemMetadata);
 
-              // the index of the Replica in the List<Replica>
-              int replicaIndex = -1;
+        // Initiate the MN checksum verification
+        try {
 
-              for (Replica replica : replicaList) {
-                  if (replica.getReplicaMemberNode().getValue().equals(
-                              auditTargetNode.getIdentifier().getValue())) {
-                      replicaIndex = replicaList.indexOf(replica);
-                      break;
-                  }
-              }
+            // the system metadata for the object to be checked.
+            SystemMetadata sysmeta;
 
-              if (replicaIndex == -1) {
-                  throw new InvalidRequest("1080", "Node is not reported to have " +
-                          "object: " + pid);
-              }
+            // for each pid in the list of pids to be checked on this node
+            for (Identifier pid : auditIDs) {
 
-              // call for the checksum audit
-              log.debug("Calling MNRead.getChecksum() at auditTargetNode id " + 
-                        targetMN.getNodeId());
+                this.last_pid = pid;
 
-              // session is null - certificate is used
-              Session session = null;
+                // lock the pid we are going to check
+                sysMetaMap.lock(pid.getValue());
 
-              // get the target checksum
-              Checksum targetChecksum = targetMN.getChecksum(session, pid, "MD5");
+                // get the system metadata to modify ReplicationStatus and
+                // Replica for
+                // this identifier
+                sysmeta = sysMetaMap.get(pid);
 
-              if (targetChecksum != sysmeta.getChecksum()) {
-                  replicaList.get(replicaIndex).setReplicationStatus(ReplicationStatus.INVALIDATED);
-                  replicaList.get(replicaIndex).setReplicaVerified(Calendar.getInstance().getTime());
+                // list of replicas to check
+                ArrayList<Replica> replicaList = (ArrayList<Replica>) sysmeta.getReplicaList();
 
-              } else {
-                  replicaList.get(replicaIndex).setReplicaVerified(Calendar.getInstance().getTime());
-              }
+                // the index of the Replica in the List<Replica>
+                int replicaIndex = -1;
 
-              sysmeta.setReplicaList(replicaList);
+                for (Replica replica : replicaList) {
+                    if (replica.getReplicaMemberNode().getValue()
+                            .equals(auditTargetNode.getIdentifier().getValue())) {
+                        replicaIndex = replicaList.indexOf(replica);
+                        break;
+                    }
+                }
 
-              sysMetaMap.unlock(pid.getValue());
-          }
+                if (replicaIndex == -1) {
+                    throw new InvalidRequest("1080", "Node is not reported to have " + "object: "
+                            + pid);
+                }
 
+                // call for the checksum audit
+                log.debug("Calling MNRead.getChecksum() at auditTargetNode id "
+                        + targetMN.getNodeId());
 
-      } catch (NotImplemented e) {
-          // TODO Auto-generated catch block
-          e.printStackTrace();
+                // session is null - certificate is used
+                Session session = null;
 
-      } catch (ServiceFailure e) {
-          // TODO Auto-generated catch block
-          e.printStackTrace();
+                // get the target checksum
+                Checksum targetChecksum = targetMN.getChecksum(session, pid, "MD5");
 
-      } catch (NotAuthorized e) {
-          // TODO Auto-generated catch block
-          e.printStackTrace();
+                if (targetChecksum != sysmeta.getChecksum()) {
+                    replicaList.get(replicaIndex).setReplicationStatus(
+                            ReplicationStatus.INVALIDATED);
+                    replicaList.get(replicaIndex).setReplicaVerified(
+                            Calendar.getInstance().getTime());
 
-      } catch (InvalidRequest e) {
-          // TODO Auto-generated catch block
-          e.printStackTrace();
+                } else {
+                    replicaList.get(replicaIndex).setReplicaVerified(
+                            Calendar.getInstance().getTime());
+                }
 
-      } catch (InvalidToken e) {
-          // TODO Auto-generated catch block
-          e.printStackTrace();
+                sysmeta.setReplicaList(replicaList);
 
-      } catch (NotFound e) {
-          // TODO Auto-generated catch block
-          e.printStackTrace();
+                sysMetaMap.unlock(pid.getValue());
+            }
 
-      } finally {
-          sysMetaMap.unlock(this.last_pid.getValue());
-      }
+        } catch (NotImplemented e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
 
+        } catch (ServiceFailure e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
 
-      return auditTargetNode.getIdentifier().getValue();
-  }
+        } catch (NotAuthorized e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+
+        } catch (InvalidRequest e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+
+        } catch (InvalidToken e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+
+        } catch (NotFound e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+
+        } finally {
+            sysMetaMap.unlock(this.last_pid.getValue());
+        }
+
+        return auditTargetNode.getIdentifier().getValue();
+    }
 
 }
