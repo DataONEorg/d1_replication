@@ -33,6 +33,7 @@ import org.dataone.client.CNode;
 import org.dataone.client.D1Client;
 import org.dataone.client.MNode;
 import org.dataone.client.auth.CertificateManager;
+import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.InvalidRequest;
@@ -48,7 +49,6 @@ import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.SystemMetadata;
 
-import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.ILock;
 
@@ -123,7 +123,7 @@ public class MNReplicationTask implements Serializable, Callable<String> {
     public MNReplicationTask(String taskid, Identifier pid, NodeReference originatingNode,
             NodeReference targetNode) {
         this.taskid = taskid;
-        this.hzMember = Hazelcast.getDefaultInstance();
+        this.hzMember = HazelcastInstanceFactory.getProcessingInstance();
 
         this.pid = pid;
         this.originatingNode = originatingNode;

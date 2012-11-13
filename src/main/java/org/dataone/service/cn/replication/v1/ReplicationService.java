@@ -278,7 +278,7 @@ public class ReplicationService {
 
         boolean success = false;
         try {
-            success = targetMN.replicate(null, sysmeta, originatingNode);
+            success = targetMN.replicate(sysmeta, originatingNode);
             log.info("Called replicate() at targetNode " + targetMN.getNodeId() + ", identifier "
                     + sysmeta.getIdentifier().getValue() + ". Success: " + success);
         } catch (BaseException e) {
@@ -293,7 +293,7 @@ public class ReplicationService {
 
                 sysmeta = getSystemMetadata(sysmeta.getIdentifier());
                 if (sysmeta != null) {
-                    success = targetMN.replicate(null, sysmeta, originatingNode);
+                    success = targetMN.replicate(sysmeta, originatingNode);
                     log.info("Called replicate() at targetNode " + targetMN.getNodeId()
                             + ", identifier " + sysmeta.getIdentifier().getValue() + ". Success: "
                             + success);

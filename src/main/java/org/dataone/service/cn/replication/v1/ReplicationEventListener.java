@@ -25,6 +25,7 @@ import java.util.concurrent.locks.Lock;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.dataone.cn.hazelcast.HazelcastClientInstance;
+import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.types.v1.Identifier;
@@ -33,7 +34,6 @@ import org.dataone.service.types.v1.SystemMetadata;
 import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.core.EntryEvent;
 import com.hazelcast.core.EntryListener;
-import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.ILock;
 import com.hazelcast.core.IMap;
@@ -93,7 +93,9 @@ public class ReplicationEventListener implements EntryListener<Identifier, Syste
     public ReplicationEventListener() {
         // connect to both the process and storage cluster
         this.hzClient = HazelcastClientInstance.getHazelcastClient();
-        this.hzMember = Hazelcast.getDefaultInstance();
+
+        this.hzMember = HazelcastInstanceFactory.getProcessingInstance();
+
         this.eventsQueue = Settings.getConfiguration().getString(
                 "dataone.hazelcast.replicationQueuedEvents");
         // get references to the system metadata map and events queue
