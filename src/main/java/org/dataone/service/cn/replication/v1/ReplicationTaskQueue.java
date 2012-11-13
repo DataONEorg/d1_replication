@@ -152,7 +152,7 @@ public class ReplicationTaskQueue {
         log.debug("Requesting replica for id " + identifier.getValue() + " and target node "
                 + targetNode.getValue());
         try {
-            replicationService.requestReplica(identifier, targetNode);
+            replicationService.requestQueuedReplication(identifier, targetNode);
         } catch (Exception e) {
             log.error("Error requesting replica", e);
         }
