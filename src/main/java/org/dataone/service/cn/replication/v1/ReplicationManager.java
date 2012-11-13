@@ -471,11 +471,8 @@ public class ReplicationManager {
                             replicaMetadata.setReplicaVerified(Calendar.getInstance().getTime());
 
                             try {
-                                sysmeta = this.systemMetadata.get(pid); // refresh
-                                                                        // sysmeta
-                                                                        // to
-                                                                        // avoid
-                                                                        // VersionMismatch
+                                // refresh sysmeta to avoid VersionMismatch
+                                sysmeta = this.systemMetadata.get(pid);
                                 updated = this.cnReplication.updateReplicationMetadata(pid,
                                         replicaMetadata, sysmeta.getSerialVersion().longValue());
 
@@ -698,18 +695,6 @@ public class ReplicationManager {
     }
 
     /**
-     * Implement the ItemListener interface, responding to items being removed
-     * from the hzReplicationTasks queue.
-     * 
-     * @param task
-     *            - the object being removed from the queue (ReplicationTask)
-     */
-    public void itemRemoved(MNReplicationTask task) {
-        // not implemented until needed
-
-    }
-
-    /**
      * Check if replication is allowed for the given pid
      * 
      * @param pid
@@ -745,10 +730,11 @@ public class ReplicationManager {
         return isAllowed;
     }
 
-    /*
+    /**
      * Check to see if replication tasks are pending for the given pid
      * 
-     * @param pid - the identifier of the object to check
+     * @param pid
+     *            - the identifier of the object to check
      */
     public boolean isPending(Identifier pid) {
         SystemMetadata sysmeta = this.systemMetadata.get(pid);
