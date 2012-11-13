@@ -64,11 +64,10 @@ public class StaleReplicationRequestAuditor implements Runnable {
     public void run() {
         if (ReplicationUtil.replicationIsActive()) {
             log.debug("Stale Replication Request Auditor running.");
-            Date auditDate = calculateAuditDate();
-            List<ReplicaDto> requestedReplicas = getReplicasToAudit(auditDate);
             CNode cn = getCNode();
             if (cn != null) {
                 Map<String, MNode> memberNodes = new HashMap<String, MNode>();
+                List<ReplicaDto> requestedReplicas = getReplicasToAudit();
                 for (ReplicaDto result : requestedReplicas) {
                     Identifier identifier = result.identifier;
                     NodeReference nodeId = result.replica.getReplicaMemberNode();
@@ -107,7 +106,8 @@ public class StaleReplicationRequestAuditor implements Runnable {
         return auditDate;
     }
 
-    private List<ReplicaDto> getReplicasToAudit(Date auditDate) {
+    private List<ReplicaDto> getReplicasToAudit() {
+        Date auditDate = calculateAuditDate();
         List<ReplicaDto> requestedReplicas = new ArrayList<ReplicaDto>();
         try {
             requestedReplicas = DaoFactory.getReplicationDao()

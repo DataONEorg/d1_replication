@@ -29,10 +29,10 @@ import org.dataone.cn.dao.DaoFactory;
 import org.dataone.cn.dao.ReplicationDao;
 import org.dataone.cn.dao.ReplicationDao.ReplicaDto;
 import org.dataone.cn.dao.exceptions.DataAccessException;
+import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
 
-import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.ILock;
 
@@ -47,9 +47,10 @@ import com.hazelcast.core.ILock;
 public class ReplicationTaskQueue {
 
     private static Log log = LogFactory.getLog(ReplicationTaskQueue.class);
+
     private static ReplicationDao replicationDao = DaoFactory.getReplicationDao();
     private static ReplicationService replicationService = new ReplicationService();
-    private static HazelcastInstance hzMember = Hazelcast.getDefaultInstance();
+    private static HazelcastInstance hzMember = HazelcastInstanceFactory.getProcessingInstance();
 
     public ReplicationTaskQueue() {
     }

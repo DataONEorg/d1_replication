@@ -31,7 +31,6 @@ public class QueuedReplicationAuditor implements Runnable {
     private static Log log = LogFactory.getLog(QueuedReplicationAuditor.class);
 
     private ReplicationTaskQueue replicationTaskQueue = new ReplicationTaskQueue();
-
     private ReplicationDao replicationDao = DaoFactory.getReplicationDao();
 
     public QueuedReplicationAuditor() {

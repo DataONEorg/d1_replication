@@ -41,6 +41,7 @@ import org.dataone.client.auth.CertificateManager;
 import org.dataone.cn.dao.DaoFactory;
 import org.dataone.cn.dao.exceptions.DataAccessException;
 import org.dataone.cn.hazelcast.HazelcastClientInstance;
+import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.configuration.Settings;
 import org.dataone.service.cn.v1.CNReplication;
 import org.dataone.service.exceptions.BaseException;
@@ -63,7 +64,6 @@ import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.SystemMetadata;
 
 import com.hazelcast.client.HazelcastClient;
-import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.ILock;
 import com.hazelcast.core.IMap;
@@ -204,7 +204,7 @@ public class ReplicationManager {
 
         // Connect to the Hazelcast process cluster
         log.info("Becoming a DataONE Process cluster hazelcast member with the default instance.");
-        this.hzMember = Hazelcast.getDefaultInstance();
+        this.hzMember = HazelcastInstanceFactory.getProcessingInstance();
 
         // get references to cluster structures
         this.nodes = this.hzMember.getMap(this.nodeMap);
