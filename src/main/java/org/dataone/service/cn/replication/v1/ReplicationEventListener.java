@@ -24,7 +24,7 @@ import java.util.concurrent.locks.Lock;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.dataone.cn.hazelcast.HazelcastClientInstance;
+import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.BaseException;
@@ -92,7 +92,7 @@ public class ReplicationEventListener implements EntryListener<Identifier, Syste
      */
     public ReplicationEventListener() {
         // connect to both the process and storage cluster
-        this.hzClient = HazelcastClientInstance.getHazelcastClient();
+        this.hzClient = HazelcastClientFactory.getStorageClient();
 
         this.hzMember = HazelcastInstanceFactory.getProcessingInstance();
 

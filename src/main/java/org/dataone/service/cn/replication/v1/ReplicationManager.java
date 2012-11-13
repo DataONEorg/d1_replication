@@ -40,7 +40,7 @@ import org.dataone.client.D1Client;
 import org.dataone.client.auth.CertificateManager;
 import org.dataone.cn.dao.DaoFactory;
 import org.dataone.cn.dao.exceptions.DataAccessException;
-import org.dataone.cn.hazelcast.HazelcastClientInstance;
+import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.configuration.Settings;
 import org.dataone.service.cn.v1.CNReplication;
@@ -200,7 +200,7 @@ public class ReplicationManager {
         this.cnRouterHostname = Settings.getConfiguration().getString("cn.router.hostname");
 
         // Connect to the Hazelcast storage cluster
-        this.hzClient = HazelcastClientInstance.getHazelcastClient();
+        this.hzClient = HazelcastClientFactory.getStorageClient();
 
         // Connect to the Hazelcast process cluster
         log.info("Becoming a DataONE Process cluster hazelcast member with the default instance.");
