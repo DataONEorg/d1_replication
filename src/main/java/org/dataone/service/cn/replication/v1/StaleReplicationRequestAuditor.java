@@ -43,7 +43,6 @@ import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.Replica;
-import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.SystemMetadata;
 
 /**
@@ -73,7 +72,7 @@ public class StaleReplicationRequestAuditor implements Runnable {
                 for (ReplicaDto result : requestedReplicas) {
                     Identifier identifier = result.identifier;
                     NodeReference nodeId = result.replica.getReplicaMemberNode();
-                    SystemMetadata sysmeta = getSystemMetadata(cn, identifier);
+                    SystemMetadata sysmeta = replicationService.getSystemMetadata(identifier);
                     if (sysmeta == null) {
                         continue;
                     }
@@ -134,17 +133,6 @@ public class StaleReplicationRequestAuditor implements Runnable {
         return cn;
     }
 
-    private SystemMetadata getSystemMetadata(CNode cn, Identifier identifier) {
-        SystemMetadata sysmeta = null;
-        try {
-            sysmeta = cn.getSystemMetadata(identifier);
-        } catch (BaseException be) {
-            log.error("Stale Replica Status: cannot get system metadata from CN for id: "
-                    + identifier.getValue(), be);
-        }
-        return sysmeta;
-    }
-
     private MNode getMemberNode(Map<String, MNode> memberNodes, NodeReference nodeId) {
         MNode mn = null;
         if (memberNodes.containsKey(nodeId.getValue())) {
@@ -180,25 +168,17 @@ public class StaleReplicationRequestAuditor implements Runnable {
 
     private void updateReplicaToComplete(CNode cn, Identifier identifier, NodeReference nodeId,
             SystemMetadata sysmeta) {
-        try {
-            Replica replicaToUpdate = null;
-            for (Replica replica : sysmeta.getReplicaList()) {
-                if (replica.getReplicaMemberNode().getValue().equals(nodeId.getValue())) {
-                    replicaToUpdate = replica;
-                    break;
-                }
+        Replica replicaToUpdate = null;
+        for (Replica replica : sysmeta.getReplicaList()) {
+            if (replica.getReplicaMemberNode().getValue().equals(nodeId.getValue())) {
+                replicaToUpdate = replica;
+                break;
             }
-            if (replicaToUpdate != null) {
-                replicaToUpdate.setReplicationStatus(ReplicationStatus.COMPLETED);
-                long serialVersion = sysmeta.getSerialVersion().longValue();
-                cn.updateReplicationMetadata(identifier, replicaToUpdate, serialVersion);
-                log.debug("Stale Replication Request Auditor setting replica complete for pid: "
-                        + identifier.getValue() + " for target mn: " + nodeId);
-            }
-        } catch (BaseException e) {
-            log.error(
-                    "Stale Replica Audit - cannot update replica for pid: " + identifier.getValue(),
-                    e);
+        }
+        if (replicaToUpdate != null) {
+            log.debug("Stale Replication Request Auditor setting replica complete for pid: "
+                    + identifier.getValue() + " for target mn: " + nodeId);
+            replicationService.setReplicaToCompleted(identifier, nodeId);
         }
     }
 
