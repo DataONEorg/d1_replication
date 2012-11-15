@@ -90,11 +90,12 @@ public class ReplicationService {
             return;
         }
 
-        if (hasQueuedReplica(sysmeta, targetNode) == false) {
-            log.debug("Replica not queued for: " + identifier + " for node: "
-                    + targetNode.getValue() + ". exiting...");
-            return;
-        }
+        hasQueuedReplica(sysmeta, targetNode);
+        // if (hasQueuedReplica(sysmeta, targetNode) == false) {
+        // log.debug("Replica not queued for: " + identifier + " for node: "
+        // + targetNode.getValue() + ". exiting...");
+        // return;
+        // }
 
         boolean updated = setReplicaToRequested(identifier, targetNode);
         if (updated == false) {
@@ -222,7 +223,7 @@ public class ReplicationService {
         List<Replica> replicaList = sysmeta.getReplicaList();
         for (Replica replica : replicaList) {
             NodeReference listedNode = replica.getReplicaMemberNode();
-            if (listedNode == targetNode) {
+            if (listedNode.getValue().equals(targetNode.getValue())) {
                 ReplicationStatus currentStatus = replica.getReplicationStatus();
                 if (currentStatus == ReplicationStatus.REQUESTED
                         || currentStatus == ReplicationStatus.COMPLETED) {
@@ -231,7 +232,7 @@ public class ReplicationService {
                 }
             }
         }
-        if (!handled) {
+        if (handled) {
             log.debug("Replica is already handled for: " + sysmeta.getIdentifier().getValue()
                     + " at node: " + targetNode.getValue());
         }
@@ -243,7 +244,7 @@ public class ReplicationService {
         List<Replica> replicaList = sysmeta.getReplicaList();
         for (Replica replica : replicaList) {
             NodeReference listedNode = replica.getReplicaMemberNode();
-            if (listedNode == targetNode) {
+            if (listedNode.getValue().equals(targetNode.getValue())) {
                 ReplicationStatus currentStatus = replica.getReplicationStatus();
                 if (currentStatus == ReplicationStatus.QUEUED) {
                     queued = true;
