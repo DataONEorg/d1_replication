@@ -2,6 +2,7 @@
 <!-- Apache Commons Configuration -->
 <configuration>
   <properties fileName="node.properties"/>
+  <properties fileName="dataoneHazelcast.properties"/>
   <properties fileName="replication.properties"/>
   <properties fileName="d1client.properties"/>
   <properties fileName="ldapService.properties"/>
