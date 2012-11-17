@@ -100,8 +100,12 @@ public class ReplicationManagerTest {
             System.out.print(queueName + " ");
         }
         System.out.println();
+        String processingHzInstance = Settings.getConfiguration().getString("dataone.hazelcast.process.instanceName");
+        hzConfig.setInstanceName(processingHzInstance);
         hzMember = Hazelcast.newHazelcastInstance(hzConfig);
+        hzConfig.setInstanceName(processingHzInstance + "1");
         h1 = Hazelcast.newHazelcastInstance(hzConfig);
+        hzConfig.setInstanceName(processingHzInstance + "2");
         h2 = Hazelcast.newHazelcastInstance(hzConfig);
         System.out.println("Hazelcast member hzMember name: " + hzMember.getName());
         System.out.println("Hazelcast member h1 name: " + h1.getName());

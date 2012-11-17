@@ -561,6 +561,7 @@ public class ReplicationManager {
 
                             }
                             if (updated) {
+                                taskCount++;
                                 this.replicationTaskQueue.processAllTasksForMN(targetNode
                                         .getIdentifier().getValue());
                             } else {
