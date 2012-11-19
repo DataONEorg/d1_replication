@@ -23,12 +23,14 @@
 package org.dataone.service.cn.replication.v1;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
+import java.util.Set;
 import java.util.TreeMap;
 
 import org.apache.commons.logging.Log;
@@ -454,26 +456,65 @@ public class ReplicationPrioritizationStrategy {
 
         sortedScoresMap.putAll(nodeScoreMap);
 
-        // add sorted map entries to the sorted potential node list
         log.debug("Sorted scores map size: " + sortedScoresMap.size());
-        if (sortedScoresMap.size() > 0) {
-            log.debug("Sorted scores members: ");
-            for (Entry<NodeReference, Float> entry : sortedScoresMap.entrySet()) {
-                if (entry.getValue().floatValue() > 0) {
-                    nodesByPriority.add(entry.getKey()); // append to retain
-                                                         // order
-                    log.debug("Node: " + entry.getKey().getValue()
-                            + ", score: " + entry.getValue().floatValue());
 
-                } else {
-                    log.info("Removed " + entry.getKey().getValue()
-                            + ", score is " + entry.getValue().floatValue());
-
+        Set<Float> usedScores = new HashSet<Float>();
+        List<NodeReference> randomSortedNodes = new ArrayList<NodeReference>();
+        for (NodeReference nodeRef : sortedScoresMap.keySet()) {
+            Float value = sortedScoresMap.get(nodeRef);
+            if (value.floatValue() <= 0) {
+                log.info("Removed " + nodeRef.getValue() + ", score is " + value.floatValue());
+                continue;
+            }
+            if (usedScores.contains(value)) {
+                continue;
+            }
+            usedScores.add(value);
+            List<NodeReference> sameScores = new ArrayList<NodeReference>();
+            for (NodeReference matchRef : sortedScoresMap.keySet()) {
+                if (matchRef.equals(nodeRef)) {
+                    continue;
+                }
+                Float matchValue = sortedScoresMap.get(matchRef);
+                if (matchValue.floatValue() == value.floatValue()) {
+                    sameScores.add(nodeRef);
                 }
             }
-
+            if (sameScores.isEmpty()) {
+                log.debug("Adding " + nodeRef.getValue() + " , score is " + value.floatValue());
+                randomSortedNodes.add(nodeRef);
+            } else {
+                Collections.shuffle(sameScores);
+                if (log.isDebugEnabled()) {
+                    log.debug("Adding: ");
+                    for (NodeReference logRef : sameScores) {
+                        log.debug("Node: " + logRef.getValue() + " , score is "
+                                + value.floatValue());
+                    }
+                }
+                randomSortedNodes.addAll(sameScores);
+            }
         }
-        return nodesByPriority;
+
+        // add sorted map entries to the sorted potential node list
+        // log.debug("Sorted scores map size: " + sortedScoresMap.size());
+        // if (sortedScoresMap.size() > 0) {
+        // log.debug("Sorted scores members: ");
+        // for (Entry<NodeReference, Float> entry : sortedScoresMap.entrySet())
+        // {
+        // if (entry.getValue().floatValue() > 0) {
+        // nodesByPriority.add(entry.getKey()); // append to retain
+        // // order
+        // log.debug("Node: " + entry.getKey().getValue()
+        // + ", score: " + entry.getValue().floatValue());
+        //
+        // } else {
+        // log.info("Removed " + entry.getKey().getValue()
+        // + ", score is " + entry.getValue().floatValue());
+        // }
+        // }
+        // }
+        return randomSortedNodes;
     }
 
     /**
