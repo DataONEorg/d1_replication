@@ -476,7 +476,9 @@ public class ReplicationPrioritizationStrategy {
                     continue;
                 }
                 Float matchValue = sortedScoresMap.get(matchRef);
-                if (matchValue.floatValue() == value.floatValue()) {
+                if (matchValue == null) {
+                    log.debug("match value is null for: " + matchRef.getValue());
+                } else if (matchValue.floatValue() == value.floatValue()) {
                     sameScores.add(nodeRef);
                 }
             }
