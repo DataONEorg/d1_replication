@@ -462,6 +462,7 @@ public class ReplicationPrioritizationStrategy {
         List<NodeReference> randomSortedNodes = new ArrayList<NodeReference>();
         for (NodeReference nodeRef : sortedScoresMap.keySet()) {
             Float value = sortedScoresMap.get(nodeRef);
+            log.debug("score for node: " + nodeRef.getValue() + " is: " + value.floatValue());
             if (value.floatValue() <= 0) {
                 log.info("Removed " + nodeRef.getValue() + ", score is " + value.floatValue());
                 continue;
@@ -479,6 +480,8 @@ public class ReplicationPrioritizationStrategy {
                 if (matchValue == null) {
                     log.debug("match value is null for: " + matchRef.getValue());
                 } else if (matchValue.floatValue() == value.floatValue()) {
+                    log.debug("match value score for node: " + matchRef.getValue() + " is: "
+                            + matchValue.floatValue());
                     sameScores.add(nodeRef);
                 }
             }
