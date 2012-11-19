@@ -481,7 +481,12 @@ public class ReplicationPrioritizationStrategy {
             Float value = sortedScoresMap.get(nodeRef);
             if (value == null) {
                 log.debug("Node: " + nodeRef.getValue() + " has NULL score.");
-                continue;
+                value = nodeScoreMap.get(nodeRef);
+                if (value == null) {
+                    log.debug("Could not get node score from node score map either: "
+                            + nodeRef.getValue());
+                    continue;
+                }
             }
             log.debug("score for node: " + nodeRef.getValue() + " is: " + value.floatValue());
             if (value.floatValue() <= 0) {
@@ -500,7 +505,14 @@ public class ReplicationPrioritizationStrategy {
                 Float matchValue = sortedScoresMap.get(matchRef);
                 if (matchValue == null) {
                     log.debug("match value is null for: " + matchRef.getValue());
-                } else if (matchValue.floatValue() == value.floatValue()) {
+                    matchValue = nodeScoreMap.get(matchRef);
+                    if (matchValue == null) {
+                        log.debug("could not get node score from node score map: "
+                                + matchRef.getValue());
+                        continue;
+                    }
+                }
+                if (matchValue.floatValue() == value.floatValue()) {
                     log.debug("match value score for node: " + matchRef.getValue() + " is: "
                             + matchValue.floatValue());
                     sameScores.add(matchRef);
