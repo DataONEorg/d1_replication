@@ -456,6 +456,23 @@ public class ReplicationPrioritizationStrategy {
 
         sortedScoresMap.putAll(nodeScoreMap);
 
+        log.debug("logging sorted scores map:");
+        for (NodeReference nodeRef : sortedScoresMap.keySet()) {
+            log.debug("node id: " + nodeRef.getValue());
+            Float score = sortedScoresMap.get(nodeRef);
+            if (score != null) {
+                log.debug("node score is: " + score.floatValue());
+            } else {
+                log.debug("node score is NULL.");
+                Float backupScore = nodeScoreMap.get(nodeRef);
+                if (backupScore != null) {
+                    log.debug("backup score is " + backupScore.floatValue());
+                } else {
+                    log.debug("backup score is NULL");
+                }
+            }
+        }
+
         log.debug("Sorted scores map size: " + sortedScoresMap.size());
 
         Set<Float> usedScores = new HashSet<Float>();
@@ -493,6 +510,7 @@ public class ReplicationPrioritizationStrategy {
                 log.debug("Adding " + nodeRef.getValue() + " , score is " + value.floatValue());
                 randomSortedNodes.add(nodeRef);
             } else {
+                sameScores.add(nodeRef);
                 Collections.shuffle(sameScores);
                 if (log.isDebugEnabled()) {
                     log.debug("Adding: ");
