@@ -364,6 +364,9 @@ public class ReplicationService {
                         ie);
             }
         }
+        if (targetMN != null) {
+            targetMN.setNodeId(targetNode.getValue());
+        }
         return targetMN;
     }
 
