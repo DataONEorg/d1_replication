@@ -24,7 +24,11 @@ import org.apache.commons.logging.LogFactory;
 import org.dataone.cn.dao.DaoFactory;
 import org.dataone.cn.dao.ReplicationDao;
 import org.dataone.cn.dao.exceptions.DataAccessException;
+import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.service.types.v1.NodeReference;
+
+import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.ILock;
 
 public class QueuedReplicationAuditor implements Runnable {
 
@@ -32,6 +36,8 @@ public class QueuedReplicationAuditor implements Runnable {
 
     private ReplicationTaskQueue replicationTaskQueue = new ReplicationTaskQueue();
     private ReplicationDao replicationDao = DaoFactory.getReplicationDao();
+    private static final String QUEUED_REPLICATION_LOCK_NAME = "queuedReplicationAuditingLock";
+    private static HazelcastInstance hzMember = HazelcastInstanceFactory.getProcessingInstance();
 
     public QueuedReplicationAuditor() {
     }
@@ -39,9 +45,22 @@ public class QueuedReplicationAuditor implements Runnable {
     @Override
     public void run() {
         if (ReplicationUtil.replicationIsActive()) {
-            log.debug("Queued Request Auditor running.");
-            runQueuedTasks();
-            log.debug("Queued Replication Auditor finished.");
+            boolean isLocked = false;
+            ILock lock = hzMember.getLock(QUEUED_REPLICATION_LOCK_NAME);
+            try {
+                isLocked = lock.tryLock();
+                if (isLocked) {
+                    log.debug("Queued Request Auditor running.");
+                    runQueuedTasks();
+                    log.debug("Queued Replication Auditor finished.");
+                }
+            } catch (Exception e) {
+                log.error("Error processing queued replicas:", e);
+            } finally {
+                if (isLocked) {
+                    lock.unlock();
+                }
+            }
         }
     }
 
