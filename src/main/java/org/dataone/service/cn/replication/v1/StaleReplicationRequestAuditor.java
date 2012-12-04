@@ -37,6 +37,7 @@ import org.dataone.client.MNode;
 import org.dataone.cn.dao.DaoFactory;
 import org.dataone.cn.dao.ReplicationDao.ReplicaDto;
 import org.dataone.cn.dao.exceptions.DataAccessException;
+import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.types.v1.Checksum;
@@ -44,6 +45,9 @@ import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.SystemMetadata;
+
+import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.ILock;
 
 /**
  * Auditor class to inspect Member Node replication requests that have been in
@@ -59,35 +63,54 @@ public class StaleReplicationRequestAuditor implements Runnable {
 
     private static Log log = LogFactory.getLog(StaleReplicationRequestAuditor.class);
     private static ReplicationService replicationService = new ReplicationService();
+    private static final String STALE_REPLICATION_LOCK_NAME = "staleReplicationAuditingLock";
+    private static HazelcastInstance hzMember = HazelcastInstanceFactory.getProcessingInstance();
 
     @Override
     public void run() {
         if (ReplicationUtil.replicationIsActive()) {
-            log.debug("Stale Replication Request Auditor running.");
-            CNode cn = getCNode();
-            if (cn != null) {
-                Map<String, MNode> memberNodes = new HashMap<String, MNode>();
-                List<ReplicaDto> requestedReplicas = getReplicasToAudit();
-                for (ReplicaDto result : requestedReplicas) {
-                    Identifier identifier = result.identifier;
-                    NodeReference nodeId = result.replica.getReplicaMemberNode();
-                    SystemMetadata sysmeta = replicationService.getSystemMetadata(identifier);
-                    if (sysmeta == null) {
-                        continue;
-                    }
-                    MNode mn = getMemberNode(memberNodes, nodeId);
-                    if (mn == null) {
-                        continue;
-                    }
-                    Checksum mnChecksum = getChecksumFromMN(identifier, nodeId, sysmeta, mn);
-                    if (mnChecksum == null) {
-                        deleteReplica(identifier, nodeId);
-                    } else {
-                        updateReplicaToComplete(cn, identifier, nodeId, sysmeta);
-                    }
+            boolean isLocked = false;
+            ILock lock = hzMember.getLock(STALE_REPLICATION_LOCK_NAME);
+            try {
+                isLocked = lock.tryLock();
+                if (isLocked) {
+                    log.debug("Stale Replication Request Auditor running.");
+                    processStaleRequests();
+                    log.debug("Stale Replication Request Auditor finished.");
+                }
+            } catch (Exception e) {
+                log.error("Error processing stale requested replicas:", e);
+            } finally {
+                if (isLocked) {
+                    lock.unlock();
                 }
             }
-            log.debug("Stale Replication Request Auditor finished.");
+        }
+    }
+
+    private void processStaleRequests() {
+        CNode cn = getCNode();
+        if (cn != null) {
+            Map<String, MNode> memberNodes = new HashMap<String, MNode>();
+            List<ReplicaDto> requestedReplicas = getReplicasToAudit();
+            for (ReplicaDto result : requestedReplicas) {
+                Identifier identifier = result.identifier;
+                NodeReference nodeId = result.replica.getReplicaMemberNode();
+                SystemMetadata sysmeta = replicationService.getSystemMetadata(identifier);
+                if (sysmeta == null) {
+                    continue;
+                }
+                MNode mn = getMemberNode(memberNodes, nodeId);
+                if (mn == null) {
+                    continue;
+                }
+                Checksum mnChecksum = getChecksumFromMN(identifier, nodeId, sysmeta, mn);
+                if (mnChecksum == null) {
+                    deleteReplica(identifier, nodeId);
+                } else {
+                    updateReplicaToComplete(cn, identifier, nodeId, sysmeta);
+                }
+            }
         }
     }
 
