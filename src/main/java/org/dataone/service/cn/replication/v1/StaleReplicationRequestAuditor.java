@@ -34,6 +34,7 @@ import org.apache.commons.logging.LogFactory;
 import org.dataone.client.CNode;
 import org.dataone.client.D1Client;
 import org.dataone.client.MNode;
+import org.dataone.cn.ComponentActivationUtility;
 import org.dataone.cn.dao.DaoFactory;
 import org.dataone.cn.dao.ReplicationDao.ReplicaDto;
 import org.dataone.cn.dao.exceptions.DataAccessException;
@@ -68,7 +69,7 @@ public class StaleReplicationRequestAuditor implements Runnable {
 
     @Override
     public void run() {
-        if (ReplicationUtil.replicationIsActive()) {
+        if (ComponentActivationUtility.replicationIsActive()) {
             boolean isLocked = false;
             ILock lock = hzMember.getLock(STALE_REPLICATION_LOCK_NAME);
             try {
