@@ -21,6 +21,7 @@ package org.dataone.service.cn.replication.v1;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.dataone.cn.ComponentActivationUtility;
 import org.dataone.cn.dao.DaoFactory;
 import org.dataone.cn.dao.ReplicationDao;
 import org.dataone.cn.dao.exceptions.DataAccessException;
@@ -44,7 +45,7 @@ public class QueuedReplicationAuditor implements Runnable {
 
     @Override
     public void run() {
-        if (ReplicationUtil.replicationIsActive()) {
+        if (ComponentActivationUtility.replicationIsActive()) {
             boolean isLocked = false;
             ILock lock = hzMember.getLock(QUEUED_REPLICATION_LOCK_NAME);
             try {

@@ -24,6 +24,7 @@ import java.util.concurrent.locks.Lock;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.dataone.cn.ComponentActivationUtility;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.configuration.Settings;
@@ -125,7 +126,7 @@ public class ReplicationEventListener implements EntryListener<Identifier, Syste
      * replicationManager to evaluate the replication policy for the identifier
      */
     public void itemAdded(ItemEvent<Identifier> item) {
-        if (ReplicationUtil.replicationIsActive()) {
+        if (ComponentActivationUtility.replicationIsActive()) {
 
             Identifier identifier = item.getItem();
 
@@ -199,7 +200,7 @@ public class ReplicationEventListener implements EntryListener<Identifier, Syste
      */
     public void entryAdded(EntryEvent<Identifier, SystemMetadata> event) {
 
-        if (ReplicationUtil.replicationIsActive()) {
+        if (ComponentActivationUtility.replicationIsActive()) {
             log.info("Received entry added event on the hzSystemMetadata map. Queueing "
                     + event.getKey().getValue());
 
@@ -263,7 +264,7 @@ public class ReplicationEventListener implements EntryListener<Identifier, Syste
      */
     public void entryUpdated(EntryEvent<Identifier, SystemMetadata> event) {
 
-        if (ReplicationUtil.replicationIsActive()) {
+        if (ComponentActivationUtility.replicationIsActive()) {
             log.info("Received entry updated event on the hzSystemMetadata map. Queueing "
                     + event.getKey().getValue());
 
