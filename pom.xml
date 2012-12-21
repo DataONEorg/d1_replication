@@ -12,7 +12,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <spring.version>3.1.1.RELEASE</spring.version>
-        <hazelcast.version>2.4.1-SNAPSHOT</hazelcast.version>
+        <hazelcast.version>2.4.1</hazelcast.version>
         <d1_libclient_version>1.2.0-SNAPSHOT</d1_libclient_version>
         <d1_cn_noderegistry_version>1.2.0-SNAPSHOT</d1_cn_noderegistry_version>
         <d1_cn_common_version_test>1.2.0-SNAPSHOT</d1_cn_common_version_test>
