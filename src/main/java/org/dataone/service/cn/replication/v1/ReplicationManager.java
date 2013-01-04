@@ -42,7 +42,6 @@ import org.dataone.cn.dao.DaoFactory;
 import org.dataone.cn.dao.exceptions.DataAccessException;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
-import org.dataone.cn.hazelcast.membership.ClusterPartitionMonitor;
 import org.dataone.configuration.Settings;
 import org.dataone.service.cn.v1.CNReplication;
 import org.dataone.service.exceptions.BaseException;
@@ -213,8 +212,6 @@ public class ReplicationManager {
         this.replicationEvents = this.hzMember.getQueue(eventsQueue);
         this.taskIdGenerator = this.hzMember.getIdGenerator(this.taskIds);
         this.nodeReplicationStatus = this.hzMember.getMap(this.nodeReplicationStatusMap);
-        ClusterPartitionMonitor.startStorageMonitor();
-        ClusterPartitionMonitor.startProcessingMonitor();
 
         this.replicationTaskQueue = new ReplicationTaskQueue();
 
