@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
@@ -68,7 +67,6 @@ import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.ILock;
 import com.hazelcast.core.IMap;
 import com.hazelcast.core.IQueue;
-import com.hazelcast.core.IdGenerator;
 
 /**
  * A DataONE Coordinating Node implementation which manages replication queues
@@ -91,35 +89,14 @@ public class ReplicationManager {
     /* the instance of the Hazelcast processing cluster member */
     private HazelcastInstance hzMember;
 
-    /*
-     * The instance of the IdGenerator created by Hazelcast used to generate
-     * "task-ids"
-     */
-    private IdGenerator taskIdGenerator;
-
     /* The name of the node map */
     private String nodeMap;
 
     /* The name of the system metadata map */
     private String systemMetadataMap;
 
-    /* The name of the replication tasks queue */
-    private String tasksQueue;
-
     /* The name of the replication events queue */
     private String eventsQueue;
-
-    /* The Hazelcast distributed task id generator namespace */
-    private String taskIds;
-
-    /* The Hazelcast distributed audit lock string name */
-    private String hzAuditString;
-
-    /* The Hazelcast distributed audit lock string name */
-    private String shortListAge;
-
-    /* The Hazelcast distributed audit lock string name */
-    private String shortListNumRows;
 
     /* The Hazelcast distributed system metadata map */
     private IMap<NodeReference, Node> nodes;
@@ -132,38 +109,17 @@ public class ReplicationManager {
     /* The Hazelcast distributed replication events queue */
     private IQueue<Identifier> replicationEvents;
 
-    /* The event listener used to manage incoming map and queue changes */
-    private ReplicationEventListener listener;
-
     /* The Hazelcast distributed counts by node-status map name */
     private String nodeReplicationStatusMap;
 
     /* The Hazelcast distributed map of status counts by node-status */
     private IMap<String, Integer> nodeReplicationStatus;
 
-    /* A scheduler for replication reporting */
-    private ScheduledExecutorService reportScheduler;
-
-    /* The future result of reporting counts by node status to hazelcast */
-    private Future<?> reportCountsTask;
-
     /* A scheduler for pending replica auditing */
     private ScheduledExecutorService pendingReplicaAuditScheduler;
 
     /* A scheduler for queued replica auditing */
     private ScheduledExecutorService queuedReplicaAuditScheduler;
-
-    /* The future result of reporting counts by node status to hazelcast */
-    private Future<?> pendingReplicaAuditTask;
-
-    /* The future result of reporting counts by node status to hazelcast */
-    private Future<?> queuedReplicaAuditTask;
-
-    /*
-     * The timeout period for tasks submitted to the executor service to
-     * complete the call to MN.replicate()
-     */
-    private long timeout = 30L;
 
     /* A client reference to the coordinating node */
     private CNReplication cnReplication = null;
@@ -185,15 +141,8 @@ public class ReplicationManager {
         this.nodeMap = Settings.getConfiguration().getString("dataone.hazelcast.nodes");
         this.systemMetadataMap = Settings.getConfiguration().getString(
                 "dataone.hazelcast.systemMetadata");
-        this.tasksQueue = Settings.getConfiguration().getString(
-                "dataone.hazelcast.replicationQueuedTasks");
         this.eventsQueue = Settings.getConfiguration().getString(
                 "dataone.hazelcast.replicationQueuedEvents");
-        this.taskIds = Settings.getConfiguration().getString("dataone.hazelcast.tasksIdGenerator");
-        this.hzAuditString = Settings.getConfiguration().getString("dataone.hazelcast.auditString");
-        this.shortListAge = Settings.getConfiguration().getString("dataone.hazelcast.shortListAge");
-        this.shortListNumRows = Settings.getConfiguration().getString(
-                "dataone.hazelcast.shortListNumRows");
         this.nodeReplicationStatusMap = Settings.getConfiguration().getString(
                 "dataone.hazelcast.nodeReplicationStatusMap");
 
@@ -210,7 +159,6 @@ public class ReplicationManager {
         this.nodes = this.hzMember.getMap(this.nodeMap);
         this.systemMetadata = this.hzClient.getMap(this.systemMetadataMap);
         this.replicationEvents = this.hzMember.getQueue(eventsQueue);
-        this.taskIdGenerator = this.hzMember.getIdGenerator(this.taskIds);
         this.nodeReplicationStatus = this.hzMember.getMap(this.nodeReplicationStatusMap);
 
         this.replicationTaskQueue = new ReplicationTaskQueue();
@@ -219,12 +167,12 @@ public class ReplicationManager {
         // For now, every hour, clear problematic replica entries that are
         // causing a given node to have too many pending replica requests
         pendingReplicaAuditScheduler = Executors.newSingleThreadScheduledExecutor();
-        pendingReplicaAuditTask = pendingReplicaAuditScheduler.scheduleAtFixedRate(
-                new StaleReplicationRequestAuditor(), 0L, 1L, TimeUnit.HOURS);
+        pendingReplicaAuditScheduler.scheduleAtFixedRate(new StaleReplicationRequestAuditor(), 0L,
+                1L, TimeUnit.HOURS);
 
         queuedReplicaAuditScheduler = Executors.newSingleThreadScheduledExecutor();
-        queuedReplicaAuditTask = queuedReplicaAuditScheduler.scheduleAtFixedRate(
-                new QueuedReplicationAuditor(), 0L, 1L, TimeUnit.HOURS);
+        queuedReplicaAuditScheduler.scheduleAtFixedRate(new QueuedReplicationAuditor(), 0L, 1L,
+                TimeUnit.HOURS);
 
         // Report node status statistics on a scheduled basis
         // TODO: hold off on scheduling code for now
@@ -702,7 +650,7 @@ public class ReplicationManager {
      *            - the identifier of the object to check
      * @return
      */
-    public boolean isAllowed(Identifier pid) {
+    private boolean isAllowed(Identifier pid) {
 
         log.debug("ReplicationManager.isAllowed() called for " + pid.getValue());
         boolean isAllowed = false;
@@ -737,7 +685,7 @@ public class ReplicationManager {
      * @param pid
      *            - the identifier of the object to check
      */
-    public boolean isPending(Identifier pid) {
+    private boolean isPending(Identifier pid) {
         SystemMetadata sysmeta = this.systemMetadata.get(pid);
         List<Replica> replicaList = sysmeta.getReplicaList();
         boolean is_pending = false;
@@ -819,7 +767,7 @@ public class ReplicationManager {
      *            use the cached values if the cache hasn't expired
      * @return requestFactors the pending request factors of the nodes
      */
-    public Map<NodeReference, Float> getPendingRequestFactors(List<NodeReference> nodeIdentifiers,
+    private Map<NodeReference, Float> getPendingRequestFactors(List<NodeReference> nodeIdentifiers,
             boolean useCache) {
 
         return prioritizationStrategy.getPendingRequestFactors(nodeIdentifiers, useCache);
@@ -835,7 +783,7 @@ public class ReplicationManager {
      *            use the cached values if the cache hasn't expired
      * @return failureFactors the failure factors of the nodes
      */
-    public Map<NodeReference, Float> getFailureFactors(List<NodeReference> nodeIdentifiers,
+    private Map<NodeReference, Float> getFailureFactors(List<NodeReference> nodeIdentifiers,
             boolean useCache) {
         return prioritizationStrategy.getFailureFactors(nodeIdentifiers, useCache);
     }
@@ -850,7 +798,7 @@ public class ReplicationManager {
      *            use the cached values if the cache hasn't expired
      * @return bandwidthFactors the bandwidth factor of the node
      */
-    public Map<NodeReference, Float> getBandwidthFactors(List<NodeReference> nodeIdentifiers,
+    private Map<NodeReference, Float> getBandwidthFactors(List<NodeReference> nodeIdentifiers,
             boolean useCache) {
         HashMap<NodeReference, Float> bandwidthFactors = new HashMap<NodeReference, Float>();
 
@@ -889,7 +837,7 @@ public class ReplicationManager {
      * @return nodesByPriority a list of nodes by descending priority
      */
     @SuppressWarnings("unchecked")
-    public List<NodeReference> prioritizeNodes(int desiredReplicasLessListed,
+    private List<NodeReference> prioritizeNodes(int desiredReplicasLessListed,
             List<NodeReference> potentialNodeList, SystemMetadata sysmeta) {
 
         List<NodeReference> nodesByPriority = prioritizationStrategy.prioritizeNodes(
