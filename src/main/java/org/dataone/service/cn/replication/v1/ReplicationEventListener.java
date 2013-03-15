@@ -111,6 +111,8 @@ public class ReplicationEventListener implements EntryListener<Identifier, Syste
         this.replicationEvents.addItemListener(this, true);
         log.info("Added a listener to the " + this.replicationEvents.getName() + " queue.");
 
+        this.replicationManager = ReplicationFactory.getReplicationManager();
+
     }
 
     /**
@@ -343,27 +345,5 @@ public class ReplicationEventListener implements EntryListener<Identifier, Syste
 
             }
         }
-    }
-
-    /**
-     * Get a reference to the ReplicationManager instance
-     * 
-     * @return replicationManager - the singleton instance of the
-     *         ReplicationManager
-     */
-    public ReplicationManager getReplicationManager() {
-        return replicationManager;
-
-    }
-
-    /**
-     * Set the ReplicationManager instance
-     * 
-     * param replicationManager - the singleton instance of the
-     * ReplicationManager
-     */
-    public void setReplicationManager(ReplicationManager replicationManager) {
-        this.replicationManager = replicationManager;
-
     }
 }

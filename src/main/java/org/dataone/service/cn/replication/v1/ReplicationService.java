@@ -104,10 +104,11 @@ public class ReplicationService {
             return;
         }
 
-        MNode targetMN = getMemberNode(sysmeta.getIdentifier(), targetNode);
+        MNode targetMN = getMemberNode(targetNode);
         if (targetMN == null) {
             log.error("Unable to get target mn: " + targetNode.getValue()
-                    + ". deleting replica metadata, not requesting replica.");
+                    + ". deleting replica metadata, not requesting replica for pid: "
+                    + sysmeta.getIdentifier().getValue());
             deleteReplicationMetadata(identifier, targetNode);
             return;
         }
@@ -147,7 +148,7 @@ public class ReplicationService {
         for (int i = 0; i < 5; i++) {
             try {
                 // refresh the system metadata in case it changed
-                sysmeta = cn.getSystemMetadata(pid);
+                sysmeta = getSystemMetadata(pid);
                 deleted = cn.deleteReplicationMetadata(pid, targetNode, sysmeta.getSerialVersion()
                         .longValue());
                 if (deleted) {
@@ -321,6 +322,58 @@ public class ReplicationService {
         return success;
     }
 
+    /**
+     * Update the replica metadata against the CN router address rather than the
+     * local CN address. This only gets called if normal updates fail due to
+     * local CN communication errors
+     * 
+     * @return true if the replica metadata are updated
+     * @param session
+     * @param pid
+     * @param replicaMetadata
+     **/
+    public boolean updateReplicationMetadata(Identifier pid, Replica replicaMetadata) {
+
+        SystemMetadata sysmeta = null;
+        boolean updated = false;
+
+        for (int i = 0; i < 5; i++) {
+            try {
+                // refresh the system metadata in case it changed
+                sysmeta = getSystemMetadata(pid);
+                updated = cn.updateReplicationMetadata(pid, replicaMetadata, sysmeta
+                        .getSerialVersion().longValue());
+                if (updated) {
+                    break;
+                }
+            } catch (BaseException be) {
+                // the replica has already completed from a different task
+                if (be instanceof InvalidRequest) {
+                    log.warn(
+                            "Couldn't update replication metadata to "
+                                    + replicaMetadata.getReplicationStatus().toString()
+                                    + ", it may have possibly already been updated for identifier "
+                                    + pid.getValue() + " and target node "
+                                    + replicaMetadata.getReplicaMemberNode().getValue()
+                                    + ". The error was: " + be.getMessage(), be);
+                    return false;
+                }
+                if (log.isDebugEnabled()) {
+                    log.debug(be);
+                }
+                log.error("Error in calling updateReplicationMetadata(): " + be.getMessage());
+                continue;
+            } catch (RuntimeException re) {
+                if (log.isDebugEnabled()) {
+                    log.debug(re);
+                }
+                log.error("Error in getting sysyem metadata from the map: " + re.getMessage());
+                continue;
+            }
+        }
+        return updated;
+    }
+
     private void initializeCN() {
         try {
             this.cn = D1Client.getCN();
@@ -342,7 +395,7 @@ public class ReplicationService {
         }
     }
 
-    private MNode getMemberNode(Identifier identifier, NodeReference targetNode) {
+    public MNode getMemberNode(NodeReference targetNode) {
         MNode targetMN = null;
         try {
             targetMN = D1Client.getMN(targetNode);
@@ -359,9 +412,8 @@ public class ReplicationService {
                         e1);
             } catch (InterruptedException ie) {
                 log.error(
-                        "Caught InterruptedException while getting a reference to the MN identifier "
-                                + identifier.getValue() + ", target node " + targetNode.getValue(),
-                        ie);
+                        "Caught InterruptedException while getting a reference to the MN identifier, target node "
+                                + targetNode.getValue(), ie);
             }
         }
         if (targetMN != null) {

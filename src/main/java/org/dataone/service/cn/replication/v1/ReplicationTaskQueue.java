@@ -37,9 +37,14 @@ import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.ILock;
 
 /**
- * Abstract member node replication task work queue. Provides interface for
- * working with queued replication objects which represent a replication that
- * needs to be performed.
+ * A member node replication work queue.
+ * 
+ * Provides an abstraction for working with queued replication objects which
+ * represent a replication that needs to be performed. These tasks are
+ * represented by replica objects in the 'QUEUED' status.
+ * 
+ * Essentially this is a Queued Replica Work Queue -- its job is to move
+ * replicas to the requested status.
  * 
  * @author sroseboo
  * 
@@ -48,11 +53,14 @@ public class ReplicationTaskQueue {
 
     private static Log log = LogFactory.getLog(ReplicationTaskQueue.class);
 
-    private static ReplicationDao replicationDao = DaoFactory.getReplicationDao();
-    private static ReplicationService replicationService = new ReplicationService();
-    private static HazelcastInstance hzMember = HazelcastInstanceFactory.getProcessingInstance();
+    private ReplicationDao replicationDao;
+    private ReplicationService replicationService;
+    private HazelcastInstance hzMember;
 
     public ReplicationTaskQueue() {
+        replicationDao = DaoFactory.getReplicationDao();
+        replicationService = ReplicationFactory.getReplicationService();
+        hzMember = HazelcastInstanceFactory.getProcessingInstance();
     }
 
     public void logState() {
@@ -66,6 +74,12 @@ public class ReplicationTaskQueue {
         }
     }
 
+    /**
+     * Returns a Collection of NodeReference objects for member nodes that
+     * currently have queued replicas.
+     * 
+     * @return
+     */
     public Collection<NodeReference> getMemberNodesInQueue() {
         Collection<NodeReference> nodes = new ArrayList<NodeReference>();
         try {
@@ -76,6 +90,13 @@ public class ReplicationTaskQueue {
         return nodes;
     }
 
+    /**
+     * Returns the count of queued replica objects for the node specified by the
+     * nodeId parameter.
+     * 
+     * @param nodeId
+     * @return
+     */
     public int getCountOfTasksForNode(String nodeId) {
         int count = 0;
         try {
@@ -86,7 +107,15 @@ public class ReplicationTaskQueue {
         return count;
     }
 
-    public boolean containsTask(String nodeId, String identifier) {
+    /**
+     * Indicates if a queued replica currently exists for the specified
+     * identifier and the memeber node specified by the nodeId parameter.
+     * 
+     * @param nodeId
+     * @param identifier
+     * @return
+     */
+    private boolean containsTask(String nodeId, String identifier) {
         log.debug("invoking contains task");
         if (nodeId == null || identifier == null) {
             return false;
@@ -100,6 +129,12 @@ public class ReplicationTaskQueue {
         return contains;
     }
 
+    /**
+     * Attempt to move each 'queued' replica to the 'requested' state for the
+     * member node specified by the memberNodeIdentifierValue parameter.
+     * 
+     * @param memberNodeIdentifierValue
+     */
     public void processAllTasksForMN(String memberNodeIdentifierValue) {
         String mnId = memberNodeIdentifierValue;
         boolean isLocked = false;
@@ -119,7 +154,7 @@ public class ReplicationTaskQueue {
                         for (ReplicaDto replica : queuedReplicas) {
                             if (replica != null) {
                                 try {
-                                    this.executeTask(replica.identifier,
+                                    this.requestReplication(replica.identifier,
                                             replica.replica.getReplicaMemberNode());
                                 } catch (Exception e) {
                                     log.error("Caught exception requesting replica", e);
@@ -142,11 +177,12 @@ public class ReplicationTaskQueue {
     }
 
     /**
-     * Encapsulates implementation details on how a replication task is
-     * executed.
+     * Encapsulates implementation details on how a queued replica is moved to
+     * the requested state. Sets a replica to Queued status, which effectively
+     * removes it from the QueuedTaskQueue
      * 
      */
-    private void executeTask(Identifier identifier, NodeReference targetNode) {
+    private void requestReplication(Identifier identifier, NodeReference targetNode) {
         if (identifier == null || targetNode == null) {
             return;
         }
@@ -159,6 +195,15 @@ public class ReplicationTaskQueue {
         }
     }
 
+    /**
+     * Represents the task or work for the member node specified by the mnId
+     * parameter. In terms of replication, the work here represents replicas
+     * which have been queued for replication, waiting to be transition to
+     * requested state.
+     * 
+     * @param mnId
+     * @return
+     */
     private Collection<ReplicaDto> getQueuedReplicas(String mnId) {
         Collection<ReplicaDto> queuedReplicas = new ArrayList<ReplicaDto>();
         try {

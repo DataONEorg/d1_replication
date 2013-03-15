@@ -100,7 +100,8 @@ public class ReplicationManagerTest {
             System.out.print(queueName + " ");
         }
         System.out.println();
-        String processingHzInstance = Settings.getConfiguration().getString("dataone.hazelcast.process.instanceName");
+        String processingHzInstance = Settings.getConfiguration().getString(
+                "dataone.hazelcast.process.instanceName");
         hzConfig.setInstanceName(processingHzInstance);
         hzMember = Hazelcast.newHazelcastInstance(hzConfig);
         hzConfig.setInstanceName(processingHzInstance + "1");
@@ -154,7 +155,7 @@ public class ReplicationManagerTest {
         }
 
         // create the ReplicationManager
-        replicationManager = new ReplicationManager();
+        replicationManager = ReplicationFactory.getReplicationManager();
         CNReplication cnReplication = new CNReplicationImpl();
         // inject a mock CNReplication Class so that we don't need a
         // CN running on a remote server somewhere in order to unit test
