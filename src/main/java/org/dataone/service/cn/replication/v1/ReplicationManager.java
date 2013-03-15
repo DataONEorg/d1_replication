@@ -28,8 +28,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
@@ -59,7 +57,6 @@ import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationPolicy;
 import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.Service;
-import org.dataone.service.types.v1.Session;
 import org.dataone.service.types.v1.SystemMetadata;
 
 import com.hazelcast.client.HazelcastClient;
@@ -82,6 +79,8 @@ public class ReplicationManager {
 
     /* Get a Log instance */
     public static Log log = LogFactory.getLog(ReplicationManager.class);
+
+    private ReplicationService replicationService;
 
     /* The instance of the Hazelcast storage cluster client */
     private HazelcastClient hzClient;
@@ -114,12 +113,6 @@ public class ReplicationManager {
 
     /* The Hazelcast distributed map of status counts by node-status */
     private IMap<String, Integer> nodeReplicationStatus;
-
-    /* A scheduler for pending replica auditing */
-    private ScheduledExecutorService pendingReplicaAuditScheduler;
-
-    /* A scheduler for queued replica auditing */
-    private ScheduledExecutorService queuedReplicaAuditScheduler;
 
     /* A client reference to the coordinating node */
     private CNReplication cnReplication = null;
@@ -161,18 +154,8 @@ public class ReplicationManager {
         this.replicationEvents = this.hzMember.getQueue(eventsQueue);
         this.nodeReplicationStatus = this.hzMember.getMap(this.nodeReplicationStatusMap);
 
-        this.replicationTaskQueue = new ReplicationTaskQueue();
-
-        // TODO: use a more comprehensive MNAuditTask to fix problem replicas
-        // For now, every hour, clear problematic replica entries that are
-        // causing a given node to have too many pending replica requests
-        pendingReplicaAuditScheduler = Executors.newSingleThreadScheduledExecutor();
-        pendingReplicaAuditScheduler.scheduleAtFixedRate(new StaleReplicationRequestAuditor(), 0L,
-                1L, TimeUnit.HOURS);
-
-        queuedReplicaAuditScheduler = Executors.newSingleThreadScheduledExecutor();
-        queuedReplicaAuditScheduler.scheduleAtFixedRate(new QueuedReplicationAuditor(), 0L, 1L,
-                TimeUnit.HOURS);
+        this.replicationTaskQueue = ReplicationFactory.getReplicationTaskQueue();
+        this.replicationService = ReplicationFactory.getReplicationService();
 
         // Report node status statistics on a scheduled basis
         // TODO: hold off on scheduling code for now
@@ -196,10 +179,10 @@ public class ReplicationManager {
         CertificateManager.getInstance().setCertificateLocation(clientCertificateLocation);
         log.info("ReplicationManager is using an X509 certificate from "
                 + clientCertificateLocation);
-
+        init();
     }
 
-    public void init() {
+    private void init() {
         log.info("initialization");
         CNode cnode = null;
         // Get an CNode reference to communicate with
@@ -265,7 +248,6 @@ public class ReplicationManager {
         Node targetNode = new Node(); // the target node for the replica
         Node authoritativeNode = new Node(); // the source node of the object
         SystemMetadata sysmeta;
-        Session session = null;
 
         // use the distributed lock
         lock = null;
@@ -463,7 +445,7 @@ public class ReplicationManager {
                                         // communication
                                         // try the round robin address multiple
                                         // times
-                                        updated = updateReplicationMetadata(session, pid,
+                                        updated = replicationService.updateReplicationMetadata(pid,
                                                 replicaMetadata);
 
                                     }
@@ -493,7 +475,7 @@ public class ReplicationManager {
                                     // communication
                                     // try the round robin address multiple
                                     // times
-                                    updated = updateReplicationMetadata(session, pid,
+                                    updated = replicationService.updateReplicationMetadata(pid,
                                             replicaMetadata);
 
                                 }
@@ -569,77 +551,6 @@ public class ReplicationManager {
         log.info("Added " + taskCount + " MNReplicationTasks to the queue for " + pid.getValue());
 
         return taskCount;
-
-    }
-
-    /**
-     * Update the replica metadata against the CN router address rather than the
-     * local CN address. This only gets called if normal updates fail due to
-     * local CN communication errors
-     * 
-     * @return true if the replica metadata are updated
-     * 
-     * @param session
-     *            - the session
-     * 
-     * @param pid
-     *            - the identifier of the object to be updated
-     * 
-     * @param replicaMetadata
-     **/
-    private boolean updateReplicationMetadata(Session session, Identifier pid,
-            Replica replicaMetadata) {
-        SystemMetadata sysmeta;
-        CNode cn;
-        boolean updated = false;
-        String baseURL = "https://" + this.cnRouterHostname + "/cn";
-        cn = new CNode(baseURL);
-
-        // try multiple times since at this point we may be dealing with a lame
-        // CN in the cluster and the RR may still point us to it
-        for (int i = 0; i < 5; i++) {
-            try {
-                // refresh the system metadata in case it changed
-                sysmeta = this.systemMetadata.get(pid);
-                updated = cn.updateReplicationMetadata(session, pid, replicaMetadata, sysmeta
-                        .getSerialVersion().longValue());
-                if (updated) {
-                    break;
-                }
-
-            } catch (BaseException be) {
-                // the replica has already completed from a different task
-                if (be instanceof InvalidRequest) {
-                    log.warn(
-                            "Couldn't update replication metadata to "
-                                    + replicaMetadata.getReplicationStatus().toString()
-                                    + ", it may have possibly already been updated for identifier "
-                                    + pid.getValue() + " and target node "
-                                    + replicaMetadata.getReplicaMemberNode().getValue()
-                                    + ". The error was: " + be.getMessage(), be);
-                    return false;
-
-                }
-                if (log.isDebugEnabled()) {
-                    log.debug(be);
-
-                }
-                log.error("Error in calling updateReplicationMetadata() " + "at " + baseURL + ": "
-                        + be.getMessage());
-                continue;
-
-            } catch (RuntimeException re) {
-                if (log.isDebugEnabled()) {
-                    log.debug(re);
-
-                }
-                log.error("Error in getting sysyem metadata from the map: " + re.getMessage());
-                continue;
-
-            }
-        }
-
-        return updated;
 
     }
 
