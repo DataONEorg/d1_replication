@@ -7,6 +7,12 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+/**
+ * Controller responsible for scheduling(starting) and stopping replication auditors.
+ * 
+ * @author sroseboo
+ *
+ */
 public class ScheduledReplicationAuditController {
 
     private static Log logger = LogFactory.getLog(ScheduledReplicationAuditController.class

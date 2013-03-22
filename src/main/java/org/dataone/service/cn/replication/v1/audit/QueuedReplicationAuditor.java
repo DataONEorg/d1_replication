@@ -32,6 +32,15 @@ import org.dataone.service.types.v1.NodeReference;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.ILock;
 
+/**
+ * 
+ * Periodically runs to clear out the 'queued' replication tasks.
+ * Transitions all queued replicas to requested.  Purely a process to aid
+ * replication processing from deadlocking the task queue.
+ * 
+ * @author sroseboo
+ *
+ */
 public class QueuedReplicationAuditor implements Runnable {
 
     private static Log log = LogFactory.getLog(QueuedReplicationAuditor.class);

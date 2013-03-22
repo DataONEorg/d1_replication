@@ -51,6 +51,9 @@ import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.core.IMap;
 
 /**
+ * Unused, ready to be removed.
+ * 
+ * 
  * A single audit task to be queued and executed by the Replication Service. The
  * audit task is generated from the result of a query on objects with replicas
  * that haven't been verified in 2 or more months.
