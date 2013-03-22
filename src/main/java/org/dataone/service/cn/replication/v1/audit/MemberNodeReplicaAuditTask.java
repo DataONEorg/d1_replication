@@ -2,6 +2,7 @@ package org.dataone.service.cn.replication.v1.audit;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.concurrent.Callable;
 
@@ -11,20 +12,20 @@ public class MemberNodeReplicaAuditTask implements Serializable, Callable<String
 
     private static final long serialVersionUID = 8549092026722882706L;
 
-    private String taskid;
     private List<Identifier> pidsToAudit = new ArrayList<Identifier>();
     private MemberNodeReplicaAuditingStrategy auditor;
+    private Date auditDate;
 
-    public MemberNodeReplicaAuditTask(String taskid, List<Identifier> pids) {
-        this.taskid = taskid;
+    public MemberNodeReplicaAuditTask(List<Identifier> pids, Date auditDate) {
         this.pidsToAudit = pids;
+        this.auditDate = auditDate;
         auditor = new MemberNodeReplicaAuditingStrategy();
     }
 
     @Override
     public String call() throws Exception {
-        auditor.auditPids(pidsToAudit);
-        return "Replica audit task: " + taskid + " for pids: " + pidsToAudit + " completed.";
+        auditor.auditPids(pidsToAudit, auditDate);
+        return "Replica audit task for pids: " + pidsToAudit + " completed.";
     }
 
     public List<Identifier> getPidsToAudit() {
