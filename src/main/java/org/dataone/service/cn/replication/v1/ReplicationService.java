@@ -30,6 +30,7 @@ import org.dataone.client.D1Client;
 import org.dataone.client.MNode;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.InvalidRequest;
+import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
@@ -120,6 +121,27 @@ public class ReplicationService {
                     + " for: " + identifier.getValue() + ". setting status to failed.");
             setReplicationStatus(identifier, targetNode, ReplicationStatus.FAILED);
         }
+    }
+
+    public boolean deleteReplicaObject(Identifier pid, NodeReference memberNode) {
+        boolean success = true;
+
+        // verify node reference really is a member node reference, otherwise could delete from CN!!
+        MNode targetMN = getMemberNode(memberNode);
+        try {
+            targetMN.delete(pid);
+        } catch (NotFound e) {
+            log.error(
+                    "Unable to find object to delete replica for target MN:  "
+                            + memberNode.getValue() + "for pid: " + pid.getValue()
+                            + ".  Continuing as if delete successful.", e);
+        } catch (BaseException be) {
+            success = false;
+            log.error("Unable to delete replica object from target MN: " + memberNode.getValue()
+                    + " for pid: " + pid.getValue() + ".", be);
+        }
+
+        return success;
     }
 
     /**
