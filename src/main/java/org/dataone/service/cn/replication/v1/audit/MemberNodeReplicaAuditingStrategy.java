@@ -45,10 +45,6 @@ import org.dataone.service.types.v1.util.ChecksumUtil;
 import com.hazelcast.core.IMap;
 
 /**
- * A single audit task to be queued and executed by the Replication Service. The
- * audit task is generated from the result of a query on objects with replicas
- * that haven't been verified in 2 or more months.
- * 
  * This type of audit verifies both that the replication policy is fufilled and
  * that each replica is still valid (by comparing checksum values).
  * 
@@ -58,8 +54,6 @@ import com.hazelcast.core.IMap;
  * 
  * Verified replicas have their verified date updated to reflect audit complete
  * date.
- * 
- * Reuses ReplicationService to perform common operations.
  * 
  * @author sroseboo
  * 
@@ -111,7 +105,7 @@ public class MemberNodeReplicaAuditingStrategy {
         int validReplicaCount = 0;
 
         for (Replica replica : sysMeta.getReplicaList()) {
-            // parts of the replica policy may have already been validated.
+            // parts of the replica policy may have already been validated,
             // only verify replicas with stale replica verified date.
             boolean verify = replica.getReplicaVerified().before(auditDate);
 
@@ -126,7 +120,7 @@ public class MemberNodeReplicaAuditingStrategy {
             } else {
                 boolean verified = false;
                 if (verify) {
-                    verified = auditMNodeReplica(sysMeta, replica);
+                    verified = auditMemberNodeReplica(sysMeta, replica);
                 }
                 if (verified || !verify) {
                     validReplicaCount++;
@@ -141,17 +135,10 @@ public class MemberNodeReplicaAuditingStrategy {
         return;
     }
 
-    private boolean auditMNodeReplica(SystemMetadata sysMeta, Replica replica) {
-
-        boolean verified = false;
-        Identifier pid = sysMeta.getIdentifier();
-        Checksum expected = sysMeta.getChecksum();
+    private boolean auditMemberNodeReplica(SystemMetadata sysMeta, Replica replica) {
 
         MNode mn = getMNode(replica.getReplicaMemberNode());
-
         if (mn == null) {
-            log.error("Cannot get MN: " + replica.getReplicaMemberNode().getValue()
-                    + " unable to verify replica information.");
             // TODO: how to handle not finding the MN? is the replica INVALID? 
             //MN down for maintenance, temporary outage?
             // Auditing may need to check a MN service to determine 
@@ -159,16 +146,19 @@ public class MemberNodeReplicaAuditingStrategy {
             return true;
         }
 
+        Identifier pid = sysMeta.getIdentifier();
+        Checksum expected = sysMeta.getChecksum();
         Checksum actual = getChecksumFromMN(pid, sysMeta, mn);
-        if (ChecksumUtil.areChecksumsEqual(actual, expected)) {
-            verified = true;
+
+        boolean valid = ChecksumUtil.areChecksumsEqual(actual, expected);
+        if (valid) {
             updateReplicaVerified(pid, replica);
         } else {
             log.error("Checksum mismatch for pid: " + pid + " against MN: "
                     + replica.getReplicaMemberNode());
             handleInvalidReplica(pid, replica);
         }
-        return verified;
+        return valid;
     }
 
     private void auditCNodeReplica(SystemMetadata sysMeta, Replica replica) {
@@ -176,8 +166,7 @@ public class MemberNodeReplicaAuditingStrategy {
         //TODO: need to do this for each CN - how to get list of CN?
 
         Checksum expected = sysMeta.getChecksum();
-        //TODO: Checksum actual = replicationService.calculateCNChecksum();
-        Checksum actual = sysMeta.getChecksum();
+        Checksum actual = replicationService.calculateCNChecksum(sysMeta.getIdentifier());
 
         boolean valid = ChecksumUtil.areChecksumsEqual(expected, actual);
         if (valid) {
@@ -188,7 +177,7 @@ public class MemberNodeReplicaAuditingStrategy {
     }
 
     private void auditAuthoritativeMNodeReplica(SystemMetadata sysMeta, Replica replica) {
-        boolean verified = auditMNodeReplica(sysMeta, replica);
+        boolean verified = auditMemberNodeReplica(sysMeta, replica);
         if (!verified) {
             //TODO: what do do if authoritative MN is invalid?
         }
@@ -260,6 +249,9 @@ public class MemberNodeReplicaAuditingStrategy {
             MNode mn = replicationService.getMemberNode(nodeRef);
             if (mn != null) {
                 mnMap.put(nodeRef, mn);
+            } else {
+                log.error("Cannot get MN: " + nodeRef.getValue()
+                        + " unable to verify replica information.");
             }
         }
         return mnMap.get(nodeRef);

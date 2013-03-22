@@ -21,6 +21,7 @@
 
 package org.dataone.service.cn.replication.v1;
 
+import java.io.InputStream;
 import java.util.List;
 
 import org.apache.commons.logging.Log;
@@ -30,13 +31,14 @@ import org.dataone.client.D1Client;
 import org.dataone.client.MNode;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.InvalidRequest;
-import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.ServiceFailure;
+import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.SystemMetadata;
+import org.dataone.service.types.v1.util.ChecksumUtil;
 
 /**
  * 
@@ -121,27 +123,6 @@ public class ReplicationService {
                     + " for: " + identifier.getValue() + ". setting status to failed.");
             setReplicationStatus(identifier, targetNode, ReplicationStatus.FAILED);
         }
-    }
-
-    public boolean deleteReplicaObject(Identifier pid, NodeReference memberNode) {
-        boolean success = true;
-
-        // verify node reference really is a member node reference, otherwise could delete from CN!!
-        MNode targetMN = getMemberNode(memberNode);
-        try {
-            targetMN.delete(pid);
-        } catch (NotFound e) {
-            log.error(
-                    "Unable to find object to delete replica for target MN:  "
-                            + memberNode.getValue() + "for pid: " + pid.getValue()
-                            + ".  Continuing as if delete successful.", e);
-        } catch (BaseException be) {
-            success = false;
-            log.error("Unable to delete replica object from target MN: " + memberNode.getValue()
-                    + " for pid: " + pid.getValue() + ".", be);
-        }
-
-        return success;
     }
 
     /**
@@ -284,12 +265,41 @@ public class ReplicationService {
 
     public SystemMetadata getSystemMetadata(Identifier identifier) {
         SystemMetadata sysmeta = null;
-        try {
-            sysmeta = cn.getSystemMetadata(null, identifier);
-        } catch (BaseException be) {
-            log.error("Cannot get system metedata for id: " + identifier.getValue());
+        if (identifier != null && identifier.getValue() != null) {
+            try {
+                sysmeta = cn.getSystemMetadata(identifier);
+            } catch (BaseException be) {
+                log.error("Cannot get system metedata for id: " + identifier.getValue(), be);
+            }
         }
         return sysmeta;
+    }
+
+    public InputStream getObjectFromCN(Identifier identifier) {
+        InputStream is = null;
+        if (identifier != null && identifier.getValue() != null) {
+            try {
+                is = cn.get(identifier);
+            } catch (BaseException be) {
+                log.error("Cannot get input stream for id: " + identifier.getValue(), be);
+            }
+        }
+        return is;
+    }
+
+    public Checksum calculateCNChecksum(Identifier identifier) {
+        Checksum checksum = null;
+        SystemMetadata sysmeta = getSystemMetadata(identifier);
+        if (sysmeta != null) {
+            String algorithm = sysmeta.getChecksum().getAlgorithm();
+            InputStream is = getObjectFromCN(identifier);
+            try {
+                checksum = ChecksumUtil.checksum(is, algorithm);
+            } catch (Exception e) {
+                log.error("Cannot calculate CN checksum for id: " + identifier.getValue(), e);
+            }
+        }
+        return checksum;
     }
 
     private boolean requestReplication(MNode targetMN, SystemMetadata sysmeta) {
