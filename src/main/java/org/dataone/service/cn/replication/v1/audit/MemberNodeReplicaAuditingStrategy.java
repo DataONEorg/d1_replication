@@ -32,6 +32,12 @@ import org.dataone.service.cn.replication.v1.ReplicationFactory;
 import org.dataone.service.cn.replication.v1.ReplicationManager;
 import org.dataone.service.cn.replication.v1.ReplicationService;
 import org.dataone.service.exceptions.BaseException;
+import org.dataone.service.exceptions.InvalidRequest;
+import org.dataone.service.exceptions.InvalidToken;
+import org.dataone.service.exceptions.NotAuthorized;
+import org.dataone.service.exceptions.NotFound;
+import org.dataone.service.exceptions.NotImplemented;
+import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.Node;
@@ -62,6 +68,7 @@ public class MemberNodeReplicaAuditingStrategy {
 
     public static Log log = LogFactory.getLog(MemberNodeReplicaAuditingStrategy.class);
 
+    // pass/inject mnMap from higher layer....a service/resource
     private Map<NodeReference, MNode> mnMap = new HashMap<NodeReference, MNode>();
 
     private ReplicationManager replicationManager;
@@ -83,7 +90,6 @@ public class MemberNodeReplicaAuditingStrategy {
     /**
      * 
      * Audit the replication policy of a pid:
-     * 1.) Verify each CN replica (checksum).
      * 2.) Verify each MN replica (checksum).
      * 3.) Verify the replication policy of the pid is fufilled.
      * 
@@ -106,16 +112,19 @@ public class MemberNodeReplicaAuditingStrategy {
 
         for (Replica replica : sysMeta.getReplicaList()) {
             // parts of the replica policy may have already been validated,
-            // only verify replicas with stale replica verified date.
             boolean verify = replica.getReplicaVerified().before(auditDate);
 
+            // only verify replicas with stale replica verified date (verify).
             if (isCNodeReplica(replica) && verify) {
-
-                auditCNodeReplica(sysMeta, replica);
+                // CN replicas should not be appearing in this auditors data selection
+                log.error("found CN replica in Member Node auditing for pid: " + pid.getValue());
 
             } else if (isAuthoritativeMNReplica(sysMeta, replica) && verify) {
 
-                auditAuthoritativeMNodeReplica(sysMeta, replica);
+                boolean verified = auditAuthoritativeMNodeReplica(sysMeta, replica);
+                if (!verified) {
+                    queueToReplication = true;
+                }
 
             } else {
                 boolean verified = false;
@@ -139,48 +148,37 @@ public class MemberNodeReplicaAuditingStrategy {
 
         MNode mn = getMNode(replica.getReplicaMemberNode());
         if (mn == null) {
-            // TODO: how to handle not finding the MN? is the replica INVALID? 
-            //MN down for maintenance, temporary outage?
-            // Auditing may need to check a MN service to determine 
-            // if the MN has been marked inactive/down/dead
             return true;
         }
 
         Identifier pid = sysMeta.getIdentifier();
         Checksum expected = sysMeta.getChecksum();
-        Checksum actual = getChecksumFromMN(pid, sysMeta, mn);
+        Checksum actual = null;
+        boolean valid = true;
 
-        boolean valid = ChecksumUtil.areChecksumsEqual(actual, expected);
-        if (valid) {
-            updateReplicaVerified(pid, replica);
-        } else {
-            log.error("Checksum mismatch for pid: " + pid + " against MN: "
-                    + replica.getReplicaMemberNode());
-            handleInvalidReplica(pid, replica);
+        actual = getChecksumFromMN(pid, sysMeta, mn);
+
+        if (actual != null) {
+            if (valid) {
+                valid = ChecksumUtil.areChecksumsEqual(actual, expected);
+            }
+            if (valid) {
+                updateReplicaVerified(pid, replica);
+            } else {
+                log.error("Checksum mismatch for pid: " + pid + " against MN: "
+                        + replica.getReplicaMemberNode());
+                handleInvalidReplica(pid, replica);
+            }
         }
         return valid;
     }
 
-    private void auditCNodeReplica(SystemMetadata sysMeta, Replica replica) {
-
-        //TODO: need to do this for each CN - how to get list of CN?
-
-        Checksum expected = sysMeta.getChecksum();
-        Checksum actual = replicationService.calculateCNChecksum(sysMeta.getIdentifier());
-
-        boolean valid = ChecksumUtil.areChecksumsEqual(expected, actual);
-        if (valid) {
-            updateReplicaVerified(sysMeta.getIdentifier(), replica);
-        } else {
-            //TODO: how to handle invalid CN relica?
-        }
-    }
-
-    private void auditAuthoritativeMNodeReplica(SystemMetadata sysMeta, Replica replica) {
+    private boolean auditAuthoritativeMNodeReplica(SystemMetadata sysMeta, Replica replica) {
         boolean verified = auditMemberNodeReplica(sysMeta, replica);
         if (!verified) {
-            //TODO: what do do if authoritative MN is invalid?
+            //any further special processing for auth MN?
         }
+        return verified;
     }
 
     private void updateReplicaVerified(Identifier pid, Replica replica) {
@@ -212,10 +210,6 @@ public class MemberNodeReplicaAuditingStrategy {
     }
 
     private void handleInvalidReplica(Identifier pid, Replica replica) {
-        //        boolean success = replicationService.deleteReplicaObject(pid,
-        //                replica.getReplicaMemberNode());
-        //        success = replicationService.deleteReplicationMetadata(pid, replica.getReplicaMemberNode());
-
         replica.setReplicationStatus(ReplicationStatus.INVALIDATED);
         boolean success = replicationService.updateReplicationMetadata(pid, replica);
         if (!success) {
@@ -234,21 +228,44 @@ public class MemberNodeReplicaAuditingStrategy {
     }
 
     private Checksum getChecksumFromMN(Identifier pid, SystemMetadata sysMeta, MNode mn) {
-        try {
-            return mn.getChecksum(pid, sysMeta.getChecksum().getAlgorithm());
-        } catch (BaseException be) {
-            log.error(
-                    "Unable to get checksum from mn: " + mn.getNodeId() + " for id: "
-                            + pid.getValue(), be);
+        Checksum checksum = null;
+        for (int i = 0; i < 5; i++) {
+            try {
+                checksum = mn.getChecksum(pid, sysMeta.getChecksum().getAlgorithm());
+                break;
+            } catch (ServiceFailure e) {
+                // try again, no audit (skip)
+            } catch (InvalidRequest e) {
+                // try again, no audit (skip)
+            } catch (InvalidToken e) {
+                // try again, no audit (skip)
+            } catch (NotAuthorized e) {
+                // cannot audit, set to invalid
+                checksum = new Checksum();
+                break;
+            } catch (NotImplemented e) {
+                // cannot audit, set to invalid
+                checksum = new Checksum();
+                break;
+            } catch (NotFound e) {
+                // cannot audit, set to invalid
+                checksum = new Checksum();
+                break;
+            }
         }
-        return null;
+        return checksum;
     }
 
     private MNode getMNode(NodeReference nodeRef) {
         if (!mnMap.containsKey(nodeRef)) {
             MNode mn = replicationService.getMemberNode(nodeRef);
             if (mn != null) {
-                mnMap.put(nodeRef, mn);
+                try {
+                    mn.ping();
+                    mnMap.put(nodeRef, mn);
+                } catch (BaseException e) {
+                    log.error("Unable to ping MN: " + nodeRef.getValue(), e);
+                }
             } else {
                 log.error("Cannot get MN: " + nodeRef.getValue()
                         + " unable to verify replica information.");

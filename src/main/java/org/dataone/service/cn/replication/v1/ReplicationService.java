@@ -31,6 +31,10 @@ import org.dataone.client.D1Client;
 import org.dataone.client.MNode;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.InvalidRequest;
+import org.dataone.service.exceptions.InvalidToken;
+import org.dataone.service.exceptions.NotAuthorized;
+import org.dataone.service.exceptions.NotFound;
+import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v1.Identifier;
@@ -280,8 +284,11 @@ public class ReplicationService {
         if (identifier != null && identifier.getValue() != null) {
             try {
                 is = cn.get(identifier);
-            } catch (BaseException be) {
-                log.error("Cannot get input stream for id: " + identifier.getValue(), be);
+            } catch (InvalidToken e) {
+            } catch (ServiceFailure e) {
+            } catch (NotAuthorized e) {
+            } catch (NotFound e) {
+            } catch (NotImplemented e) {
             }
         }
         return is;
@@ -293,11 +300,17 @@ public class ReplicationService {
         if (sysmeta != null) {
             String algorithm = sysmeta.getChecksum().getAlgorithm();
             InputStream is = getObjectFromCN(identifier);
-            try {
-                checksum = ChecksumUtil.checksum(is, algorithm);
-            } catch (Exception e) {
-                log.error("Cannot calculate CN checksum for id: " + identifier.getValue(), e);
+            if (is != null) {
+                try {
+                    checksum = ChecksumUtil.checksum(is, algorithm);
+                } catch (Exception e) {
+                    log.error("Cannot calculate CN checksum for id: " + identifier.getValue(), e);
+                }
+            } else {
+                // cannot get object!
             }
+        } else {
+            // CANNOT GET SYSMETA!
         }
         return checksum;
     }
