@@ -26,7 +26,7 @@ import java.util.concurrent.Callable;
 import org.dataone.cn.dao.exceptions.DataAccessException;
 import org.dataone.service.types.v1.Identifier;
 
-public class MemberNodeReplicationAuditor extends AbstractReplicationAuditor {
+public class CoordinatingNodeReplicationAuditor extends AbstractReplicationAuditor {
 
     private static final int pageSize = 100;
     private static final int pidsPerTaskSize = 10;
@@ -34,11 +34,11 @@ public class MemberNodeReplicationAuditor extends AbstractReplicationAuditor {
     private static final int maxPages = 1000;
     private static final long auditPeriod = 1000 * 60 * 60 * 24 * 60; // 60 days
 
-    private static final String MN_AUDIT_LOCK_NAME = "memberNodeReplicationAuditLock";
+    private static final String CN_AUDIT_LOCK_NAME = "coordinatingNodeReplicationAuditLock";
 
     @Override
     protected String getLockName() {
-        return MN_AUDIT_LOCK_NAME;
+        return CN_AUDIT_LOCK_NAME;
     }
 
     @Override
@@ -49,13 +49,13 @@ public class MemberNodeReplicationAuditor extends AbstractReplicationAuditor {
     @Override
     protected List<Identifier> getPidsToAudit(Date auditDate, int pageNumber, int pageSize)
             throws DataAccessException {
-        return this.replicationDao.getCompletedMemberNodeReplicasByDate(auditDate, pageNumber,
-                pageSize);
+        return this.replicationDao.getCompletedCoordinatingNodeReplicasByDate(auditDate,
+                pageNumber, pageSize);
     }
 
     @Override
     protected Callable<String> newAuditTask(List<Identifier> pids, Date auditDate) {
-        return new MemberNodeReplicaAuditTask(pids, auditDate);
+        return new CoordinatingNodeReplicaAuditTask(pids, auditDate);
     }
 
     protected int getMaxPages() {

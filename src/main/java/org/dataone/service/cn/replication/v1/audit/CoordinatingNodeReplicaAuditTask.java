@@ -27,25 +27,18 @@ import java.util.concurrent.Callable;
 
 import org.dataone.service.types.v1.Identifier;
 
-/**
- * Callable java task, delegates to MemberNodeReplicaAuditingStrategy to handle
- * audit work for each pid in pids.
- * 
- * @author sroseboo
- *
- */
-public class MemberNodeReplicaAuditTask implements Serializable, Callable<String> {
+public class CoordinatingNodeReplicaAuditTask implements Serializable, Callable<String> {
 
     private static final long serialVersionUID = 8549092026722882706L;
 
     private List<Identifier> pidsToAudit = new ArrayList<Identifier>();
-    private MemberNodeReplicaAuditingStrategy auditor;
+    private CoordinatingNodeReplicaAuditingStrategy auditor;
     private Date auditDate;
 
-    public MemberNodeReplicaAuditTask(List<Identifier> pids, Date auditDate) {
+    public CoordinatingNodeReplicaAuditTask(List<Identifier> pids, Date auditDate) {
         this.pidsToAudit = pids;
         this.auditDate = auditDate;
-        auditor = new MemberNodeReplicaAuditingStrategy();
+        auditor = new CoordinatingNodeReplicaAuditingStrategy();
     }
 
     @Override

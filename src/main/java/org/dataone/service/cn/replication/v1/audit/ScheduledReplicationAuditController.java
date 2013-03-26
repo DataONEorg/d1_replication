@@ -21,6 +21,7 @@ public class ScheduledReplicationAuditController {
     private static ScheduledExecutorService staleRequestedReplicaAuditScheduler;
     private static ScheduledExecutorService staleQueuedReplicaAuditScheduler;
     private static ScheduledExecutorService mnReplicaAuditScheduler;
+    private static ScheduledExecutorService cnReplicaAuditScheduler;
 
     public ScheduledReplicationAuditController() {
 
@@ -31,6 +32,7 @@ public class ScheduledReplicationAuditController {
         startStaleRequestedAuditing();
         startStaleQueuedAuditing();
         // startMnReplicaAuditing();
+        // startCnreplicaAuditing();
         logger.info("scheduled replication auditing started.");
     }
 
@@ -44,6 +46,9 @@ public class ScheduledReplicationAuditController {
         }
         if (mnReplicaAuditScheduler != null) {
             mnReplicaAuditScheduler.shutdown();
+        }
+        if (cnReplicaAuditScheduler != null) {
+            cnReplicaAuditScheduler.shutdown();
         }
         logger.info("scheduled replication auditing stopped.");
     }
@@ -71,6 +76,14 @@ public class ScheduledReplicationAuditController {
             mnReplicaAuditScheduler = Executors.newSingleThreadScheduledExecutor();
             mnReplicaAuditScheduler.scheduleAtFixedRate(new MemberNodeReplicationAuditor(), 0L, 1L,
                     TimeUnit.HOURS);
+        }
+    }
+
+    private void startCnReplicaAuditing() {
+        if (cnReplicaAuditScheduler == null || cnReplicaAuditScheduler.isShutdown()) {
+            cnReplicaAuditScheduler = Executors.newSingleThreadScheduledExecutor();
+            cnReplicaAuditScheduler.scheduleAtFixedRate(new CoordinatingNodeReplicationAuditor(),
+                    0L, 1L, TimeUnit.HOURS);
         }
     }
 }
