@@ -85,7 +85,11 @@ public class ReplicationService {
             return;
         }
 
-        SystemMetadata sysmeta = getSystemMetadata(identifier);
+        SystemMetadata sysmeta = null;
+        try {
+            sysmeta = getSystemMetadata(identifier);
+        } catch (NotFound e) {
+        }
         if (sysmeta == null) {
             log.error("Unable to get system metadata for: " + identifier + ". exiting...");
             return;
@@ -267,34 +271,43 @@ public class ReplicationService {
         return queued;
     }
 
-    public SystemMetadata getSystemMetadata(Identifier identifier) {
+    public SystemMetadata getSystemMetadata(Identifier identifier) throws NotFound {
         SystemMetadata sysmeta = null;
         if (identifier != null && identifier.getValue() != null) {
             try {
                 sysmeta = cn.getSystemMetadata(identifier);
-            } catch (BaseException be) {
-                log.error("Cannot get system metedata for id: " + identifier.getValue(), be);
+            } catch (InvalidToken e) {
+                log.error("Cannot get system metedata for id: " + identifier.getValue(), e);
+            } catch (ServiceFailure e) {
+                log.error("Cannot get system metedata for id: " + identifier.getValue(), e);
+            } catch (NotAuthorized e) {
+                log.error("Cannot get system metedata for id: " + identifier.getValue(), e);
+            } catch (NotImplemented e) {
+                log.error("Cannot get system metedata for id: " + identifier.getValue(), e);
             }
         }
         return sysmeta;
     }
 
-    public InputStream getObjectFromCN(Identifier identifier) {
+    public InputStream getObjectFromCN(Identifier identifier) throws NotFound {
         InputStream is = null;
         if (identifier != null && identifier.getValue() != null) {
             try {
                 is = cn.get(identifier);
             } catch (InvalidToken e) {
+                log.error("Unable to get object from CN for pid: " + identifier.getValue(), e);
             } catch (ServiceFailure e) {
+                log.error("Unable to get object from CN for pid: " + identifier.getValue(), e);
             } catch (NotAuthorized e) {
-            } catch (NotFound e) {
+                log.error("Unable to get object from CN for pid: " + identifier.getValue(), e);
             } catch (NotImplemented e) {
+                log.error("Unable to get object from CN for pid: " + identifier.getValue(), e);
             }
         }
         return is;
     }
 
-    public Checksum calculateCNChecksum(Identifier identifier) {
+    public Checksum calculateCNChecksum(Identifier identifier) throws NotFound {
         Checksum checksum = null;
         SystemMetadata sysmeta = getSystemMetadata(identifier);
         if (sysmeta != null) {
@@ -307,10 +320,10 @@ public class ReplicationService {
                     log.error("Cannot calculate CN checksum for id: " + identifier.getValue(), e);
                 }
             } else {
-                // cannot get object!
+                log.error("Could not calculate checksum on CN, unable to get object bytes");
             }
         } else {
-            // CANNOT GET SYSMETA!
+            log.error("Could not calculate checksum on CN, unable to get system metadata");
         }
         return checksum;
     }

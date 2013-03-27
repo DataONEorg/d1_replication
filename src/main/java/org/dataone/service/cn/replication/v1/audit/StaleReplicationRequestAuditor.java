@@ -42,6 +42,7 @@ import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.configuration.Settings;
 import org.dataone.service.cn.replication.v1.ReplicationService;
 import org.dataone.service.exceptions.BaseException;
+import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
@@ -98,7 +99,13 @@ public class StaleReplicationRequestAuditor implements Runnable {
             for (ReplicaDto result : requestedReplicas) {
                 Identifier identifier = result.identifier;
                 NodeReference nodeId = result.replica.getReplicaMemberNode();
-                SystemMetadata sysmeta = replicationService.getSystemMetadata(identifier);
+                SystemMetadata sysmeta = null;
+                try {
+                    sysmeta = replicationService.getSystemMetadata(identifier);
+                } catch (NotFound e) {
+                    log.error("Cannot find system metadata for pid: " + identifier.getValue());
+                    continue;
+                }
                 if (sysmeta == null) {
                     continue;
                 }
