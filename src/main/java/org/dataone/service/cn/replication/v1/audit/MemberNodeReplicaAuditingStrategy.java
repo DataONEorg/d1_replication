@@ -100,7 +100,12 @@ public class MemberNodeReplicaAuditingStrategy {
      */
     public void auditPid(Identifier pid, Date auditDate) {
 
-        SystemMetadata sysMeta = replicationService.getSystemMetadata(pid);
+        SystemMetadata sysMeta = null;
+        try {
+            sysMeta = replicationService.getSystemMetadata(pid);
+        } catch (NotFound e) {
+            log.error("Could not find system meta for pid: " + pid.getValue());
+        }
         if (sysMeta == null) {
             log.error("Cannot get system metadata from CN for pid: " + pid
                     + ".  Could not audit replicas for pid: " + pid + "");
@@ -156,19 +161,22 @@ public class MemberNodeReplicaAuditingStrategy {
         Checksum actual = null;
         boolean valid = true;
 
-        actual = getChecksumFromMN(pid, sysMeta, mn);
+        try {
+            actual = getChecksumFromMN(pid, sysMeta, mn);
+        } catch (NotFound e) {
+            // want an alternate strategy when NotFound occurs?
+            valid = false;
+        }
 
-        if (actual != null) {
-            if (valid) {
-                valid = ChecksumUtil.areChecksumsEqual(actual, expected);
-            }
-            if (valid) {
-                updateReplicaVerified(pid, replica);
-            } else {
-                log.error("Checksum mismatch for pid: " + pid + " against MN: "
-                        + replica.getReplicaMemberNode());
-                handleInvalidReplica(pid, replica);
-            }
+        if (actual != null && valid) {
+            valid = ChecksumUtil.areChecksumsEqual(actual, expected);
+        }
+        if (valid) {
+            updateReplicaVerified(pid, replica);
+        } else {
+            log.error("Checksum mismatch for pid: " + pid + " against MN: "
+                    + replica.getReplicaMemberNode());
+            handleInvalidReplica(pid, replica);
         }
         return valid;
     }
@@ -227,7 +235,8 @@ public class MemberNodeReplicaAuditingStrategy {
         }
     }
 
-    private Checksum getChecksumFromMN(Identifier pid, SystemMetadata sysMeta, MNode mn) {
+    private Checksum getChecksumFromMN(Identifier pid, SystemMetadata sysMeta, MNode mn)
+            throws NotFound {
         Checksum checksum = null;
         for (int i = 0; i < 5; i++) {
             try {
@@ -244,10 +253,6 @@ public class MemberNodeReplicaAuditingStrategy {
                 checksum = new Checksum();
                 break;
             } catch (NotImplemented e) {
-                // cannot audit, set to invalid
-                checksum = new Checksum();
-                break;
-            } catch (NotFound e) {
                 // cannot audit, set to invalid
                 checksum = new Checksum();
                 break;

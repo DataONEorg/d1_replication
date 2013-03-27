@@ -30,6 +30,7 @@ import org.dataone.client.CNode;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.service.cn.replication.v1.ReplicationFactory;
 import org.dataone.service.cn.replication.v1.ReplicationService;
+import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.Node;
@@ -64,10 +65,15 @@ public class CoordinatingNodeReplicaAuditingStrategy {
 
     public void auditPid(Identifier pid, Date auditDate) {
 
-        SystemMetadata sysMeta = replicationService.getSystemMetadata(pid);
+        SystemMetadata sysMeta = null;
+        try {
+            sysMeta = replicationService.getSystemMetadata(pid);
+        } catch (NotFound e) {
+
+        }
         if (sysMeta == null) {
             log.error("Cannot get system metadata from CN for pid: " + pid
-                    + ".  Could not audit replicas for pid: " + pid + "");
+                    + ".  Could not audit CN replica for pid: " + pid + "");
             return;
         }
 
@@ -88,15 +94,19 @@ public class CoordinatingNodeReplicaAuditingStrategy {
 
         Checksum expected = sysMeta.getChecksum();
         Checksum actual = null;
-
-        actual = replicationService.calculateCNChecksum(sysMeta.getIdentifier());
-        if (actual != null) {
-            boolean valid = ChecksumUtil.areChecksumsEqual(expected, actual);
-            if (valid) {
-                updateReplicaVerified(sysMeta.getIdentifier(), replica);
-            } else {
-                //TODO: how to handle invalid CN relica?
-            }
+        boolean valid = true;
+        try {
+            actual = replicationService.calculateCNChecksum(sysMeta.getIdentifier());
+        } catch (NotFound e) {
+            valid = false;
+        }
+        if (actual != null && valid) {
+            valid = ChecksumUtil.areChecksumsEqual(expected, actual);
+        }
+        if (valid) {
+            updateReplicaVerified(sysMeta.getIdentifier(), replica);
+        } else {
+            //TODO: how to handle invalid CN relica?
         }
     }
 
