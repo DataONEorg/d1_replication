@@ -31,8 +31,8 @@ public class ScheduledReplicationAuditController {
         logger.info("starting scheduled replication auditing...");
         startStaleRequestedAuditing();
         startStaleQueuedAuditing();
-        // startMnReplicaAuditing();
-        // startCnreplicaAuditing();
+        startMnReplicaAuditing();
+        startCnReplicaAuditing();
         logger.info("scheduled replication auditing started.");
     }
 

@@ -34,7 +34,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 
 import org.apache.log4j.Logger;
-import org.dataone.cn.ComponentActivationUtility;
 import org.dataone.cn.dao.DaoFactory;
 import org.dataone.cn.dao.ReplicationDao;
 import org.dataone.cn.dao.exceptions.DataAccessException;
@@ -79,13 +78,15 @@ public abstract class AbstractReplicationAuditor implements Runnable {
 
     protected abstract int getPidsPerTaskSize();
 
+    protected abstract boolean shouldRunAudit();
+
     @Override
     public void run() {
         auditReplication();
     }
 
     public void auditReplication() {
-        if (ComponentActivationUtility.replicationIsActive()) {
+        if (shouldRunAudit()) {
 
             auditLock = processingClient.getLock(getLockName());
 
