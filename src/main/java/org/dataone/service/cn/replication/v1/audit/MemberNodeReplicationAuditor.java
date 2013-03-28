@@ -23,7 +23,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.concurrent.Callable;
 
+import org.dataone.cn.ComponentActivationUtility;
 import org.dataone.cn.dao.exceptions.DataAccessException;
+import org.dataone.configuration.Settings;
 import org.dataone.service.types.v1.Identifier;
 
 public class MemberNodeReplicationAuditor extends AbstractReplicationAuditor {
@@ -32,7 +34,11 @@ public class MemberNodeReplicationAuditor extends AbstractReplicationAuditor {
     private static final int pidsPerTaskSize = 10;
     private static final int taskPoolSize = 10;
     private static final int maxPages = 1000;
-    private static final long auditPeriod = 1000 * 60 * 60 * 24 * 60; // 60 days
+
+    private static final int auditPeriodDays = Settings.getConfiguration().getInt(
+            "Replication.audit.mn.period.days", 90);
+
+    private static final long auditPeriod = 1000 * 60 * 60 * 24 * auditPeriodDays;
 
     private static final String MN_AUDIT_LOCK_NAME = "memberNodeReplicationAuditLock";
 
@@ -72,5 +78,13 @@ public class MemberNodeReplicationAuditor extends AbstractReplicationAuditor {
 
     protected int getPidsPerTaskSize() {
         return pidsPerTaskSize;
+    }
+
+    @Override
+    protected boolean shouldRunAudit() {
+        boolean replicationActive = ComponentActivationUtility.replicationIsActive();
+        boolean auditMNReplicas = Settings.getConfiguration().getBoolean(
+                "Replication.audit.mn.active", false);
+        return replicationActive && auditMNReplicas;
     }
 }

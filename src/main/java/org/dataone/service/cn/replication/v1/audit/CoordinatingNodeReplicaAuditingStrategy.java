@@ -91,7 +91,6 @@ public class CoordinatingNodeReplicaAuditingStrategy {
     private void auditCNodeReplica(SystemMetadata sysMeta, Replica replica) {
 
         //TODO: need to do this for each CN - how to get list of CN?
-
         Checksum expected = sysMeta.getChecksum();
         Checksum actual = null;
         boolean valid = true;
