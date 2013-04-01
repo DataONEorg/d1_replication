@@ -175,8 +175,9 @@ public class MemberNodeReplicaAuditingStrategy {
         if (valid) {
             updateReplicaVerified(pid, replica);
         } else {
-            log.error("Checksum mismatch for pid: " + pid + " against MN: "
-                    + replica.getReplicaMemberNode());
+            log.error("Checksum mismatch for pid: " + pid.getValue() + " against MN: "
+                    + replica.getReplicaMemberNode().getValue() + ".  Expected checksum is: "
+                    + expected.getValue() + " actual was: " + actual.getValue());
             handleInvalidReplica(pid, replica);
         }
         return valid;
