@@ -82,6 +82,7 @@ public class MemberNodeReplicaAuditingStrategy {
     }
 
     public void auditPids(List<Identifier> pids, Date auditDate) {
+        log.debug("audit pids called with " + pids.size() + ".");
         for (Identifier pid : pids) {
             this.auditPid(pid, auditDate);
         }
@@ -99,7 +100,7 @@ public class MemberNodeReplicaAuditingStrategy {
      * @return
      */
     public void auditPid(Identifier pid, Date auditDate) {
-
+        log.debug("audit pid called for pid: " + pid.getValue());
         SystemMetadata sysMeta = null;
         try {
             sysMeta = replicationService.getSystemMetadata(pid);
