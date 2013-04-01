@@ -25,6 +25,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.concurrent.Callable;
 
+import org.apache.log4j.Logger;
 import org.dataone.service.types.v1.Identifier;
 
 /**
@@ -37,13 +38,15 @@ import org.dataone.service.types.v1.Identifier;
 public class MemberNodeReplicaAuditTask implements Serializable, Callable<String> {
 
     private static final long serialVersionUID = 8549092026722882706L;
+    private static Logger log = Logger.getLogger(MemberNodeReplicaAuditTask.class.getName());
 
     private List<Identifier> pidsToAudit = new ArrayList<Identifier>();
     private MemberNodeReplicaAuditingStrategy auditor;
     private Date auditDate;
 
     public MemberNodeReplicaAuditTask(List<Identifier> pids, Date auditDate) {
-        this.pidsToAudit = pids;
+        this.pidsToAudit.addAll(pids);
+        log.debug("audit task has " + pids.size() + " pids to audit.");
         this.auditDate = auditDate;
         auditor = new MemberNodeReplicaAuditingStrategy();
     }
