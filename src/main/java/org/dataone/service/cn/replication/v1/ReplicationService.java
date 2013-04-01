@@ -36,13 +36,11 @@ import org.dataone.service.exceptions.NotAuthorized;
 import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
-import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.SystemMetadata;
-import org.dataone.service.types.v1.util.ChecksumUtil;
 
 /**
  * 
@@ -305,27 +303,6 @@ public class ReplicationService {
             }
         }
         return is;
-    }
-
-    public Checksum calculateCNChecksum(Identifier identifier) throws NotFound {
-        Checksum checksum = null;
-        SystemMetadata sysmeta = getSystemMetadata(identifier);
-        if (sysmeta != null) {
-            String algorithm = sysmeta.getChecksum().getAlgorithm();
-            InputStream is = getObjectFromCN(identifier);
-            if (is != null) {
-                try {
-                    checksum = ChecksumUtil.checksum(is, algorithm);
-                } catch (Exception e) {
-                    log.error("Cannot calculate CN checksum for id: " + identifier.getValue(), e);
-                }
-            } else {
-                log.error("Could not calculate checksum on CN, unable to get object bytes");
-            }
-        } else {
-            log.error("Could not calculate checksum on CN, unable to get system metadata");
-        }
-        return checksum;
     }
 
     private boolean requestReplication(MNode targetMN, SystemMetadata sysmeta) {

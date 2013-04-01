@@ -19,6 +19,7 @@
  */
 package org.dataone.service.cn.replication.v1.audit;
 
+import java.io.InputStream;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -28,9 +29,14 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.dataone.client.CNode;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
+import org.dataone.configuration.Settings;
 import org.dataone.service.cn.replication.v1.ReplicationFactory;
 import org.dataone.service.cn.replication.v1.ReplicationService;
+import org.dataone.service.exceptions.InvalidToken;
+import org.dataone.service.exceptions.NotAuthorized;
 import org.dataone.service.exceptions.NotFound;
+import org.dataone.service.exceptions.NotImplemented;
+import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.Node;
@@ -46,8 +52,10 @@ public class CoordinatingNodeReplicaAuditingStrategy {
 
     public static Log log = LogFactory.getLog(MemberNodeReplicaAuditingStrategy.class);
 
-    // pass/inject mnMap from higher layer....a service/resource...
     private Map<NodeReference, CNode> cnMap = new HashMap<NodeReference, CNode>();
+
+    private static final String cnRouterId = Settings.getConfiguration().getString(
+            "cn.router.nodeId", "urn:node:CN");
 
     private ReplicationService replicationService;
     private IMap<NodeReference, Node> hzNodes;
@@ -90,21 +98,46 @@ public class CoordinatingNodeReplicaAuditingStrategy {
 
     private void auditCNodeReplica(SystemMetadata sysMeta, Replica replica) {
 
-        //TODO: need to do this for each CN - how to get list of CN?
-        Checksum expected = sysMeta.getChecksum();
-        Checksum actual = null;
+        NodeReference invalidCN = null;
         boolean valid = true;
-        try {
-            actual = replicationService.calculateCNChecksum(sysMeta.getIdentifier());
-        } catch (NotFound e) {
-            valid = false;
-        }
-        if (actual != null && valid) {
-            valid = ChecksumUtil.areChecksumsEqual(expected, actual);
+
+        for (NodeReference nodeRef : hzNodes.keySet()) {
+            Node node = hzNodes.get(nodeRef);
+            if (NodeType.CN.equals(node.getType())
+                    && cnRouterId.equals(node.getIdentifier().getValue()) == false) {
+
+                CNode cn = getCNode(node);
+                if (cn != null) {
+                    Checksum expected = sysMeta.getChecksum();
+                    Checksum actual = null;
+                    try {
+                        actual = calculateCNChecksum(cn, sysMeta.getIdentifier());
+                    } catch (NotFound e) {
+                        valid = false;
+                    } catch (NotAuthorized e) {
+                        valid = false;
+                    } catch (NotImplemented e) {
+                        valid = false;
+                    } catch (InvalidToken e) {
+                        // skip
+                    } catch (ServiceFailure e) {
+                        //skip
+                    }
+                    if (actual != null && valid) {
+                        valid = ChecksumUtil.areChecksumsEqual(expected, actual);
+                    }
+                    if (!valid) {
+                        invalidCN = nodeRef;
+                        break;
+                    }
+                }
+            }
         }
         if (valid) {
             updateReplicaVerified(sysMeta.getIdentifier(), replica);
         } else {
+            log.error("CN replica is not valid for pid: " + sysMeta.getIdentifier() + " on CN: "
+                    + invalidCN.getValue());
             //TODO: how to handle invalid CN relica?
         }
     }
@@ -123,5 +156,35 @@ public class CoordinatingNodeReplicaAuditingStrategy {
 
     private Date calculateReplicaVerifiedDate() {
         return new Date(System.currentTimeMillis());
+    }
+
+    private Checksum calculateCNChecksum(CNode cn, Identifier identifier) throws NotFound,
+            InvalidToken, ServiceFailure, NotAuthorized, NotImplemented {
+        Checksum checksum = null;
+        SystemMetadata sysmeta = cn.getSystemMetadata(identifier);
+        if (sysmeta != null) {
+            String algorithm = sysmeta.getChecksum().getAlgorithm();
+            InputStream is = cn.get(identifier);
+            if (is != null) {
+                try {
+                    checksum = ChecksumUtil.checksum(is, algorithm);
+                } catch (Exception e) {
+                    log.error("Cannot calculate CN checksum for id: " + identifier.getValue(), e);
+                }
+            } else {
+                log.error("Could not calculate checksum on CN, unable to get object bytes");
+            }
+        } else {
+            log.error("Could not calculate checksum on CN, unable to get system metadata");
+        }
+        return checksum;
+    }
+
+    private CNode getCNode(Node node) {
+        if (!cnMap.containsKey(node.getIdentifier().getValue())) {
+            CNode cn = new CNode(node.getBaseURL());
+            cnMap.put(node.getIdentifier(), cn);
+        }
+        return cnMap.get(node.getIdentifier());
     }
 }

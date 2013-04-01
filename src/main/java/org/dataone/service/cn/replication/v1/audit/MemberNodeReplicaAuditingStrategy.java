@@ -68,7 +68,6 @@ public class MemberNodeReplicaAuditingStrategy {
 
     public static Log log = LogFactory.getLog(MemberNodeReplicaAuditingStrategy.class);
 
-    // pass/inject mnMap from higher layer....a service/resource
     private Map<NodeReference, MNode> mnMap = new HashMap<NodeReference, MNode>();
 
     private ReplicationManager replicationManager;
