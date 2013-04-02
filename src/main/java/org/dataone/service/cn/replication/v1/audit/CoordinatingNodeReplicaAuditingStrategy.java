@@ -111,7 +111,7 @@ public class CoordinatingNodeReplicaAuditingStrategy {
                     Checksum expected = sysMeta.getChecksum();
                     Checksum actual = null;
                     try {
-                        actual = calculateCNChecksum(cn, sysMeta.getIdentifier());
+                        actual = calculateCNChecksum(cn, sysMeta);
                     } catch (NotFound e) {
                         valid = false;
                     } catch (NotAuthorized e) {
@@ -158,24 +158,20 @@ public class CoordinatingNodeReplicaAuditingStrategy {
         return new Date(System.currentTimeMillis());
     }
 
-    private Checksum calculateCNChecksum(CNode cn, Identifier identifier) throws NotFound,
+    private Checksum calculateCNChecksum(CNode cn, SystemMetadata sysmeta) throws NotFound,
             InvalidToken, ServiceFailure, NotAuthorized, NotImplemented {
         Checksum checksum = null;
-        SystemMetadata sysmeta = cn.getSystemMetadata(identifier);
-        if (sysmeta != null) {
-            String algorithm = sysmeta.getChecksum().getAlgorithm();
-            InputStream is = cn.get(identifier);
-            if (is != null) {
-                try {
-                    checksum = ChecksumUtil.checksum(is, algorithm);
-                } catch (Exception e) {
-                    log.error("Cannot calculate CN checksum for id: " + identifier.getValue(), e);
-                }
-            } else {
-                log.error("Could not calculate checksum on CN, unable to get object bytes");
+        String algorithm = sysmeta.getChecksum().getAlgorithm();
+        InputStream is = cn.get(sysmeta.getIdentifier());
+        if (is != null) {
+            try {
+                checksum = ChecksumUtil.checksum(is, algorithm);
+            } catch (Exception e) {
+                log.error("Cannot calculate CN checksum for id: "
+                        + sysmeta.getIdentifier().getValue(), e);
             }
         } else {
-            log.error("Could not calculate checksum on CN, unable to get system metadata");
+            log.error("Could not calculate checksum on CN, unable to get object bytes");
         }
         return checksum;
     }
