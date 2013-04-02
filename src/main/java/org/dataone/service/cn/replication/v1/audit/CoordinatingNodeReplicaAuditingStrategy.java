@@ -48,6 +48,18 @@ import org.dataone.service.types.v1.util.ChecksumUtil;
 
 import com.hazelcast.core.IMap;
 
+/**
+ * Strategy for auditing coordinating node replica copies of an object cataloged and
+ * replicated by dataone.  Attempts to get the object bytes from each CN node found 
+ * in the hzNodes map.  Then calculates the checksum of the object and compares to
+ * the value found in system metadata.   If the checksum matches, the replica is considered
+ * valid and the verified date of the replica record is updated.  However if the object
+ * is not found or has a different checksum, the object needs to be replaced on that
+ * node.  
+ * 
+ * @author sroseboo
+ *
+ */
 public class CoordinatingNodeReplicaAuditingStrategy {
 
     public static Log log = LogFactory.getLog(MemberNodeReplicaAuditingStrategy.class);
@@ -138,7 +150,7 @@ public class CoordinatingNodeReplicaAuditingStrategy {
         } else {
             log.error("CN replica is not valid for pid: " + sysMeta.getIdentifier() + " on CN: "
                     + invalidCN.getValue());
-            //TODO: how to handle invalid CN relica?
+            //TODO: handle invalid CN relica
         }
     }
 
