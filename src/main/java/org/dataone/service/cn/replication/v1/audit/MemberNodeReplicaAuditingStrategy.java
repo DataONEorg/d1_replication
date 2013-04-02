@@ -52,7 +52,7 @@ import com.hazelcast.core.IMap;
 
 /**
  * This type of audit verifies both that the replication policy is fufilled and
- * that each replica is still valid (by comparing checksum values).
+ * that each Member Node replica is still valid (by comparing checksum values).
  * 
  * Replicas found with invalid checksums have system metadata replica status
  * updated to INVALID. Pids with unfufilled replica policies are sent to
@@ -116,29 +116,29 @@ public class MemberNodeReplicaAuditingStrategy {
         int validReplicaCount = 0;
 
         for (Replica replica : sysMeta.getReplicaList()) {
-            // parts of the replica policy may have already been validated,
+            // parts of the replica policy may have already been validated recently.
             boolean verify = replica.getReplicaVerified().before(auditDate);
 
             // only verify replicas with stale replica verified date (verify).
-            if (isCNodeReplica(replica) && verify) {
-                // CN replicas should not be appearing in this auditors data selection
-                log.error("found CN replica in Member Node auditing for pid: " + pid.getValue());
-
-            } else if (isAuthoritativeMNReplica(sysMeta, replica) && verify) {
-
-                boolean verified = auditAuthoritativeMNodeReplica(sysMeta, replica);
-                if (!verified) {
-                    queueToReplication = true;
-                }
-
-            } else {
-                boolean verified = false;
+            if (isCNodeReplica(replica)) {
+                // CN replicas should not be appearing in this auditors data selection but
+                // may appear coincidentally having both a stale CN and MN replica.
+                continue;
+            } else if (isAuthoritativeMNReplica(sysMeta, replica)) {
                 if (verify) {
-                    verified = auditMemberNodeReplica(sysMeta, replica);
+                    boolean verified = auditAuthoritativeMNodeReplica(sysMeta, replica);
+                    if (!verified) {
+                        queueToReplication = true;
+                    }
                 }
-                if (verified || !verify) {
+            } else { // not a CN replica, not the authMN replica - a MN replica!
+                boolean valid = false;
+                if (verify) {
+                    valid = auditMemberNodeReplica(sysMeta, replica);
+                }
+                if (valid || !verify) {
                     validReplicaCount++;
-                } else if (!verified) {
+                } else if (!valid) {
                     queueToReplication = true;
                 }
             }
@@ -164,7 +164,6 @@ public class MemberNodeReplicaAuditingStrategy {
         try {
             actual = getChecksumFromMN(pid, sysMeta, mn);
         } catch (NotFound e) {
-            // want an alternate strategy when NotFound occurs?
             valid = false;
         }
 
@@ -229,6 +228,7 @@ public class MemberNodeReplicaAuditingStrategy {
 
     private void sendToReplication(Identifier pid) {
         try {
+            log.debug("Sending pid to replication manager: " + pid.getValue());
             replicationManager.createAndQueueTasks(pid);
         } catch (Exception e) {
             log.error("Pid: " + pid + " not accepted by replicationManager createAndQueueTasks: ",

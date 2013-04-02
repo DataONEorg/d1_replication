@@ -28,6 +28,16 @@ import org.dataone.cn.dao.exceptions.DataAccessException;
 import org.dataone.configuration.Settings;
 import org.dataone.service.types.v1.Identifier;
 
+/**
+ * Concrete implementation of AbstractReplicationAuditor to provide specific
+ * behavior for auditing member node replicas using callable auditing tasks.
+ * This class provides specific implementation for methods to select pids for
+ * auditing, creating coordinating node auditing tasks, controlling the audit
+ * period, and configuration of the executor service.
+ * 
+ * @author sroseboo
+ *
+ */
 public class CoordinatingNodeReplicationAuditor extends AbstractReplicationAuditor {
 
     private static final int pageSize = 100;

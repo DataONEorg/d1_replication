@@ -30,7 +30,7 @@ import org.dataone.service.types.v1.Identifier;
 
 /**
  * Callable java task, delegates to MemberNodeReplicaAuditingStrategy to handle
- * audit work for each pid in pids.
+ * audit work for each pid in pidsToAudit.
  * 
  * @author sroseboo
  *

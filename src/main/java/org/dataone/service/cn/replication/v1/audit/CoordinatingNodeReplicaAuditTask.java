@@ -27,6 +27,13 @@ import java.util.concurrent.Callable;
 
 import org.dataone.service.types.v1.Identifier;
 
+/**
+ * Callable java task, delegates to CoordinatingNodeReplicaAuditingStrategy to handle
+ * audit work for each pid in pidsToAudit.
+ * 
+ * @author sroseboo
+ *
+ */
 public class CoordinatingNodeReplicaAuditTask implements Serializable, Callable<String> {
 
     private static final long serialVersionUID = 8549092026722882706L;
