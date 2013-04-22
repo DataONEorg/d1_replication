@@ -311,7 +311,7 @@ public class ReplicationService {
             return false;
         }
 
-        NodeReference originatingNode = sysmeta.getAuthoritativeMemberNode();
+        NodeReference originatingNode = determineReplicationSourceNode(sysmeta);
 
         boolean success = false;
         try {
@@ -355,6 +355,22 @@ public class ReplicationService {
                     + ". Error message: " + e.getMessage(), e);
         }
         return success;
+    }
+
+    private NodeReference determineReplicationSourceNode(SystemMetadata sysMeta) {
+        NodeReference source = null;
+        NodeReference authNode = sysMeta.getAuthoritativeMemberNode();
+        for (Replica replica : sysMeta.getReplicaList()) {
+            if (replica.getReplicaMemberNode().equals(authNode)
+                    && replica.getReplicationStatus().equals(ReplicationStatus.COMPLETED)) {
+                source = replica.getReplicaMemberNode();
+                break;
+            } else if (source == null
+                    && replica.getReplicationStatus().equals(ReplicationStatus.COMPLETED)) {
+                source = replica.getReplicaMemberNode();
+            }
+        }
+        return source;
     }
 
     /**
