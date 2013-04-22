@@ -44,9 +44,9 @@ import com.hazelcast.client.HazelcastClient;
 
 /**
  * An abstract runnable that encapsulates processing callable auditing tasks.  
- * This processor uses an executor service to order to process tasks 
- * concurrently in a thread pool.  Strategy is to batch tasks for the executor
- * service, then handle the futures from the previous batch of tasks while the
+ * This processor uses an executor service to process tasks concurrently
+ * in a thread pool.  Strategy is to batch tasks for the executor service, 
+ * then handle the futures from the previous batch while the
  * current batch of tasks are executing.
  * 
  * @author sroseboo
