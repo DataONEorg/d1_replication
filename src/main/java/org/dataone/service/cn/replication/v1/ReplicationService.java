@@ -312,7 +312,11 @@ public class ReplicationService {
         }
 
         NodeReference originatingNode = determineReplicationSourceNode(sysmeta);
-
+        if (originatingNode == null) {
+            log.error("Could not determine replication source node for replication request for pid: "
+                    + sysmeta.getIdentifier().getValue() + ".  Replication request failed.");
+            return false;
+        }
         boolean success = false;
         try {
             success = targetMN.replicate(sysmeta, originatingNode);
@@ -367,6 +371,8 @@ public class ReplicationService {
                 break;
             } else if (source == null
                     && replica.getReplicationStatus().equals(ReplicationStatus.COMPLETED)) {
+                // set the source to the first completed replica but keep iterating to find
+                // the authoritative MN and give preference to its 'replica' as source.
                 source = replica.getReplicaMemberNode();
             }
         }
