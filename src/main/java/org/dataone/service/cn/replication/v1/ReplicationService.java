@@ -367,7 +367,7 @@ public class ReplicationService {
         for (Replica replica : sysMeta.getReplicaList()) {
             if (replica.getReplicaMemberNode().equals(authNode)
                     && replica.getReplicationStatus().equals(ReplicationStatus.COMPLETED)) {
-                source = replica.getReplicaMemberNode();
+                source = authNode;
                 break;
             } else if (source == null
                     && replica.getReplicationStatus().equals(ReplicationStatus.COMPLETED)) {
