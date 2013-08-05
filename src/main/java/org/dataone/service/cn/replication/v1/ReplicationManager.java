@@ -234,7 +234,7 @@ public class ReplicationManager {
 
         log.debug("ReplicationManager.createAndQueueTasks called.");
 
-        replicationTaskQueue.logState();
+        //replicationTaskQueue.logState();
 
         ILock lock;
         boolean allowed;
