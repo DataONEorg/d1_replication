@@ -28,6 +28,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
@@ -120,6 +122,9 @@ public class ReplicationManager {
     /* The prioritization strategy for determining target replica nodes */
     private ReplicationPrioritizationStrategy prioritizationStrategy = new ReplicationPrioritizationStrategy();
 
+    private static ScheduledExecutorService staleRequestedReplicaAuditScheduler;
+    private static ScheduledExecutorService staleQueuedReplicaAuditScheduler;
+
     /* The router hostname for the CN cluster (round robin) */
     private String cnRouterHostname;
 
@@ -156,6 +161,9 @@ public class ReplicationManager {
 
         this.replicationTaskQueue = ReplicationFactory.getReplicationTaskQueue();
         this.replicationService = ReplicationFactory.getReplicationService();
+
+        startStaleRequestedAuditing();
+        startStaleQueuedAuditing();
 
         // Report node status statistics on a scheduled basis
         // TODO: hold off on scheduling code for now
@@ -784,5 +792,23 @@ public class ReplicationManager {
 
         }
         return nodesByPriority;
+    }
+
+    private void startStaleQueuedAuditing() {
+        if (staleQueuedReplicaAuditScheduler == null
+                || staleQueuedReplicaAuditScheduler.isShutdown()) {
+            staleQueuedReplicaAuditScheduler = Executors.newSingleThreadScheduledExecutor();
+            staleQueuedReplicaAuditScheduler.scheduleAtFixedRate(new QueuedReplicationAuditor(),
+                    0L, 1L, TimeUnit.HOURS);
+        }
+    }
+
+    private void startStaleRequestedAuditing() {
+        if (staleRequestedReplicaAuditScheduler == null
+                || staleRequestedReplicaAuditScheduler.isShutdown()) {
+            staleRequestedReplicaAuditScheduler = Executors.newSingleThreadScheduledExecutor();
+            staleRequestedReplicaAuditScheduler.scheduleAtFixedRate(
+                    new StaleReplicationRequestAuditor(), 0L, 1L, TimeUnit.HOURS);
+        }
     }
 }
