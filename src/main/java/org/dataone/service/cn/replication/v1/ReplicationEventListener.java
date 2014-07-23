@@ -30,6 +30,9 @@ import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.types.v1.Identifier;
+import org.dataone.service.types.v1.NodeReference;
+import org.dataone.service.types.v1.Replica;
+import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.SystemMetadata;
 
 import com.hazelcast.client.HazelcastClient;
@@ -120,7 +123,6 @@ public class ReplicationEventListener implements EntryListener<Identifier, Syste
      */
     public void init() {
         log.info("initialization");
-
     }
 
     /**
@@ -146,42 +148,38 @@ public class ReplicationEventListener implements EntryListener<Identifier, Syste
                     log.info("Won the replication events queue poll [top of] for " + pid.getValue());
                     String lockString = lockPrefix + pid.getValue();
                     lock = this.hzMember.getLock(lockString);
-                    // lock the string across CN ReplicationEventListener
-                    // instances
+                    // lock the string across CN ReplicationEventListener instances
                     isLocked = lock.tryLock(1L, TimeUnit.SECONDS);
                     if (isLocked) {
                         log.debug("Gained the event lock " + lockString);
-                        log.trace("METRICS:\tREPLICATION:\tEVALUATE:\tPID:\t" + pid.getValue());
 
-                        // evaluate the object's replication policy for
-                        // potential
-                        // task creation
-                        this.replicationManager.createAndQueueTasks(pid);
+                        if (isAuthoritativeReplicaValid(this.systemMetadata.get(pid))) {
 
-                        log.trace("METRICS:\tREPLICATION:\tEND EVALUATE:\tPID:\t" + pid.getValue());
+                            log.trace("METRICS:\tREPLICATION:\tEVALUATE:\tPID:\t" + pid.getValue());
+                            this.replicationManager.createAndQueueTasks(pid);
+                            log.trace("METRICS:\tREPLICATION:\tEND EVALUATE:\tPID:\t"
+                                    + pid.getValue());
 
+                        } else {
+                            log.info("Authoritative replica is not valid, not queueing to replication for pid: "
+                                    + pid.getValue());
+                        }
                     } else {
                         log.debug("Didn't gain the event lock " + lockString);
-
                     }
                 }
-
             } catch (BaseException e) {
                 log.error("There was a problem handling task creation for " + pid.getValue()
                         + ". The error message was " + e.getMessage(), e);
                 // something went very wrong trying to create tasks for this
                 // pid. Resubmit it to evaluate again.
                 queueEvent(pid);
-
             } catch (InterruptedException e) {
                 log.error("Polling of the hzReplicationEvents queue was interrupted.", e);
-
             } finally {
                 if (isLocked) {
                     lock.unlock();
-
                 }
-
             }
         }
     }
@@ -206,55 +204,49 @@ public class ReplicationEventListener implements EntryListener<Identifier, Syste
             log.info("Received entry added event on the hzSystemMetadata map. Queueing "
                     + event.getKey().getValue());
 
-            // a lock to coordinate event handling between the 3 CN
-            // ReplicationManager instances
-            String lockString = EVENT_PREFIX + event.getKey().getValue();
-            Lock lock = null;
-            boolean isLocked = false;
+            if (isAuthoritativeReplicaValid(event.getValue())) {
 
-            try {
+                // a lock to coordinate event handling between the 3 CN
+                // ReplicationManager instances
+                String lockString = EVENT_PREFIX + event.getKey().getValue();
+                Lock lock = null;
+                boolean isLocked = false;
 
-                // lock the event string and queue the event.
-                lock = this.hzMember.getLock(lockString);
-                isLocked = lock.tryLock(10L, TimeUnit.MILLISECONDS);
-                if (isLocked) {
-                    log.info("Locked " + lockString);
-                    queueEvent(event.getKey());
-                    lock.unlock();
-                    log.info("Unlocked " + lockString);
-                    isLocked = false;
+                try {
 
-                } else {
-                    log.info("Didn't get lock for identifier " + event.getKey().getValue());
+                    // lock the event string and queue the event.
+                    lock = this.hzMember.getLock(lockString);
+                    isLocked = lock.tryLock(10L, TimeUnit.MILLISECONDS);
+                    if (isLocked) {
+                        log.info("Locked " + lockString);
+                        queueEvent(event.getKey());
+                        lock.unlock();
+                        log.info("Unlocked " + lockString);
+                        isLocked = false;
 
+                    } else {
+                        log.info("Didn't get lock for identifier " + event.getKey().getValue());
+
+                    }
+
+                } catch (NullPointerException e) {
+                    log.debug("The event identifier was null", e);
+                } catch (RuntimeException e) {
+                    log.debug("Couldn't get a lock for " + lockString, e);
+                } catch (InterruptedException e) {
+                    log.debug("Lock retreival was interrupted for " + lockString, e);
+                } finally {
+                    if (isLocked) {
+                        lock.unlock();
+                        log.info("Unlocked " + lockString);
+
+                    }
                 }
-
-            } catch (NullPointerException e) {
-                log.debug("The event identifier was null", e);
-            } catch (RuntimeException e) {
-                log.debug("Couldn't get a lock for " + lockString, e);
-            } catch (InterruptedException e) {
-                log.debug("Lock retreival was interrupted for " + lockString, e);
-            } finally {
-                if (isLocked) {
-                    lock.unlock();
-                    log.info("Unlocked " + lockString);
-
-                }
+            } else {
+                log.info("Authoritative replica is not valid, not queueing to replication for pid: "
+                        + event.getValue());
             }
         }
-    }
-
-    /**
-     * Implement the EntryListener interface, responding to entries being
-     * deleted from the hzSystemMetadata map.
-     * 
-     * @param event
-     *            - the entry event being deleted from the map
-     */
-    public void entryRemoved(EntryEvent<Identifier, SystemMetadata> event) {
-        // we don't remove replicas (do we?)
-
     }
 
     /**
@@ -270,44 +262,73 @@ public class ReplicationEventListener implements EntryListener<Identifier, Syste
             log.info("Received entry updated event on the hzSystemMetadata map. Queueing "
                     + event.getKey().getValue());
 
-            // a lock to coordinate event handling between the 3 CN
-            // ReplicationManager instances
-            String lockString = EVENT_PREFIX + event.getKey().getValue();
-            Lock lock = null;
-            boolean isLocked = false;
-
-            try {
-
-                // lock the pid and queue the event.
-                lock = this.hzMember.getLock(lockString);
-                isLocked = lock.tryLock(10L, TimeUnit.MILLISECONDS);
-                if (isLocked) {
-                    log.info("Locked " + lockString);
-                    queueEvent(event.getKey());
-                    log.info("Locked " + lockString);
-                    lock.unlock();
-                    log.info("Unlocked " + lockString);
-                    isLocked = false;
-
-                } else {
-                    log.info("Didn't get lock for identifier " + event.getKey().getValue());
-
-                }
-
-            } catch (NullPointerException e) {
-                log.debug("The event identifier was null", e);
-            } catch (RuntimeException e) {
-                log.debug("Couldn't get a lock for " + lockString, e);
-            } catch (InterruptedException e) {
-                log.debug("Lock retreival was interrupted for " + lockString, e);
-            } finally {
-                if (isLocked) {
-                    lock.unlock();
-                    log.info("Unlocked " + lockString);
-
+            if (isAuthoritativeReplicaValid(event.getValue())) {
+                // a lock to coordinate event handling between the 3 CN
+                // ReplicationManager instances
+                String lockString = EVENT_PREFIX + event.getKey().getValue();
+                Lock lock = null;
+                boolean isLocked = false;
+                try {
+                    // lock the pid and queue the event.
+                    lock = this.hzMember.getLock(lockString);
+                    isLocked = lock.tryLock(10L, TimeUnit.MILLISECONDS);
+                    if (isLocked) {
+                        log.info("Locked " + lockString);
+                        queueEvent(event.getKey());
+                        log.info("Locked " + lockString);
+                        lock.unlock();
+                        log.info("Unlocked " + lockString);
+                        isLocked = false;
+                    } else {
+                        log.info("Didn't get lock for identifier " + event.getKey().getValue());
+                    }
+                } catch (NullPointerException e) {
+                    log.debug("The event identifier was null", e);
+                } catch (RuntimeException e) {
+                    log.debug("Couldn't get a lock for " + lockString, e);
+                } catch (InterruptedException e) {
+                    log.debug("Lock retreival was interrupted for " + lockString, e);
+                } finally {
+                    if (isLocked) {
+                        lock.unlock();
+                        log.info("Unlocked " + lockString);
+                    }
                 }
             }
+        } else {
+            log.info("Authoritative replica is not valid, not queueing to replication for pid: "
+                    + event.getValue());
         }
+    }
+
+    private boolean isAuthoritativeReplicaValid(SystemMetadata sysMeta) {
+        if (sysMeta == null) {
+            return false;
+        }
+        ReplicationStatus status = getAuthoritativeMNReplicaStatus(sysMeta);
+        return ReplicationStatus.COMPLETED.equals(status);
+    }
+
+    private ReplicationStatus getAuthoritativeMNReplicaStatus(SystemMetadata sysMeta) {
+        NodeReference authNode = sysMeta.getAuthoritativeMemberNode();
+        for (Replica replica : sysMeta.getReplicaList()) {
+            if (authNode.equals(replica.getReplicaMemberNode())) {
+                return replica.getReplicationStatus();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Implement the EntryListener interface, responding to entries being
+     * deleted from the hzSystemMetadata map.
+     * 
+     * @param event
+     *            - the entry event being deleted from the map
+     */
+    public void entryRemoved(EntryEvent<Identifier, SystemMetadata> event) {
+        // we don't remove replicas (do we?)
+
     }
 
     /**
