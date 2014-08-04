@@ -20,9 +20,9 @@
  * $Id$
  */
 
-package org.dataone.service.cn.replication.v1;
+package org.dataone.service.cn.replication.v2;
 
-import org.dataone.service.cn.v1.CNReplication;
+import org.dataone.service.cn.v2.CNReplication;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.InvalidRequest;
 import org.dataone.service.exceptions.InvalidToken;
@@ -72,29 +72,5 @@ public class CNReplicationImpl implements CNReplication {
        return true;
     }
 
-    @Override
-    public boolean setReplicationStatus(Identifier pid, NodeReference nodeRef, ReplicationStatus status, BaseException failure) throws ServiceFailure, NotImplemented, InvalidToken, NotAuthorized, InvalidRequest, NotFound {
-        return true;
-    }
-
-    @Override
-    public boolean setReplicationPolicy(Identifier pid, ReplicationPolicy policy, long serialVersion) throws NotImplemented, NotFound, NotAuthorized, ServiceFailure, InvalidRequest, InvalidToken, VersionMismatch {
-        return true;
-    }
-
-    @Override
-    public boolean isNodeAuthorized(Subject targetNodeSubject, Identifier pid) throws NotImplemented, NotAuthorized, InvalidToken, ServiceFailure, NotFound, InvalidRequest {
-        return true;
-    }
-
-    @Override
-    public boolean updateReplicationMetadata(Identifier pid, Replica replicaMetadata, long serialVersion) throws NotImplemented, NotAuthorized, ServiceFailure, NotFound, InvalidRequest, InvalidToken, VersionMismatch {
-        return true;
-    }
-
-    @Override
-    public boolean deleteReplicationMetadata(Identifier pid, NodeReference nodeId, long serialVersion) throws InvalidToken, InvalidRequest, ServiceFailure, NotAuthorized, NotFound, NotImplemented, VersionMismatch {
-        return true;
-    }
 
 }

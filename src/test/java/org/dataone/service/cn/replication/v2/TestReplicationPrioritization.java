@@ -1,4 +1,4 @@
-package org.dataone.service.cn.replication.v1;
+package org.dataone.service.cn.replication.v2;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -11,13 +11,14 @@ import junit.framework.Assert;
 
 import org.dataone.cn.dao.DataSourceFactory;
 import org.dataone.cn.dao.ReplicationDaoMetacatImplTestUtil;
+import org.dataone.service.cn.replication.ReplicationPrioritizationStrategy;
 import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.ObjectFormatIdentifier;
 import org.dataone.service.types.v1.ReplicationPolicy;
 import org.dataone.service.types.v1.Subject;
-import org.dataone.service.types.v1.SystemMetadata;
+import org.dataone.service.types.v2.SystemMetadata;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;

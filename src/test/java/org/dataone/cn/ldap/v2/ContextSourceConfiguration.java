@@ -20,7 +20,7 @@
  * $Id$
  */
 
-package org.dataone.cn.ldap.v1;
+package org.dataone.cn.ldap.v2;
 
 import javax.naming.NamingException;
 import org.dataone.configuration.Settings;

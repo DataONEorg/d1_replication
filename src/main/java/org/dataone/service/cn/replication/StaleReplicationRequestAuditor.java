@@ -19,21 +19,18 @@
  * 
  */
 
-package org.dataone.service.cn.replication.v1;
+package org.dataone.service.cn.replication;
 
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import org.apache.commons.configuration.ConversionException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.dataone.client.CNode;
-import org.dataone.client.D1Client;
-import org.dataone.client.MNode;
+import org.dataone.client.v1.CNode;
+import org.dataone.client.v1.itk.D1Client;
 import org.dataone.cn.ComponentActivationUtility;
 import org.dataone.cn.dao.DaoFactory;
 import org.dataone.cn.dao.ReplicationDao.ReplicaDto;
@@ -46,7 +43,7 @@ import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.Replica;
-import org.dataone.service.types.v1.SystemMetadata;
+import org.dataone.service.types.v2.SystemMetadata;
 
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.ILock;
@@ -93,7 +90,6 @@ public class StaleReplicationRequestAuditor implements Runnable {
     private void processStaleRequests() {
         CNode cn = getCNode();
         if (cn != null) {
-            Map<String, MNode> memberNodes = new HashMap<String, MNode>();
             List<ReplicaDto> requestedReplicas = getReplicasToAudit();
             for (ReplicaDto result : requestedReplicas) {
                 Identifier identifier = result.identifier;
@@ -108,11 +104,14 @@ public class StaleReplicationRequestAuditor implements Runnable {
                 if (sysmeta == null) {
                     continue;
                 }
-                MNode mn = getMemberNode(memberNodes, nodeId);
-                if (mn == null) {
-                    continue;
-                }
-                Checksum mnChecksum = getChecksumFromMN(identifier, nodeId, sysmeta, mn);
+                
+                ReplicationCommunication rc = ReplicationCommunication.getInstance(nodeId);
+                Checksum mnChecksum = null;
+				try {
+					mnChecksum = rc.getChecksumFromMN(identifier, nodeId, sysmeta);
+				} catch (BaseException e) {
+					log.warn(e.getMessage());
+				}
                 if (mnChecksum == null) {
                     deleteReplica(identifier, nodeId);
                 } else {
@@ -162,39 +161,6 @@ public class StaleReplicationRequestAuditor implements Runnable {
             }
         }
         return cn;
-    }
-
-    private MNode getMemberNode(Map<String, MNode> memberNodes, NodeReference nodeId) {
-        MNode mn = null;
-        if (memberNodes.containsKey(nodeId.getValue())) {
-            mn = memberNodes.get(nodeId.getValue());
-        } else {
-            try {
-                mn = D1Client.getMN(nodeId);
-            } catch (BaseException e) {
-                log.error("Couldn't connect to the MN to manage replica states: " + e.getMessage());
-                if (log.isDebugEnabled()) {
-                    e.printStackTrace();
-                }
-            }
-            if (mn != null) {
-                memberNodes.put(nodeId.getValue(), mn);
-            }
-        }
-        return mn;
-    }
-
-    private Checksum getChecksumFromMN(Identifier identifier, NodeReference nodeId,
-            SystemMetadata sysmeta, MNode mn) {
-        Checksum mnChecksum = null;
-        try {
-            mnChecksum = mn.getChecksum(identifier, sysmeta.getChecksum().getAlgorithm());
-        } catch (BaseException e) {
-            log.debug(
-                    "Stale Replica Status Audit: Cannot get checksum from MN: " + nodeId.getValue()
-                            + " for pid: " + identifier.getValue(), e);
-        }
-        return mnChecksum;
     }
 
     private void updateReplicaToComplete(CNode cn, Identifier identifier, NodeReference nodeId,

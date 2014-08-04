@@ -20,14 +20,14 @@
  * $Id$
  */
 
-package org.dataone.cn.ldap.v1;
+package org.dataone.cn.ldap.v2;
 
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.dataone.service.types.v1.Node;
-import org.dataone.service.types.v1.NodeList;
+import org.dataone.service.types.v2.Node;
+import org.dataone.service.types.v2.NodeList;
 import org.dataone.service.types.v1.Service;
 import org.dataone.service.util.TypeMarshaller;
 import org.springframework.beans.factory.annotation.Autowired;

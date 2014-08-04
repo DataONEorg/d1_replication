@@ -18,15 +18,15 @@
  * limitations under the License.
  */
 
-package org.dataone.service.cn.replication.v1;
+package org.dataone.service.cn.replication;
 
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadPoolExecutor;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.dataone.client.CNode;
-import org.dataone.client.D1Client;
+import org.dataone.client.v2.CNode;
+import org.dataone.client.v2.itk.D1Client;
 import org.dataone.service.exceptions.BaseException;
 
 /**
@@ -70,9 +70,9 @@ public class RejectedReplicationTaskHandler implements RejectedExecutionHandler 
         
         try {
             this.cn = D1Client.getCN();
-            long serialVersion = this.cn.getSystemMetadata(
+            long serialVersion = this.cn.getSystemMetadata(null,
                     task.getPid()).getSerialVersion().longValue();
-            deleted = this.cn.deleteReplicationMetadata(
+            deleted = this.cn.deleteReplicationMetadata(null,
                     task.getPid(), task.getTargetNode(), serialVersion);
             log.info("Deleted replica entry for" + 
                 task.getTargetNode().getValue() + " and identifier " + 
