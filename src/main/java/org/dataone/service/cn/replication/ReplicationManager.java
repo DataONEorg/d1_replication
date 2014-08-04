@@ -19,7 +19,7 @@
  * 
  */
 
-package org.dataone.service.cn.replication.v1;
+package org.dataone.service.cn.replication;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -34,15 +34,15 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.dataone.client.CNode;
-import org.dataone.client.D1Client;
+import org.dataone.client.v2.CNode;
+import org.dataone.client.v2.itk.D1Client;
 import org.dataone.client.auth.CertificateManager;
 import org.dataone.cn.dao.DaoFactory;
 import org.dataone.cn.dao.exceptions.DataAccessException;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.configuration.Settings;
-import org.dataone.service.cn.v1.CNReplication;
+import org.dataone.service.cn.v2.CNReplication;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.InvalidRequest;
 import org.dataone.service.exceptions.InvalidToken;
@@ -52,14 +52,14 @@ import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.exceptions.VersionMismatch;
 import org.dataone.service.types.v1.Identifier;
-import org.dataone.service.types.v1.Node;
+import org.dataone.service.types.v2.Node;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.NodeType;
 import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationPolicy;
 import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.Service;
-import org.dataone.service.types.v1.SystemMetadata;
+import org.dataone.service.types.v2.SystemMetadata;
 
 import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.core.HazelcastInstance;
@@ -200,7 +200,7 @@ public class ReplicationManager {
 
             cnode = D1Client.getCN();
             log.info("ReplicationManager D1Client base_url is: " + cnode.getNodeBaseServiceUrl());
-        } catch (ServiceFailure e) {
+        } catch (BaseException e) {
 
             // try again, then fail
             try {
@@ -212,7 +212,7 @@ public class ReplicationManager {
                 }
                 cnode = D1Client.getCN();
 
-            } catch (ServiceFailure e1) {
+            } catch (BaseException e1) {
                 log.error("There was a problem getting a Coordinating Node reference "
                         + " for the ReplicationManager. ", e1);
                 throw new RuntimeException(e1);
@@ -220,6 +220,10 @@ public class ReplicationManager {
             }
         }
         this.cnReplication = cnode;
+    }
+    
+    public Node getNode(NodeReference nodeRef) {
+    	return this.nodes.get(nodeRef);
     }
 
     /**
@@ -312,6 +316,7 @@ public class ReplicationManager {
                 }
 
                 // build the potential list of target nodes
+                // TODO: only include nodes that can handle the version of our object (v1 or v2)
                 for (NodeReference nodeReference : nodeList) {
                     Node node = this.nodes.get(nodeReference);
 
@@ -411,7 +416,7 @@ public class ReplicationManager {
                             try {
                                 // refresh sysmeta to avoid VersionMismatch
                                 sysmeta = this.systemMetadata.get(pid);
-                                updated = this.cnReplication.updateReplicationMetadata(pid,
+                                updated = this.cnReplication.updateReplicationMetadata(null, pid,
                                         replicaMetadata, sysmeta.getSerialVersion().longValue());
 
                             } catch (VersionMismatch e) {
@@ -420,7 +425,7 @@ public class ReplicationManager {
                                 try {
                                     sysmeta = this.systemMetadata.get(pid);
                                     updated = this.cnReplication
-                                            .updateReplicationMetadata(pid, replicaMetadata,
+                                            .updateReplicationMetadata(null, pid, replicaMetadata,
                                                     sysmeta.getSerialVersion().longValue());
 
                                 } catch (VersionMismatch e1) {

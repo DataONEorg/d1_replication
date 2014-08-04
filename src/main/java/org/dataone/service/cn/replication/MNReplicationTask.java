@@ -19,7 +19,7 @@
  * 
  * $Id$
  */
-package org.dataone.service.cn.replication.v1;
+package org.dataone.service.cn.replication;
 
 import java.io.File;
 import java.io.Serializable;
@@ -29,25 +29,24 @@ import java.util.concurrent.Callable;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.dataone.client.CNode;
-import org.dataone.client.D1Client;
-import org.dataone.client.MNode;
+import org.dataone.client.v2.CNode;
+import org.dataone.client.v2.itk.D1Client;
 import org.dataone.client.auth.CertificateManager;
 import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.InvalidRequest;
 import org.dataone.service.exceptions.NotFound;
+import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.exceptions.VersionMismatch;
 import org.dataone.service.types.v1.Checksum;
-import org.dataone.service.types.v1.DescribeResponse;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.Session;
-import org.dataone.service.types.v1.SystemMetadata;
+import org.dataone.service.types.v2.SystemMetadata;
 
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.ILock;
@@ -90,8 +89,8 @@ public class MNReplicationTask implements Serializable, Callable<String> {
     /* The subject of the originating node, extracted from the Node object */
     private String originatingNodeSubject;
 
-    /* A client reference to the target node */
-    private MNode targetMN;
+    /* A reference for communicating with member nodes */
+    private ReplicationCommunication nodeCommunication;
 
     /* A client reference to the coordinating node */
     private CNode cn;
@@ -312,7 +311,7 @@ public class MNReplicationTask implements Serializable, Callable<String> {
         try {
             this.cn = D1Client.getCN();
 
-        } catch (ServiceFailure e) {
+        } catch (Exception e) {
             log.warn("Caught a ServiceFailure while getting a reference to the CN "
                     + "during replication task id " + getTaskid() + ", identifier "
                     + getPid().getValue() + ", target node " + getTargetNode().getValue());
@@ -335,44 +334,23 @@ public class MNReplicationTask implements Serializable, Callable<String> {
                 this.cn = null;
                 success = false;
 
-            }
+            } catch (NotImplemented ne) {
+	            log.error("Caught NotImplemented while getting a reference to the CN "
+	                    + "during replication task id " + getTaskid() + ", identifier "
+	                    + getPid().getValue() + ", target node " + getTargetNode().getValue(), ne);
+	            this.cn = null;
+	            success = false;
+	
+	        }
         }
 
-        // Get an target MNode reference to communicate with
-        try {
-            this.targetMN = D1Client.getMN(this.targetNode);
-
-        } catch (ServiceFailure e) {
-            log.warn("Caught a ServiceFailure while getting a reference to the MN "
-                    + "during replication task id " + getTaskid() + ", identifier "
-                    + getPid().getValue() + ", target node " + getTargetNode().getValue());
-
-            try {
-                // wait 5 seconds and try again, else fail
-                Thread.sleep(5000L);
-                this.targetMN = D1Client.getMN(this.targetNode);
-
-            } catch (ServiceFailure e1) {
-                log.error("There was a problem calling replicate() on "
-                        + getTargetNode().getValue() + " for identifier " + this.pid.getValue()
-                        + " during " + " task id " + getTaskid(), e1);
-                this.targetMN = null;
-                success = false;
-
-            } catch (InterruptedException ie) {
-                log.error("Caught InterruptedException while getting a reference to the MN "
-                        + "during replication task id " + getTaskid() + ", identifier "
-                        + getPid().getValue() + ", target node " + getTargetNode().getValue(), ie);
-                this.targetMN = null;
-                success = false;
-
-            }
-        }
+        // Get an target reference to communicate with
+       this.nodeCommunication = ReplicationCommunication.getInstance(targetNode);
 
         // now try to call MN.replicate()
         try {
 
-            if (this.cn != null && this.targetMN != null) {
+            if (this.cn != null && this.nodeCommunication != null) {
                 // get the most recent system metadata for the pid
                 sysmeta = cn.getSystemMetadata(session, pid);
 
@@ -402,8 +380,8 @@ public class MNReplicationTask implements Serializable, Callable<String> {
 
                     // check if the object exists on the target MN already
                     try {
-                        DescribeResponse description = this.targetMN.describe(getPid());
-                        if (description.getDataONE_Checksum().equals(sysmeta.getChecksum())) {
+                        Checksum checksum = this.nodeCommunication.getChecksumFromMN(getPid(), targetNode, sysmeta);
+                        if (checksum.equals(sysmeta.getChecksum())) {
                             exists = true;
 
                         }
@@ -413,13 +391,14 @@ public class MNReplicationTask implements Serializable, Callable<String> {
                         // across CN threads handling replication tasks
                         status = ReplicationStatus.REQUESTED;
 
-                        updated = this.cn.setReplicationStatus(getPid(), this.targetNode, status,
+                        updated = this.cn.setReplicationStatus(session, getPid(), this.targetNode, status,
                                 null);
                         log.debug("Task id " + this.getTaskid()
                                 + " called setReplicationStatus() for identifier "
                                 + this.pid.getValue() + ". updated result: " + updated);
 
-                        success = this.targetMN.replicate(session, sysmeta, this.originatingNode);
+                        success = this.nodeCommunication.requestReplication(targetNode, sysmeta);
+                        
                         log.info("Task id " + this.getTaskid()
                                 + " called replicate() at targetNode " + this.targetNode.getValue()
                                 + ", identifier " + this.pid.getValue() + ". Success: " + success);
@@ -449,15 +428,14 @@ public class MNReplicationTask implements Serializable, Callable<String> {
                 this.retryCount++;
                 Thread.sleep(5000L);
                 // get the most recent system metadata for the pid
-                if (this.cn != null && this.targetMN != null) {
+                if (this.cn != null && this.nodeCommunication != null) {
                     try {
-                        Checksum checksum = this.targetMN.getChecksum(getPid(), sysmeta
-                                .getChecksum().getAlgorithm());
+                        Checksum checksum = this.nodeCommunication.getChecksumFromMN(getPid(), this.targetNode, sysmeta);
                         exists = checksum.equals(sysmeta.getChecksum());
 
                     } catch (NotFound nf) {
                         sysmeta = cn.getSystemMetadata(session, pid);
-                        success = targetMN.replicate(session, sysmeta, this.originatingNode);
+                        success = this.nodeCommunication.requestReplication(targetNode, sysmeta);
                         log.info("Task id " + this.getTaskid()
                                 + " called replicate() at targetNode " + this.targetNode.getValue()
                                 + ", identifier " + this.pid.getValue() + ". Success: " + success);
@@ -563,7 +541,7 @@ public class MNReplicationTask implements Serializable, Callable<String> {
                         // err. get the latest system metadata and call the cn
                         if (be instanceof VersionMismatch) {
                             try {
-                                sysmeta = this.cn.getSystemMetadata(pid);
+                                sysmeta = this.cn.getSystemMetadata(session, pid);
                                 deleted = this.cn.deleteReplicationMetadata(session, pid,
                                         targetNode, sysmeta.getSerialVersion().longValue());
 
@@ -638,13 +616,13 @@ public class MNReplicationTask implements Serializable, Callable<String> {
                 + " Is the local CN communicationg properly?");
         CNode cn;
         boolean updated = false;
-        cn = new CNode(this.cnRouterHostname);
-
+        
         // try multiple times since at this point we may be dealing with a lame
         // CN in the cluster and the RR may still point us to it
         for (int i = 0; i < 5; i++) {
 
             try {
+                cn = D1Client.getCN(this.cnRouterHostname);
                 updated = cn.setReplicationStatus(session, pid, targetNode, status, null);
                 if (updated) {
                     break;
@@ -697,15 +675,16 @@ public class MNReplicationTask implements Serializable, Callable<String> {
         SystemMetadata sysmeta;
         CNode cn;
         boolean deleted = false;
-        cn = new CNode(this.cnRouterHostname);
 
         // try multiple times since at this point we may be dealing with a lame
         // CN in the cluster and the RR may still point us to it
         for (int i = 0; i < 5; i++) {
             try {
                 // refresh the system metadata in case it changed
-                sysmeta = cn.getSystemMetadata(pid);
-                deleted = cn.deleteReplicationMetadata(pid, targetNode, sysmeta.getSerialVersion()
+                cn = D1Client.getCN(this.cnRouterHostname);
+
+                sysmeta = cn.getSystemMetadata(session, pid);
+                deleted = cn.deleteReplicationMetadata(session, pid, targetNode, sysmeta.getSerialVersion()
                         .longValue());
                 if (deleted) {
                     break;

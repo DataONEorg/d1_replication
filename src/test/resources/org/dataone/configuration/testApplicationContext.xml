@@ -25,7 +25,7 @@
         </spring:property>
     </spring:bean>
 
-    <spring:bean id="contextSourceConfiguration" class="org.dataone.cn.ldap.v1.ContextSourceConfiguration" />
+    <spring:bean id="contextSourceConfiguration" class="org.dataone.cn.ldap.v2.ContextSourceConfiguration" />
 
     <spring:bean id="contextSource" class="org.springframework.ldap.core.support.LdapContextSource"
         factory-bean="contextSourceConfiguration" factory-method="getLdapContextSource" />
@@ -33,14 +33,14 @@
     <spring:bean id="ldapTemplate" class="org.springframework.ldap.core.LdapTemplate">
         <spring:constructor-arg ref="contextSource" />
     </spring:bean>
-    <context:component-scan base-package="org.dataone.cn.ldap.v1" />
+    <context:component-scan base-package="org.dataone.cn.ldap.v2" />
     
     <spring:bean id="readSystemMetadataResource" class="org.springframework.core.io.ClassPathResource" >
-        <spring:constructor-arg type="java.lang.String" value="org/dataone/cn/resources/samples/v1/systemMetadataSample.xml"/>
+        <spring:constructor-arg type="java.lang.String" value="org/dataone/cn/resources/samples/v2/systemMetadataSample.xml"/>
         <spring:qualifier value="readSystemMetadataResource"/>
     </spring:bean>
     <spring:bean id="nodeListResource" class="org.springframework.core.io.ClassPathResource" >
-        <spring:constructor-arg type="java.lang.String" value="org/dataone/cn/resources/samples/v1/nodeList.xml"/>
+        <spring:constructor-arg type="java.lang.String" value="org/dataone/cn/resources/samples/v2/nodeList.xml"/>
         <spring:qualifier value="nodeListResource"/>
     </spring:bean>
 

@@ -19,16 +19,15 @@
  * 
  */
 
-package org.dataone.service.cn.replication.v1;
+package org.dataone.service.cn.replication;
 
 import java.io.InputStream;
 import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.dataone.client.CNode;
-import org.dataone.client.D1Client;
-import org.dataone.client.MNode;
+import org.dataone.client.v2.CNode;
+import org.dataone.client.v2.itk.D1Client;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.InvalidRequest;
 import org.dataone.service.exceptions.InvalidToken;
@@ -40,7 +39,7 @@ import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationStatus;
-import org.dataone.service.types.v1.SystemMetadata;
+import org.dataone.service.types.v2.SystemMetadata;
 
 /**
  * 
@@ -113,20 +112,22 @@ public class ReplicationService {
             return;
         }
 
-        MNode targetMN = getMemberNode(targetNode);
-        if (targetMN == null) {
-            log.error("Unable to get target mn: " + targetNode.getValue()
-                    + ". deleting replica metadata, not requesting replica for pid: "
-                    + sysmeta.getIdentifier().getValue());
-            deleteReplicationMetadata(identifier, targetNode);
-            return;
-        }
-
-        boolean success = requestReplication(targetMN, sysmeta);
+        // request replication be queued
+        ReplicationCommunication rc = ReplicationCommunication.getInstance(targetNode);
+        boolean success = false;
+        try {
+			success = rc.requestReplication(targetNode, sysmeta);
+		} catch (BaseException e) {
+			log.warn(e.getMessage(), e);
+		}
 
         if (!success) {
             log.error("Unable to request replica from target mn: " + targetNode.getValue()
                     + " for: " + identifier.getValue() + ". setting status to failed.");
+            
+            // TODO: delete or mark as failed?
+            deleteReplicationMetadata(sysmeta.getIdentifier(), targetNode);
+
             setReplicationStatus(identifier, targetNode, ReplicationStatus.FAILED);
         }
     }
@@ -158,7 +159,7 @@ public class ReplicationService {
             try {
                 // refresh the system metadata in case it changed
                 sysmeta = getSystemMetadata(pid);
-                deleted = cn.deleteReplicationMetadata(pid, targetNode, sysmeta.getSerialVersion()
+                deleted = cn.deleteReplicationMetadata(null, pid, targetNode, sysmeta.getSerialVersion()
                         .longValue());
                 if (deleted) {
                     break;
@@ -203,7 +204,7 @@ public class ReplicationService {
         boolean updated = false;
         for (int i = 0; i < 5; i++) {
             try {
-                updated = cn.setReplicationStatus(pid, targetNode, status, null);
+                updated = cn.setReplicationStatus(null, pid, targetNode, status, null);
                 if (updated) {
                     break;
                 }
@@ -273,7 +274,7 @@ public class ReplicationService {
         SystemMetadata sysmeta = null;
         if (identifier != null && identifier.getValue() != null) {
             try {
-                sysmeta = cn.getSystemMetadata(identifier);
+                sysmeta = cn.getSystemMetadata(null, identifier);
             } catch (InvalidToken e) {
                 log.error("Cannot get system metedata for id: " + identifier.getValue(), e);
             } catch (ServiceFailure e) {
@@ -291,7 +292,7 @@ public class ReplicationService {
         InputStream is = null;
         if (identifier != null && identifier.getValue() != null) {
             try {
-                is = cn.get(identifier);
+                is = cn.get(null, identifier);
             } catch (InvalidToken e) {
                 log.error("Unable to get object from CN for pid: " + identifier.getValue(), e);
             } catch (ServiceFailure e) {
@@ -305,63 +306,9 @@ public class ReplicationService {
         return is;
     }
 
-    private boolean requestReplication(MNode targetMN, SystemMetadata sysmeta) {
+    
 
-        if (sysmeta == null) {
-            return false;
-        }
-
-        NodeReference originatingNode = determineReplicationSourceNode(sysmeta);
-        if (originatingNode == null) {
-            log.error("Could not determine replication source node for replication request for pid: "
-                    + sysmeta.getIdentifier().getValue() + ".  Replication request failed.");
-            return false;
-        }
-        boolean success = false;
-        try {
-            success = targetMN.replicate(sysmeta, originatingNode);
-            log.info("Called replicate() at targetNode " + targetMN.getNodeId() + ", identifier "
-                    + sysmeta.getIdentifier().getValue() + ". Success: " + success);
-        } catch (BaseException e) {
-            log.error("Caught base exception attempting to call replicate for pid: "
-                    + sysmeta.getIdentifier().getValue() + " with exception: " + e.getDescription()
-                    + " and message: " + e.getMessage(), e);
-            try {
-                log.info("The call to MN.replicate() failed for "
-                        + sysmeta.getIdentifier().getValue() + " on " + targetMN.getNodeId()
-                        + ". Trying again in 5 seconds.");
-                Thread.sleep(5000L);
-
-                sysmeta = getSystemMetadata(sysmeta.getIdentifier());
-                if (sysmeta != null) {
-                    success = targetMN.replicate(sysmeta, originatingNode);
-                    log.info("Called replicate() at targetNode " + targetMN.getNodeId()
-                            + ", identifier " + sysmeta.getIdentifier().getValue() + ". Success: "
-                            + success);
-                }
-            } catch (BaseException e1) {
-                log.error(
-                        "Caught base exception attempting to call replicate for pid: "
-                                + sysmeta.getIdentifier().getValue() + " with exception: "
-                                + e.getDescription() + " and message: " + e.getMessage(), e);
-                log.error(
-                        "There was a second problem calling replicate() on " + targetMN.getNodeId()
-                                + " for identifier " + sysmeta.getIdentifier().getValue(), e1);
-            } catch (InterruptedException ie) {
-                log.error(
-                        "Caught InterruptedException while calling replicate() for identifier "
-                                + sysmeta.getIdentifier().getValue() + ", target node "
-                                + targetMN.getNodeId(), ie);
-            }
-        } catch (Exception e) {
-            log.error("Unknown exception during replication for identifier "
-                    + sysmeta.getIdentifier().getValue() + ", target node " + targetMN.getNodeId()
-                    + ". Error message: " + e.getMessage(), e);
-        }
-        return success;
-    }
-
-    private NodeReference determineReplicationSourceNode(SystemMetadata sysMeta) {
+    public NodeReference determineReplicationSourceNode(SystemMetadata sysMeta) {
         NodeReference source = null;
         NodeReference authNode = sysMeta.getAuthoritativeMemberNode();
         for (Replica replica : sysMeta.getReplicaList()) {
@@ -398,7 +345,7 @@ public class ReplicationService {
             try {
                 // refresh the system metadata in case it changed
                 sysmeta = getSystemMetadata(pid);
-                updated = cn.updateReplicationMetadata(pid, replicaMetadata, sysmeta
+                updated = cn.updateReplicationMetadata(null, pid, replicaMetadata, sysmeta
                         .getSerialVersion().longValue());
                 if (updated) {
                     break;
@@ -434,14 +381,14 @@ public class ReplicationService {
     private void initializeCN() {
         try {
             this.cn = D1Client.getCN();
-        } catch (ServiceFailure e) {
+        } catch (BaseException e) {
             log.warn("Caught a ServiceFailure while getting a reference to the CN ", e);
             // try again, then fail
             try {
                 Thread.sleep(5000L);
                 this.cn = D1Client.getCN();
 
-            } catch (ServiceFailure e1) {
+            } catch (BaseException e1) {
                 log.warn("Second ServiceFailure while getting a reference to the CN", e1);
                 this.cn = null;
 
@@ -450,33 +397,6 @@ public class ReplicationService {
                 this.cn = null;
             }
         }
-    }
-
-    public MNode getMemberNode(NodeReference targetNode) {
-        MNode targetMN = null;
-        try {
-            targetMN = D1Client.getMN(targetNode);
-        } catch (ServiceFailure e) {
-            log.warn(
-                    "Caught a ServiceFailure while getting a reference to the MN: "
-                            + targetNode.getValue(), e);
-            try {
-                Thread.sleep(5000L);
-                targetMN = D1Client.getMN(targetNode);
-            } catch (ServiceFailure e1) {
-                log.error(
-                        "Second service failure getting reference to MN: " + targetNode.getValue(),
-                        e1);
-            } catch (InterruptedException ie) {
-                log.error(
-                        "Caught InterruptedException while getting a reference to the MN identifier, target node "
-                                + targetNode.getValue(), ie);
-            }
-        }
-        if (targetMN != null) {
-            targetMN.setNodeId(targetNode.getValue());
-        }
-        return targetMN;
     }
 
 }

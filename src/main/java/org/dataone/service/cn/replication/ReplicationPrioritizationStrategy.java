@@ -20,7 +20,7 @@
  * $Id: ReplicationManager.java 10445 2012-10-22 14:41:43Z sroseboo $
  */
 
-package org.dataone.service.cn.replication.v1;
+package org.dataone.service.cn.replication;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -43,7 +43,7 @@ import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationPolicy;
 import org.dataone.service.types.v1.ReplicationStatus;
-import org.dataone.service.types.v1.SystemMetadata;
+import org.dataone.service.types.v2.SystemMetadata;
 
 /**
  * ReplicationPrioritizationStrategy encapsulates the logic and calculations

@@ -17,7 +17,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.dataone.service.cn.replication.v1;
+package org.dataone.service.cn.replication.v2;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
@@ -30,13 +30,16 @@ import javax.annotation.Resource;
 
 import org.dataone.cn.dao.DataSourceFactory;
 import org.dataone.cn.dao.ReplicationDaoMetacatImplTestUtil;
-import org.dataone.cn.ldap.v1.NodeLdapPopulation;
+import org.dataone.cn.ldap.v2.NodeLdapPopulation;
 import org.dataone.configuration.Settings;
-import org.dataone.service.cn.v1.CNReplication;
+import org.dataone.service.cn.replication.MNReplicationTask;
+import org.dataone.service.cn.replication.ReplicationFactory;
+import org.dataone.service.cn.replication.ReplicationManager;
+import org.dataone.service.cn.v2.CNReplication;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.Node;
 import org.dataone.service.types.v1.NodeReference;
-import org.dataone.service.types.v1.SystemMetadata;
+import org.dataone.service.types.v2.SystemMetadata;
 import org.dataone.service.util.TypeMarshaller;
 import org.junit.Test;
 import org.junit.runner.RunWith;

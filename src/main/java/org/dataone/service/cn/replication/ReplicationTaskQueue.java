@@ -18,7 +18,7 @@
  * limitations under the License.
  * 
  */
-package org.dataone.service.cn.replication.v1;
+package org.dataone.service.cn.replication;
 
 import java.util.ArrayList;
 import java.util.Collection;
