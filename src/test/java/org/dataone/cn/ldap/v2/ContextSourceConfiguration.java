@@ -23,6 +23,7 @@
 package org.dataone.cn.ldap.v2;
 
 import javax.naming.NamingException;
+
 import org.dataone.configuration.Settings;
 import org.springframework.ldap.core.support.DefaultDirObjectFactory;
 import org.springframework.ldap.core.support.LdapContextSource;
@@ -34,6 +35,7 @@ import org.springframework.ldap.core.support.LdapContextSource;
 public class ContextSourceConfiguration {
 
     LdapContextSource ldapContextSource;
+
     // look up defaults from configuration
     private String server = Settings.getConfiguration().getString("cn.ldap.server");
     private String admin = Settings.getConfiguration().getString("cn.ldap.admin");
