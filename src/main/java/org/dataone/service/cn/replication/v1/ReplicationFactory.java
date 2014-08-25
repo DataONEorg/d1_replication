@@ -19,6 +19,9 @@
  */
 package org.dataone.service.cn.replication.v1;
 
+import org.dataone.cn.data.repository.ReplicationAttemptHistoryPostgresRepositoryFactory;
+import org.dataone.cn.data.repository.ReplicationAttemptHistoryRepository;
+
 /**
  * Factory class to provide consumers handle on replication objects
  * 
@@ -30,6 +33,8 @@ public class ReplicationFactory {
     private static ReplicationManager replicationManager;
     private static ReplicationService replicationService;
     private static ReplicationTaskQueue replicationTaskQueue;
+    private static ReplicationAttemptHistoryPostgresRepositoryFactory repositoryFactory;
+    private static ReplicationAttemptHistoryRepository tryHistoryRepository;
 
     private ReplicationFactory() {
     }
@@ -53,5 +58,16 @@ public class ReplicationFactory {
             replicationTaskQueue = new ReplicationTaskQueue();
         }
         return replicationTaskQueue;
+    }
+
+    public static ReplicationAttemptHistoryRepository getReplicationTryHistoryRepository() {
+        if (repositoryFactory == null) {
+            repositoryFactory = new ReplicationAttemptHistoryPostgresRepositoryFactory();
+            repositoryFactory.initContext();
+        }
+        if (tryHistoryRepository == null) {
+            tryHistoryRepository = repositoryFactory.getReplicationTryHistoryRepository();
+        }
+        return tryHistoryRepository;
     }
 }

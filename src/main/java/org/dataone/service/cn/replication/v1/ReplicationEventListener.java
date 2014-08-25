@@ -83,7 +83,7 @@ public class ReplicationEventListener implements EntryListener<Identifier, Syste
     private IMap<Identifier, SystemMetadata> systemMetadata;
 
     /* The ReplicationManager instance */
-    ReplicationManager replicationManager;
+    private ReplicationManager replicationManager;
 
     /* The Hazelcast distributed replication events queue */
     private IQueue<Identifier> replicationEvents;
@@ -115,7 +115,6 @@ public class ReplicationEventListener implements EntryListener<Identifier, Syste
         log.info("Added a listener to the " + this.replicationEvents.getName() + " queue.");
 
         this.replicationManager = ReplicationFactory.getReplicationManager();
-
     }
 
     /**
