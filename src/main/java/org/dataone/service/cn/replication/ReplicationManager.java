@@ -39,6 +39,8 @@ import org.dataone.client.v2.itk.D1Client;
 import org.dataone.client.auth.CertificateManager;
 import org.dataone.cn.dao.DaoFactory;
 import org.dataone.cn.dao.exceptions.DataAccessException;
+import org.dataone.cn.data.repository.ReplicationAttemptHistory;
+import org.dataone.cn.data.repository.ReplicationAttemptHistoryRepository;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.configuration.Settings;
@@ -125,6 +127,9 @@ public class ReplicationManager {
     private static ScheduledExecutorService staleRequestedReplicaAuditScheduler;
     private static ScheduledExecutorService staleQueuedReplicaAuditScheduler;
 
+    private ReplicationAttemptHistoryRepository replicationAttemptHistoryRepository;
+    private static final Integer REPLICATION_ATTEMPTS_PER_DAY = Integer.valueOf(10);
+
     /* The router hostname for the CN cluster (round robin) */
     private String cnRouterHostname;
 
@@ -161,6 +166,9 @@ public class ReplicationManager {
 
         this.replicationTaskQueue = ReplicationFactory.getReplicationTaskQueue();
         this.replicationService = ReplicationFactory.getReplicationService();
+
+        this.replicationAttemptHistoryRepository = ReplicationFactory
+                .getReplicationTryHistoryRepository();
 
         startStaleRequestedAuditing();
         startStaleQueuedAuditing();
@@ -319,14 +327,13 @@ public class ReplicationManager {
                 // TODO: only include nodes that can handle the version of our object (v1 or v2)
                 for (NodeReference nodeReference : nodeList) {
                     Node node = this.nodes.get(nodeReference);
-
                     // only add MNs as targets, excluding the authoritative MN
-                    // and MNs
-                    // that are not tagged to replicate
+                    // and MNs that are not tagged to replicate
                     if ((node.getType() == NodeType.MN)
                             && node.isReplicate()
                             && !node.getIdentifier().getValue()
-                                    .equals(authoritativeNode.getIdentifier().getValue())) {
+                                    .equals(authoritativeNode.getIdentifier().getValue())
+                            && isUnderReplicationAttemptsPerDay(pid, nodeReference)) {
                         potentialNodeList.add(node.getIdentifier());
 
                     }
@@ -815,5 +822,88 @@ public class ReplicationManager {
             staleRequestedReplicaAuditScheduler.scheduleAtFixedRate(
                     new StaleReplicationRequestAuditor(), 0L, 1L, TimeUnit.HOURS);
         }
+    }
+
+    private boolean isUnderReplicationAttemptsPerDay(Identifier identifier,
+            NodeReference nodeReference) {
+
+        if (identifier == null || identifier.getValue() == null || nodeReference == null
+                || nodeReference.getValue() == null) {
+            return false;
+        }
+
+        boolean underAttemptsPerDay = false;
+
+        ReplicationAttemptHistory attemptHistory = findReplicationAttemptHistoryRecord(identifier,
+                nodeReference);
+
+        // no attempt history yet, create one
+        if (attemptHistory == null) {
+            attemptHistory = new ReplicationAttemptHistory(identifier, nodeReference,
+                    Integer.valueOf(1));
+            replicationAttemptHistoryRepository.save(attemptHistory);
+            underAttemptsPerDay = true;
+
+        } else if (attemptHistory != null) {
+            Calendar calendar = Calendar.getInstance();
+            calendar.add(Calendar.HOUR, -24);
+
+            // if last attempt date was more than 24 hours ago:
+            if (attemptHistory.getLastReplicationAttemptDate() < calendar.getTimeInMillis()) {
+                // reset count to 1 (this attempt)
+                attemptHistory.setReplicationAttempts(Integer.valueOf(1));
+                // set last attempt date to now.
+                attemptHistory.setLastReplicationAttemptDate(System.currentTimeMillis());
+                replicationAttemptHistoryRepository.save(attemptHistory);
+                // set result to true
+                underAttemptsPerDay = true;
+
+                // if last attempt less than 24 hours ago:
+            } else if (attemptHistory.getLastReplicationAttemptDate() >= calendar.getTimeInMillis()) {
+                // if count is less than max attempts:
+                if (attemptHistory.getReplicationAttempts().intValue() < REPLICATION_ATTEMPTS_PER_DAY) {
+                    // increment count by 1
+                    attemptHistory.incrementReplicationAttempts();
+                    // set last attempt date to now.
+                    attemptHistory.setLastReplicationAttemptDate(System.currentTimeMillis());
+                    replicationAttemptHistoryRepository.save(attemptHistory);
+                    // set result to true
+                    underAttemptsPerDay = true;
+
+                    // if count is equal or greater than max
+                } else if (attemptHistory.getReplicationAttempts() >= REPLICATION_ATTEMPTS_PER_DAY) {
+                    // do not increment last attempt date or count
+                    // set result to false
+                    underAttemptsPerDay = false;
+                }
+            }
+        }
+        return underAttemptsPerDay;
+    }
+
+    private ReplicationAttemptHistory findReplicationAttemptHistoryRecord(Identifier identifier,
+            NodeReference nodeReference) {
+
+        List<ReplicationAttemptHistory> attemptHistoryList = replicationAttemptHistoryRepository
+                .findByPidAndNodeId(identifier.getValue(), nodeReference.getValue());
+
+        ReplicationAttemptHistory attemptHistory = null;
+
+        if (attemptHistoryList.size() > 1) {
+            log.error("More than one replication attempt history exists for pid: "
+                    + identifier.getValue() + " and node: " + nodeReference.getValue()
+                    + ".  Using first result, deleting others.");
+            for (ReplicationAttemptHistory attemptHistoryResult : attemptHistoryList) {
+                if (attemptHistory == null) {
+                    attemptHistory = attemptHistoryResult;
+                } else {
+                    replicationAttemptHistoryRepository.delete(attemptHistoryResult);
+                }
+            }
+        } else if (attemptHistoryList.size() == 1) {
+            attemptHistory = attemptHistoryList.get(0);
+        }
+
+        return attemptHistory;
     }
 }
