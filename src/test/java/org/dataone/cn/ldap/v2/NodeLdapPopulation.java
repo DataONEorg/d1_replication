@@ -24,11 +24,12 @@ package org.dataone.cn.ldap.v2;
 
 import java.util.ArrayList;
 import java.util.List;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.dataone.service.types.v1.Service;
 import org.dataone.service.types.v2.Node;
 import org.dataone.service.types.v2.NodeList;
-import org.dataone.service.types.v1.Service;
 import org.dataone.service.util.TypeMarshaller;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -51,7 +52,8 @@ public class NodeLdapPopulation {
 
     static {
         // Need this or context will lowercase all the rdn s
-        System.setProperty(DistinguishedName.KEY_CASE_FOLD_PROPERTY, DistinguishedName.KEY_CASE_FOLD_NONE);
+        System.setProperty(DistinguishedName.KEY_CASE_FOLD_PROPERTY,
+                DistinguishedName.KEY_CASE_FOLD_NONE);
     }
     @Autowired
     @Qualifier("ldapTemplate")
@@ -64,7 +66,8 @@ public class NodeLdapPopulation {
         // create a new SystemMetadata object for testing
         NodeList nodeList = null;
         try {
-            nodeList = TypeMarshaller.unmarshalTypeFromStream(NodeList.class, nodeListResource.getInputStream());
+            nodeList = TypeMarshaller.unmarshalTypeFromStream(NodeList.class,
+                    nodeListResource.getInputStream());
         } catch (Exception ex) {
             ex.printStackTrace();
             return;
@@ -85,7 +88,8 @@ public class NodeLdapPopulation {
                 dnService.add("cn", node.getIdentifier().getValue());
                 dnService.add("d1NodeServiceId", d1NodeServiceId);
                 context = new DirContextAdapter(dnService);
-                mapServiceToContext(service, node.getIdentifier().getValue(), d1NodeServiceId, context);
+                mapServiceToContext(service, node.getIdentifier().getValue(), d1NodeServiceId,
+                        context);
                 ldapTemplate.bind(dnService, context, null);
             }
         }
@@ -101,8 +105,10 @@ public class NodeLdapPopulation {
         context.setAttributeValue("d1NodeName", node.getName());
         context.setAttributeValue("d1NodeDescription", node.getDescription());
         context.setAttributeValue("d1NodeBaseURL", node.getBaseURL());
-        context.setAttributeValue("d1NodeReplicate", Boolean.toString(node.isReplicate()).toUpperCase());
-        context.setAttributeValue("d1NodeSynchronize", Boolean.toString(node.isSynchronize()).toUpperCase());
+        context.setAttributeValue("d1NodeReplicate", Boolean.toString(node.isReplicate())
+                .toUpperCase());
+        context.setAttributeValue("d1NodeSynchronize", Boolean.toString(node.isSynchronize())
+                .toUpperCase());
         context.setAttributeValue("d1NodeType", node.getType().xmlValue());
         context.setAttributeValue("d1NodeState", node.getState().xmlValue());
         context.setAttributeValue("subject", node.getSubject(0).getValue());
@@ -110,14 +116,16 @@ public class NodeLdapPopulation {
         context.setAttributeValue("d1NodeApproved", Boolean.toString(Boolean.TRUE).toUpperCase());
     }
 
-    protected void mapServiceToContext(org.dataone.service.types.v1.Service service, String nodeId, String nodeServiceId, DirContextOperations context) {
+    protected void mapServiceToContext(org.dataone.service.types.v1.Service service, String nodeId,
+            String nodeServiceId, DirContextOperations context) {
         context.setAttributeValue("objectclass", "d1NodeService");
         context.setAttributeValue("d1NodeServiceId", nodeServiceId);
         context.setAttributeValue("d1NodeId", nodeId);
 
         context.setAttributeValue("d1NodeServiceName", service.getName());
         context.setAttributeValue("d1NodeServiceVersion", service.getVersion());
-        context.setAttributeValue("d1NodeServiceAvailable", Boolean.toString(service.getAvailable()).toUpperCase());
+        context.setAttributeValue("d1NodeServiceAvailable", Boolean
+                .toString(service.getAvailable()).toUpperCase());
     }
 
     public void deletePopulatedMns() {
