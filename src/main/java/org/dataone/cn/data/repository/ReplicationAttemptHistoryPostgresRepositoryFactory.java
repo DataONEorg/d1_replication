@@ -37,12 +37,12 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 public class ReplicationAttemptHistoryPostgresRepositoryFactory extends
         PostgresRepositoryConfiguration {
 
-    private static final String urlProp = "datasource.postgres.replication.history.url";
-    private static final String driverClassProp = "datasource.postgres.replication.history.driverClass";
-    private static final String usernameProp = "datasource.postgres.replication.history.user";
-    private static final String passwordProperty = "datasource.postgres.replication.history.password";
-    private static final String initialPoolSizeProperty = "datasource.postgres.replication.history.initialSize";
-    private static final String maxPoolSizeProperty = "datasource.postgres.replication.history.maxSize";
+    private static final String urlProp = "datasource.replication.history.url";
+    private static final String driverClassProp = "datasource.replication.history.driverClass";
+    private static final String usernameProp = "datasource.postgres.history.user";
+    private static final String passwordProperty = "datasource.postgres.history.password";
+    private static final String initialPoolSizeProperty = "datasource.postgres.history.initialSize";
+    private static final String maxPoolSizeProperty = "datasource.postgres.history.maxSize";
 
     private static final String url = Settings.getConfiguration().getString(urlProp);
     private static final String driverClass = Settings.getConfiguration()
