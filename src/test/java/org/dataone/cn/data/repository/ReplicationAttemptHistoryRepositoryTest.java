@@ -58,6 +58,20 @@ public class ReplicationAttemptHistoryRepositoryTest {
     }
 
     @Test
+    public void testFindByPidAndNodeId() {
+        createAndSaveReplicationTryHistory();
+        Iterable<ReplicationAttemptHistory> results = repository.findByNodeId("urn:node:testNode");
+        System.out.println("Results found with findByNodeId('urn:node:testNode'):");
+        System.out.println("--------------------------------------------");
+        int count = 0;
+        for (ReplicationAttemptHistory result : results) {
+            System.out.println(result);
+            count++;
+        }
+        Assert.assertEquals("Find by nodeId did not find expected records", 2, count);
+    }
+
+    @Test
     public void testFindByReplicationAttempts() {
         createAndSaveReplicationTryHistory();
         Iterable<ReplicationAttemptHistory> results = repository.findByReplicationAttempts(Integer

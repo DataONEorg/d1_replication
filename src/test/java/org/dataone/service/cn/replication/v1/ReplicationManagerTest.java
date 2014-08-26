@@ -28,7 +28,7 @@ import java.util.logging.Logger;
 
 import javax.annotation.Resource;
 
-import org.dataone.cn.dao.DataSourceFactory;
+import org.dataone.cn.dao.MetacatDataSourceFactory;
 import org.dataone.cn.dao.ReplicationDaoMetacatImplTestUtil;
 import org.dataone.cn.ldap.v1.NodeLdapPopulation;
 import org.dataone.configuration.Settings;
@@ -77,7 +77,7 @@ public class ReplicationManagerTest {
     private org.springframework.core.io.Resource readSystemMetadataResource;
     private IMap<NodeReference, Node> nodes;
 
-    private JdbcTemplate jdbc = new JdbcTemplate(DataSourceFactory.getMetacatDataSource());
+    private JdbcTemplate jdbc = new JdbcTemplate(MetacatDataSourceFactory.getMetacatDataSource());
 
     //XX@Before
     public void setUp() throws Exception {

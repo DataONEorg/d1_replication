@@ -9,7 +9,7 @@ import java.util.Map;
 
 import junit.framework.Assert;
 
-import org.dataone.cn.dao.DataSourceFactory;
+import org.dataone.cn.dao.MetacatDataSourceFactory;
 import org.dataone.cn.dao.ReplicationDaoMetacatImplTestUtil;
 import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v1.Identifier;
@@ -28,7 +28,7 @@ public class TestReplicationPrioritization {
     private ReplicationPrioritizationStrategy prioritiyStrategy = new ReplicationPrioritizationStrategy();
 
     private JdbcTemplate jdbc = new JdbcTemplate(
-            DataSourceFactory.getMetacatDataSource());
+            MetacatDataSourceFactory.getMetacatDataSource());
 
     @Test
     public void testRequestFactorCalculation() throws Exception {
