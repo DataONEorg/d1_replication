@@ -34,9 +34,9 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.dataone.client.auth.CertificateManager;
 import org.dataone.client.v2.CNode;
 import org.dataone.client.v2.itk.D1Client;
-import org.dataone.client.auth.CertificateManager;
 import org.dataone.cn.dao.DaoFactory;
 import org.dataone.cn.dao.exceptions.DataAccessException;
 import org.dataone.cn.data.repository.ReplicationAttemptHistory;
@@ -54,13 +54,13 @@ import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.exceptions.VersionMismatch;
 import org.dataone.service.types.v1.Identifier;
-import org.dataone.service.types.v2.Node;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.NodeType;
 import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationPolicy;
 import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.Service;
+import org.dataone.service.types.v2.Node;
 import org.dataone.service.types.v2.SystemMetadata;
 
 import com.hazelcast.client.HazelcastClient;
@@ -229,9 +229,9 @@ public class ReplicationManager {
         }
         this.cnReplication = cnode;
     }
-    
+
     public Node getNode(NodeReference nodeRef) {
-    	return this.nodes.get(nodeRef);
+        return this.nodes.get(nodeRef);
     }
 
     /**
@@ -431,9 +431,9 @@ public class ReplicationManager {
                                 // retry if the serialVersion is wrong
                                 try {
                                     sysmeta = this.systemMetadata.get(pid);
-                                    updated = this.cnReplication
-                                            .updateReplicationMetadata(null, pid, replicaMetadata,
-                                                    sysmeta.getSerialVersion().longValue());
+                                    updated = this.cnReplication.updateReplicationMetadata(null,
+                                            pid, replicaMetadata, sysmeta.getSerialVersion()
+                                                    .longValue());
 
                                 } catch (VersionMismatch e1) {
                                     String msg = "Couldn't get the correct serialVersion to update "
@@ -841,7 +841,7 @@ public class ReplicationManager {
         if (attemptHistory == null) {
             attemptHistory = new ReplicationAttemptHistory(identifier, nodeReference,
                     Integer.valueOf(1));
-            replicationAttemptHistoryRepository.save(attemptHistory);
+            attemptHistory = replicationAttemptHistoryRepository.save(attemptHistory);
             underAttemptsPerDay = true;
 
         } else if (attemptHistory != null) {
@@ -854,7 +854,7 @@ public class ReplicationManager {
                 attemptHistory.setReplicationAttempts(Integer.valueOf(1));
                 // set last attempt date to now.
                 attemptHistory.setLastReplicationAttemptDate(System.currentTimeMillis());
-                replicationAttemptHistoryRepository.save(attemptHistory);
+                attemptHistory = replicationAttemptHistoryRepository.save(attemptHistory);
                 // set result to true
                 underAttemptsPerDay = true;
 
@@ -866,7 +866,7 @@ public class ReplicationManager {
                     attemptHistory.incrementReplicationAttempts();
                     // set last attempt date to now.
                     attemptHistory.setLastReplicationAttemptDate(System.currentTimeMillis());
-                    replicationAttemptHistoryRepository.save(attemptHistory);
+                    attemptHistory = replicationAttemptHistoryRepository.save(attemptHistory);
                     // set result to true
                     underAttemptsPerDay = true;
 
