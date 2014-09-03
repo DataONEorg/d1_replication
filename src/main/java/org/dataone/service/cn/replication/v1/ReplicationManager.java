@@ -835,7 +835,7 @@ public class ReplicationManager {
         if (attemptHistory == null) {
             attemptHistory = new ReplicationAttemptHistory(identifier, nodeReference,
                     Integer.valueOf(1));
-            replicationAttemptHistoryRepository.save(attemptHistory);
+            attemptHistory = replicationAttemptHistoryRepository.save(attemptHistory);
             underAttemptsPerDay = true;
 
         } else if (attemptHistory != null) {
@@ -848,7 +848,7 @@ public class ReplicationManager {
                 attemptHistory.setReplicationAttempts(Integer.valueOf(1));
                 // set last attempt date to now.
                 attemptHistory.setLastReplicationAttemptDate(System.currentTimeMillis());
-                replicationAttemptHistoryRepository.save(attemptHistory);
+                attemptHistory = replicationAttemptHistoryRepository.save(attemptHistory);
                 // set result to true
                 underAttemptsPerDay = true;
 
@@ -860,7 +860,7 @@ public class ReplicationManager {
                     attemptHistory.incrementReplicationAttempts();
                     // set last attempt date to now.
                     attemptHistory.setLastReplicationAttemptDate(System.currentTimeMillis());
-                    replicationAttemptHistoryRepository.save(attemptHistory);
+                    attemptHistory = replicationAttemptHistoryRepository.save(attemptHistory);
                     // set result to true
                     underAttemptsPerDay = true;
 

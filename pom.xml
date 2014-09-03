@@ -101,7 +101,6 @@
 		      <groupId>org.dataone</groupId>
 		      <artifactId>d1_cn_common</artifactId>
 		      <version>${d1_cn_common_version}</version>
-		      <type>test-jar</type>
 	    </dependency>     
         <dependency>
         	<groupId>org.dataone</groupId>
