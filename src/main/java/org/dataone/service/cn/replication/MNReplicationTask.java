@@ -27,11 +27,10 @@ import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.concurrent.Callable;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.log4j.Logger;
+import org.dataone.client.auth.CertificateManager;
 import org.dataone.client.v2.CNode;
 import org.dataone.client.v2.itk.D1Client;
-import org.dataone.client.auth.CertificateManager;
 import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.BaseException;
@@ -63,7 +62,7 @@ import com.hazelcast.core.ILock;
 public class MNReplicationTask implements Serializable, Callable<String> {
 
     /* Get a Log instance */
-    public static Log log = LogFactory.getLog(MNReplicationTask.class);
+    public static Logger log = Logger.getLogger(MNReplicationTask.class);
 
     /* The identifier of this task */
     private String taskid;
@@ -335,17 +334,17 @@ public class MNReplicationTask implements Serializable, Callable<String> {
                 success = false;
 
             } catch (NotImplemented ne) {
-	            log.error("Caught NotImplemented while getting a reference to the CN "
-	                    + "during replication task id " + getTaskid() + ", identifier "
-	                    + getPid().getValue() + ", target node " + getTargetNode().getValue(), ne);
-	            this.cn = null;
-	            success = false;
-	
-	        }
+                log.error("Caught NotImplemented while getting a reference to the CN "
+                        + "during replication task id " + getTaskid() + ", identifier "
+                        + getPid().getValue() + ", target node " + getTargetNode().getValue(), ne);
+                this.cn = null;
+                success = false;
+
+            }
         }
 
         // Get an target reference to communicate with
-       this.nodeCommunication = ReplicationCommunication.getInstance(targetNode);
+        this.nodeCommunication = ReplicationCommunication.getInstance(targetNode);
 
         // now try to call MN.replicate()
         try {
@@ -380,7 +379,8 @@ public class MNReplicationTask implements Serializable, Callable<String> {
 
                     // check if the object exists on the target MN already
                     try {
-                        Checksum checksum = this.nodeCommunication.getChecksumFromMN(getPid(), targetNode, sysmeta);
+                        Checksum checksum = this.nodeCommunication.getChecksumFromMN(getPid(),
+                                targetNode, sysmeta);
                         if (checksum.equals(sysmeta.getChecksum())) {
                             exists = true;
 
@@ -391,14 +391,14 @@ public class MNReplicationTask implements Serializable, Callable<String> {
                         // across CN threads handling replication tasks
                         status = ReplicationStatus.REQUESTED;
 
-                        updated = this.cn.setReplicationStatus(session, getPid(), this.targetNode, status,
-                                null);
+                        updated = this.cn.setReplicationStatus(session, getPid(), this.targetNode,
+                                status, null);
                         log.debug("Task id " + this.getTaskid()
                                 + " called setReplicationStatus() for identifier "
                                 + this.pid.getValue() + ". updated result: " + updated);
 
                         success = this.nodeCommunication.requestReplication(targetNode, sysmeta);
-                        
+
                         log.info("Task id " + this.getTaskid()
                                 + " called replicate() at targetNode " + this.targetNode.getValue()
                                 + ", identifier " + this.pid.getValue() + ". Success: " + success);
@@ -430,7 +430,8 @@ public class MNReplicationTask implements Serializable, Callable<String> {
                 // get the most recent system metadata for the pid
                 if (this.cn != null && this.nodeCommunication != null) {
                     try {
-                        Checksum checksum = this.nodeCommunication.getChecksumFromMN(getPid(), this.targetNode, sysmeta);
+                        Checksum checksum = this.nodeCommunication.getChecksumFromMN(getPid(),
+                                this.targetNode, sysmeta);
                         exists = checksum.equals(sysmeta.getChecksum());
 
                     } catch (NotFound nf) {
@@ -616,7 +617,7 @@ public class MNReplicationTask implements Serializable, Callable<String> {
                 + " Is the local CN communicationg properly?");
         CNode cn;
         boolean updated = false;
-        
+
         // try multiple times since at this point we may be dealing with a lame
         // CN in the cluster and the RR may still point us to it
         for (int i = 0; i < 5; i++) {
@@ -684,8 +685,8 @@ public class MNReplicationTask implements Serializable, Callable<String> {
                 cn = D1Client.getCN(this.cnRouterHostname);
 
                 sysmeta = cn.getSystemMetadata(session, pid);
-                deleted = cn.deleteReplicationMetadata(session, pid, targetNode, sysmeta.getSerialVersion()
-                        .longValue());
+                deleted = cn.deleteReplicationMetadata(session, pid, targetNode, sysmeta
+                        .getSerialVersion().longValue());
                 if (deleted) {
                     break;
                 }
