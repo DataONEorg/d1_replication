@@ -23,8 +23,7 @@ package org.dataone.service.cn.replication.v1;
 import java.util.ArrayList;
 import java.util.Collection;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.log4j.Logger;
 import org.dataone.cn.dao.DaoFactory;
 import org.dataone.cn.dao.ReplicationDao;
 import org.dataone.cn.dao.ReplicationDao.ReplicaDto;
@@ -51,7 +50,7 @@ import com.hazelcast.core.ILock;
  */
 public class ReplicationTaskQueue {
 
-    private static Log log = LogFactory.getLog(ReplicationTaskQueue.class);
+    private static Logger log = Logger.getLogger(ReplicationTaskQueue.class);
 
     private ReplicationDao replicationDao;
     private ReplicationService replicationService;

@@ -27,8 +27,7 @@ import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.concurrent.Callable;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.log4j.Logger;
 import org.dataone.client.CNode;
 import org.dataone.client.D1Client;
 import org.dataone.client.MNode;
@@ -64,7 +63,7 @@ import com.hazelcast.core.ILock;
 public class MNReplicationTask implements Serializable, Callable<String> {
 
     /* Get a Log instance */
-    public static Log log = LogFactory.getLog(MNReplicationTask.class);
+    public static Logger log = Logger.getLogger(MNReplicationTask.class);
 
     /* The identifier of this task */
     private String taskid;

@@ -23,8 +23,7 @@ package org.dataone.service.cn.replication.v1;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadPoolExecutor;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.log4j.Logger;
 import org.dataone.client.CNode;
 import org.dataone.client.D1Client;
 import org.dataone.service.exceptions.BaseException;
@@ -40,54 +39,51 @@ import org.dataone.service.exceptions.BaseException;
 public class RejectedReplicationTaskHandler implements RejectedExecutionHandler {
 
     /* Get a Log instance */
-    public static Log log = LogFactory.getLog(RejectedReplicationTaskHandler.class);
+    public static Logger log = Logger.getLogger(RejectedReplicationTaskHandler.class);
 
     /* a reference to the coordinating node */
     private CNode cn;
-    
+
     /**
      * Constructor to create a rejected replication task handler instance
      */
     public RejectedReplicationTaskHandler() {
-        
+
     }
-    
+
     /**
      * A handler method that adds rejected replication tasks back into the
      * Hazelcast replication task queue to be completed later or by another 
      * coordinating node that may pick it up from the queue.
      */
-    public void rejectedExecution(Runnable replicationTask, 
-            ThreadPoolExecutor executor) {
+    public void rejectedExecution(Runnable replicationTask, ThreadPoolExecutor executor) {
 
         boolean deleted = false;
 
         MNReplicationTask task = (MNReplicationTask) replicationTask;
-        
-        String msg = "Replication task id " + task.getTaskid() +
-            " for identifier " + task.getPid().getValue() + " was rejected.";
+
+        String msg = "Replication task id " + task.getTaskid() + " for identifier "
+                + task.getPid().getValue() + " was rejected.";
         log.warn(msg);
-        
+
         try {
             this.cn = D1Client.getCN();
-            long serialVersion = this.cn.getSystemMetadata(
-                    task.getPid()).getSerialVersion().longValue();
-            deleted = this.cn.deleteReplicationMetadata(
-                    task.getPid(), task.getTargetNode(), serialVersion);
-            log.info("Deleted replica entry for" + 
-                task.getTargetNode().getValue() + " and identifier " + 
-                task.getPid().getValue() + " from the replica list.");
-            
+            long serialVersion = this.cn.getSystemMetadata(task.getPid()).getSerialVersion()
+                    .longValue();
+            deleted = this.cn.deleteReplicationMetadata(task.getPid(), task.getTargetNode(),
+                    serialVersion);
+            log.info("Deleted replica entry for" + task.getTargetNode().getValue()
+                    + " and identifier " + task.getPid().getValue() + " from the replica list.");
+
         } catch (BaseException e) {
-            log.error("Unable to delete the replica entry for identifier " +
-                task.getPid().getValue() +
-                ": " + e.getMessage());
-            if ( log.isDebugEnabled() ) {
+            log.error("Unable to delete the replica entry for identifier "
+                    + task.getPid().getValue() + ": " + e.getMessage());
+            if (log.isDebugEnabled()) {
                 e.printStackTrace();
-                
+
             }
         }
-        
+
     }
 
 }

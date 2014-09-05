@@ -29,8 +29,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.configuration.ConversionException;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.log4j.Logger;
 import org.dataone.client.CNode;
 import org.dataone.client.D1Client;
 import org.dataone.client.MNode;
@@ -63,7 +62,7 @@ import com.hazelcast.core.ILock;
  */
 public class StaleReplicationRequestAuditor implements Runnable {
 
-    private static Log log = LogFactory.getLog(StaleReplicationRequestAuditor.class);
+    private static Logger log = Logger.getLogger(StaleReplicationRequestAuditor.class);
     private static ReplicationService replicationService = new ReplicationService();
     private static final String STALE_REPLICATION_LOCK_NAME = "staleReplicationAuditingLock";
     private static HazelcastInstance hzMember = HazelcastInstanceFactory.getProcessingInstance();

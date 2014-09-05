@@ -22,8 +22,7 @@ package org.dataone.service.cn.replication.v1;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.log4j.Logger;
 import org.dataone.cn.ComponentActivationUtility;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
@@ -65,7 +64,7 @@ public class ReplicationEventListener implements EntryListener<Identifier, Syste
     private static final String EVENT_PREFIX = "replication-event-";
 
     /* Get a Log instance */
-    public static Log log = LogFactory.getLog(ReplicationEventListener.class);
+    public static Logger log = Logger.getLogger(ReplicationEventListener.class);
 
     /* The instance of the Hazelcast storage cluster client */
     private HazelcastClient hzClient;

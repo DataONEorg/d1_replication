@@ -24,8 +24,7 @@ package org.dataone.service.cn.replication.v1;
 import java.io.InputStream;
 import java.util.List;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.log4j.Logger;
 import org.dataone.client.CNode;
 import org.dataone.client.D1Client;
 import org.dataone.client.MNode;
@@ -56,7 +55,7 @@ public class ReplicationService {
 
     private CNode cn;
 
-    public static Log log = LogFactory.getLog(ReplicationService.class);
+    public static Logger log = Logger.getLogger(ReplicationService.class);
 
     public ReplicationService() {
         initializeCN();

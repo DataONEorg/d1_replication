@@ -32,8 +32,7 @@ import javax.persistence.Table;
 import javax.persistence.Transient;
 
 import org.apache.commons.lang.time.FastDateFormat;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.log4j.Logger;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
 import org.hibernate.annotations.Index;
@@ -45,7 +44,7 @@ public class ReplicationAttemptHistory implements Serializable {
     private static final long serialVersionUID = -3273504291943429461L;
 
     @Transient
-    private static final Log log = LogFactory.getLog(ReplicationAttemptHistory.class);
+    private static final Logger log = Logger.getLogger(ReplicationAttemptHistory.class);
 
     @Transient
     private final FastDateFormat format = FastDateFormat.getInstance("MM/dd/yyyy:HH:mm:ss:SS");
