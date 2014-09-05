@@ -39,10 +39,10 @@ public class ReplicationAttemptHistoryPostgresRepositoryFactory extends
 
     private static final String urlProp = "datasource.replication.history.url";
     private static final String driverClassProp = "datasource.replication.history.driverClass";
-    private static final String usernameProp = "datasource.postgres.history.user";
-    private static final String passwordProperty = "datasource.postgres.history.password";
-    private static final String initialPoolSizeProperty = "datasource.postgres.history.initialSize";
-    private static final String maxPoolSizeProperty = "datasource.postgres.history.maxSize";
+    private static final String usernameProp = "datasource.replication.history.user";
+    private static final String passwordProperty = "datasource.replication.history.password";
+    private static final String initialPoolSizeProperty = "datasource.replication.history.initialSize";
+    private static final String maxPoolSizeProperty = "datasource.replication.history.maxSize";
 
     private static final String url = Settings.getConfiguration().getString(urlProp);
     private static final String driverClass = Settings.getConfiguration()
