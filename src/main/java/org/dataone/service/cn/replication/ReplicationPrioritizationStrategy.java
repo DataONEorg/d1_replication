@@ -33,8 +33,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.log4j.Logger;
 import org.dataone.cn.dao.DaoFactory;
 import org.dataone.cn.dao.exceptions.DataAccessException;
 import org.dataone.configuration.Settings;
@@ -56,18 +55,17 @@ import org.dataone.service.types.v2.SystemMetadata;
  */
 public class ReplicationPrioritizationStrategy {
 
-    public static Log log = LogFactory
-            .getLog(ReplicationPrioritizationStrategy.class);
+    public static Logger log = Logger.getLogger(ReplicationPrioritizationStrategy.class);
 
     /* The number of concurrent outstanding requests to a target member node */
     private int requestLimit = 10;
-    
+
     /* The number of concurrent outstanding requests to a target member node */
     private float successThreshold = 0.8f;
 
     /* flag to switch use of the outstanding request factor in prioritization */
     private boolean useRequestFactor = true;
-    
+
     /* flag to switch use of the failure factor in prioritization */
     private boolean useFailureFactor = true;
 
@@ -82,18 +80,18 @@ public class ReplicationPrioritizationStrategy {
      */
     public ReplicationPrioritizationStrategy() {
         // load prioritization settings
-        this.requestLimit = 
-            Settings.getConfiguration().getInt("replication.concurrent.request.limit");
-        this.successThreshold = 
-            Settings.getConfiguration().getFloat("replication.success.threshold");
-        this.useRequestFactor = 
-            Settings.getConfiguration().getBoolean("replication.prioritization.useRequestFactor");
-        this.useFailureFactor = 
-            Settings.getConfiguration().getBoolean("replication.prioritization.useFailureFactor");
-        this.useBandwidthFactor = 
-            Settings.getConfiguration().getBoolean("replication.prioritization.useBandwidthFactor");
-        this.usePreferenceFactor = 
-            Settings.getConfiguration().getBoolean("replication.prioritization.usePreferenceFactor");
+        this.requestLimit = Settings.getConfiguration().getInt(
+                "replication.concurrent.request.limit");
+        this.successThreshold = Settings.getConfiguration().getFloat(
+                "replication.success.threshold");
+        this.useRequestFactor = Settings.getConfiguration().getBoolean(
+                "replication.prioritization.useRequestFactor");
+        this.useFailureFactor = Settings.getConfiguration().getBoolean(
+                "replication.prioritization.useFailureFactor");
+        this.useBandwidthFactor = Settings.getConfiguration().getBoolean(
+                "replication.prioritization.useBandwidthFactor");
+        this.usePreferenceFactor = Settings.getConfiguration().getBoolean(
+                "replication.prioritization.usePreferenceFactor");
     }
 
     /**
@@ -105,8 +103,8 @@ public class ReplicationPrioritizationStrategy {
      *            use the cached values if the cache hasn't expired
      * @return requestFactors the pending request factors of the nodes
      */
-    public Map<NodeReference, Float> getPendingRequestFactors(
-            List<NodeReference> nodeIdentifiers, boolean useCache) {
+    public Map<NodeReference, Float> getPendingRequestFactors(List<NodeReference> nodeIdentifiers,
+            boolean useCache) {
 
         // TODO: implement the useCache parameter, ignored for now
 
@@ -136,11 +134,9 @@ public class ReplicationPrioritizationStrategy {
         // query the systemmetadatastatus table to get counts of queued and
         // requested replicas by node identifier
         try {
-            pendingRequests = DaoFactory.getReplicationDao()
-                    .getPendingReplicasByNode();
+            pendingRequests = DaoFactory.getReplicationDao().getPendingReplicasByNode();
         } catch (DataAccessException dataAccessEx) {
-            log.error("Unable to retrieve pending replicas by node: "
-                    + dataAccessEx.getMessage());
+            log.error("Unable to retrieve pending replicas by node: " + dataAccessEx.getMessage());
         }
         Iterator<NodeReference> nodeIterator = nodeIdentifiers.iterator();
 
@@ -149,8 +145,8 @@ public class ReplicationPrioritizationStrategy {
             NodeReference nodeId = nodeIterator.next();
 
             // get the failures for the node
-            Integer pending = (pendingRequests.get(nodeId) != null) ? pendingRequests
-                    .get(nodeId) : new Integer(0);
+            Integer pending = (pendingRequests.get(nodeId) != null) ? pendingRequests.get(nodeId)
+                    : new Integer(0);
             log.debug("Pending requests for node " + nodeId.getValue() + " is "
                     + pending.intValue());
 
@@ -161,8 +157,7 @@ public class ReplicationPrioritizationStrategy {
             } else {
                 // currently over the limit
                 requestFactors.put(nodeId, new Float(0));
-                log.info("Node " + nodeId.getValue()
-                        + " is currently over its request limit of "
+                log.info("Node " + nodeId.getValue() + " is currently over its request limit of "
                         + this.requestLimit + " requests.");
 
             }
@@ -181,8 +176,8 @@ public class ReplicationPrioritizationStrategy {
      *            use the cached values if the cache hasn't expired
      * @return failureFactors the failure factors of the nodes
      */
-    public Map<NodeReference, Float> getFailureFactors(
-            List<NodeReference> nodeIdentifiers, boolean useCache) {
+    public Map<NodeReference, Float> getFailureFactors(List<NodeReference> nodeIdentifiers,
+            boolean useCache) {
         // A map to store the raw failed replica counts
         Map<NodeReference, Integer> failedRequests = new HashMap<NodeReference, Integer>();
         // A map to store the raw completed replica counts
@@ -206,15 +201,13 @@ public class ReplicationPrioritizationStrategy {
          * ps/(ps+pf)
          */
         try {
-            failedRequests = DaoFactory.getReplicationDao()
-                    .getRecentFailedReplicas();
+            failedRequests = DaoFactory.getReplicationDao().getRecentFailedReplicas();
         } catch (DataAccessException dataAccessEx) {
             log.error("Unable to retrieve recent failed replicas by node: "
                     + dataAccessEx.getMessage());
         }
         try {
-            completedRequests = DaoFactory.getReplicationDao()
-                    .getRecentCompletedReplicas();
+            completedRequests = DaoFactory.getReplicationDao().getRecentCompletedReplicas();
         } catch (DataAccessException dataAccessEx) {
             log.error("Unable to retrieve recent completed replicas by node: "
                     + dataAccessEx.getMessage());
@@ -225,8 +218,8 @@ public class ReplicationPrioritizationStrategy {
             NodeReference nodeId = nodeIterator.next();
 
             // get the failures for the node
-            Integer failures = (failedRequests.get(nodeId) != null) ? failedRequests
-                    .get(nodeId) : new Integer(0);
+            Integer failures = (failedRequests.get(nodeId) != null) ? failedRequests.get(nodeId)
+                    : new Integer(0);
             // get the successes for the node
             Integer successes = (completedRequests.get(nodeId) != null) ? completedRequests
                     .get(nodeId) : new Integer(0);
@@ -238,18 +231,18 @@ public class ReplicationPrioritizationStrategy {
 
             } else {
                 // for MNs that are young, give 'em 5 attempts before calculating
-                if ( failedRequests.size() + completedRequests.size() < 5 ) {
-                    failureFactor = new Float(1.0f); 
-                    log.debug("Gave node " + nodeId.getValue() + " a pass " +
-                        "since it has less than 5 replica attempts.");
-                    
+                if (failedRequests.size() + completedRequests.size() < 5) {
+                    failureFactor = new Float(1.0f);
+                    log.debug("Gave node " + nodeId.getValue() + " a pass "
+                            + "since it has less than 5 replica attempts.");
+
                 } else {
                     // calculate the failure factor
                     failureFactor = new Float(successes.floatValue()
                             / (successes.floatValue() + failures.floatValue()));
-                    if ( failureFactor <= successThreshold ) {
+                    if (failureFactor <= successThreshold) {
                         failureFactor = new Float(0.0f);
-                        
+
                     }
                 }
                 failureFactors.put(nodeId, failureFactor);
@@ -271,8 +264,8 @@ public class ReplicationPrioritizationStrategy {
      *            use the cached values if the cache hasn't expired
      * @return bandwidthFactors the bandwidth factor of the node
      */
-    public Map<NodeReference, Float> getBandwidthFactors(
-            List<NodeReference> nodeIdentifiers, boolean useCache) {
+    public Map<NodeReference, Float> getBandwidthFactors(List<NodeReference> nodeIdentifiers,
+            boolean useCache) {
         HashMap<NodeReference, Float> bandwidthFactors = new HashMap<NodeReference, Float>();
 
         /*
@@ -306,8 +299,7 @@ public class ReplicationPrioritizationStrategy {
         Iterator<NodeReference> nodeIterator = nodeIdentifiers.iterator();
 
         while (nodeIterator.hasNext()) {
-            bandwidthFactors.put((NodeReference) nodeIterator.next(),
-                    new Float(1.0f));
+            bandwidthFactors.put((NodeReference) nodeIterator.next(), new Float(1.0f));
         }
 
         return bandwidthFactors;
@@ -324,8 +316,8 @@ public class ReplicationPrioritizationStrategy {
      * @return nodesByPriority a list of nodes by descending priority
      */
     @SuppressWarnings("unchecked")
-    public List<NodeReference> prioritizeNodes(
-            List<NodeReference> potentialNodeList, SystemMetadata sysmeta) {
+    public List<NodeReference> prioritizeNodes(List<NodeReference> potentialNodeList,
+            SystemMetadata sysmeta) {
         List<NodeReference> nodesByPriority = new ArrayList<NodeReference>();
         ReplicationPolicy replicationPolicy = sysmeta.getReplicationPolicy();
         Identifier pid = sysmeta.getIdentifier();
@@ -378,8 +370,7 @@ public class ReplicationPrioritizationStrategy {
                 preferenceFactor = 0.0f;
 
             }
-            log.debug("Node " + nodeId.getValue() + " preferenceFactor is "
-                    + preferenceFactor);
+            log.debug("Node " + nodeId.getValue() + " preferenceFactor is " + preferenceFactor);
 
             Float nodePendingRequestFactor = 1.0f;
             if (requestFactorMap.get(nodeId) != null) {
@@ -392,8 +383,7 @@ public class ReplicationPrioritizationStrategy {
             Float nodeFailureFactor = 1.0f;
             if (failureFactorMap.get(nodeId) != null) {
                 nodeFailureFactor = failureFactorMap.get(nodeId);
-                log.debug("Node " + nodeId.getValue() + " failureFactor is "
-                        + nodeFailureFactor);
+                log.debug("Node " + nodeId.getValue() + " failureFactor is " + nodeFailureFactor);
 
             }
 
@@ -407,28 +397,28 @@ public class ReplicationPrioritizationStrategy {
 
             // Score S = R * F * B * P
             // (any zero score removes node from the list)
-            if ( ! this.useRequestFactor ) {
+            if (!this.useRequestFactor) {
                 nodePendingRequestFactor = 1.0f;
                 log.debug("useRequestFactor is false, using 1.0");
             }
-            if ( ! this.useFailureFactor ) {
-                nodeFailureFactor = 1.0f; 
+            if (!this.useFailureFactor) {
+                nodeFailureFactor = 1.0f;
                 log.debug("useFailureFactor is false, using 1.0");
             }
-            if ( ! this.useBandwidthFactor ) {
-                nodeBandwidthFactor = 1.0f; 
+            if (!this.useBandwidthFactor) {
+                nodeBandwidthFactor = 1.0f;
                 log.debug("useBandwidthFactor is false, using 1.0");
             }
-            if ( ! this.usePreferenceFactor ) {
-                preferenceFactor = 1.0f; 
+            if (!this.usePreferenceFactor) {
+                preferenceFactor = 1.0f;
                 log.debug("usePreferenceFactor is false, using 1.0");
             }
 
-            Float score = nodePendingRequestFactor * nodeFailureFactor
-                    * nodeBandwidthFactor * preferenceFactor;
-            log.debug("Score for " + nodeId.getValue() + " will be "
-                    + nodePendingRequestFactor + " * " + nodeFailureFactor
-                    + " * " + nodeBandwidthFactor + " * " + preferenceFactor);
+            Float score = nodePendingRequestFactor * nodeFailureFactor * nodeBandwidthFactor
+                    * preferenceFactor;
+            log.debug("Score for " + nodeId.getValue() + " will be " + nodePendingRequestFactor
+                    + " * " + nodeFailureFactor + " * " + nodeBandwidthFactor + " * "
+                    + preferenceFactor);
 
             // if the node is already listed and is pending or complete,
             // zero its score (to avoid repeat replica tasks)
@@ -436,20 +426,16 @@ public class ReplicationPrioritizationStrategy {
             for (Replica replica : replicaList) {
                 String nodeIdStr = replica.getReplicaMemberNode().getValue();
                 ReplicationStatus nodeStatus = replica.getReplicationStatus();
-                if (nodeIdStr == nodeId.getValue() && 
-                   (nodeStatus == ReplicationStatus.QUEUED || 
-                    nodeStatus == ReplicationStatus.REQUESTED || 
-                    nodeStatus == ReplicationStatus.COMPLETED)) {
+                if (nodeIdStr == nodeId.getValue()
+                        && (nodeStatus == ReplicationStatus.QUEUED
+                                || nodeStatus == ReplicationStatus.REQUESTED || nodeStatus == ReplicationStatus.COMPLETED)) {
                     score = new Float(0.0f);
-                    log.debug("Node " + nodeId.getValue()
-                            + " is already listed " + "as a "
-                            + nodeStatus.toString() + " replica for identifier"
-                            + pid.getValue());
+                    log.debug("Node " + nodeId.getValue() + " is already listed " + "as a "
+                            + nodeStatus.toString() + " replica for identifier" + pid.getValue());
                     break;
                 }
             }
-            log.info("Priority score for " + nodeId.getValue() + " is "
-                    + score.floatValue());
+            log.info("Priority score for " + nodeId.getValue() + " is " + score.floatValue());
             nodeScoreMap.put(nodeId, score);
 
         }

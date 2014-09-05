@@ -24,8 +24,7 @@ package org.dataone.service.cn.replication;
 import java.io.InputStream;
 import java.util.List;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.log4j.Logger;
 import org.dataone.client.v2.CNode;
 import org.dataone.client.v2.itk.D1Client;
 import org.dataone.service.exceptions.BaseException;
@@ -55,7 +54,7 @@ public class ReplicationService {
 
     private CNode cn;
 
-    public static Log log = LogFactory.getLog(ReplicationService.class);
+    public static Logger log = Logger.getLogger(ReplicationService.class);
 
     public ReplicationService() {
         initializeCN();
@@ -116,15 +115,15 @@ public class ReplicationService {
         ReplicationCommunication rc = ReplicationCommunication.getInstance(targetNode);
         boolean success = false;
         try {
-			success = rc.requestReplication(targetNode, sysmeta);
-		} catch (BaseException e) {
-			log.warn(e.getMessage(), e);
-		}
+            success = rc.requestReplication(targetNode, sysmeta);
+        } catch (BaseException e) {
+            log.warn(e.getMessage(), e);
+        }
 
         if (!success) {
             log.error("Unable to request replica from target mn: " + targetNode.getValue()
                     + " for: " + identifier.getValue() + ". setting status to failed.");
-            
+
             // TODO: delete or mark as failed?
             deleteReplicationMetadata(sysmeta.getIdentifier(), targetNode);
 
@@ -159,8 +158,8 @@ public class ReplicationService {
             try {
                 // refresh the system metadata in case it changed
                 sysmeta = getSystemMetadata(pid);
-                deleted = cn.deleteReplicationMetadata(null, pid, targetNode, sysmeta.getSerialVersion()
-                        .longValue());
+                deleted = cn.deleteReplicationMetadata(null, pid, targetNode, sysmeta
+                        .getSerialVersion().longValue());
                 if (deleted) {
                     break;
                 }
@@ -305,8 +304,6 @@ public class ReplicationService {
         }
         return is;
     }
-
-    
 
     public NodeReference determineReplicationSourceNode(SystemMetadata sysMeta) {
         NodeReference source = null;

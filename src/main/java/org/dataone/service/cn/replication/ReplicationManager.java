@@ -32,8 +32,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.log4j.Logger;
 import org.dataone.client.auth.CertificateManager;
 import org.dataone.client.v2.CNode;
 import org.dataone.client.v2.itk.D1Client;
@@ -82,7 +81,7 @@ import com.hazelcast.core.IQueue;
 public class ReplicationManager {
 
     /* Get a Log instance */
-    public static Log log = LogFactory.getLog(ReplicationManager.class);
+    public static Logger log = Logger.getLogger(ReplicationManager.class);
 
     private ReplicationService replicationService;
 

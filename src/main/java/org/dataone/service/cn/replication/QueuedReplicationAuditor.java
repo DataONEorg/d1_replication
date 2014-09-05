@@ -21,8 +21,7 @@ package org.dataone.service.cn.replication;
 
 import java.util.Collection;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import org.apache.log4j.Logger;
 import org.dataone.cn.ComponentActivationUtility;
 import org.dataone.cn.dao.DaoFactory;
 import org.dataone.cn.dao.ReplicationDao;
@@ -44,7 +43,7 @@ import com.hazelcast.core.ILock;
  */
 public class QueuedReplicationAuditor implements Runnable {
 
-    private static Log log = LogFactory.getLog(QueuedReplicationAuditor.class);
+    public static Logger log = Logger.getLogger(RejectedReplicationTaskHandler.class);
 
     private ReplicationTaskQueue replicationTaskQueue = new ReplicationTaskQueue();
     private ReplicationDao replicationDao = DaoFactory.getReplicationDao();
