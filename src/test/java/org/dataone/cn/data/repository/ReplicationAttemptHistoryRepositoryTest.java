@@ -175,7 +175,6 @@ public class ReplicationAttemptHistoryRepositoryTest {
 
     @Before
     public void setUp() {
-        repositoryFactory.initContext();
         repository = repositoryFactory.getReplicationTryHistoryRepository();
     }
 
