@@ -11,7 +11,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 public class ReplicationAttemptHistoryH2RepositoryFactory extends H2RepositoryConfiguration {
 
     public ReplicationAttemptHistoryRepository getReplicationTryHistoryRepository() {
-        return context.getBean(ReplicationAttemptHistoryRepository.class);
+    	this.initContext();
+    	return context.getBean(ReplicationAttemptHistoryRepository.class);
     }
 
     @Override
