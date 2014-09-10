@@ -22,9 +22,11 @@
 package org.dataone.service.cn.replication;
 
 import java.io.File;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -34,7 +36,12 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 import org.dataone.client.auth.CertificateManager;
+import org.dataone.client.auth.CertificateManager;
+import org.dataone.client.exception.ClientSideException;
+import org.dataone.client.rest.DefaultHttpMultipartRestClient;
+import org.dataone.client.rest.MultipartRestClient;
 import org.dataone.client.v2.CNode;
+import org.dataone.client.v2.impl.D1NodeFactory;
 import org.dataone.client.v2.itk.D1Client;
 import org.dataone.cn.dao.DaoFactory;
 import org.dataone.cn.dao.exceptions.DataAccessException;
@@ -55,6 +62,7 @@ import org.dataone.service.exceptions.VersionMismatch;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v1.NodeType;
+import org.dataone.service.types.v1.ObjectFormatIdentifier;
 import org.dataone.service.types.v1.Replica;
 import org.dataone.service.types.v1.ReplicationPolicy;
 import org.dataone.service.types.v1.ReplicationStatus;
@@ -67,6 +75,8 @@ import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.ILock;
 import com.hazelcast.core.IMap;
 import com.hazelcast.core.IQueue;
+import com.hazelcast.core.MapEntry;
+import com.hazelcast.query.Predicate;
 
 /**
  * A DataONE Coordinating Node implementation which manages replication queues
@@ -100,7 +110,7 @@ public class ReplicationManager {
     /* The name of the replication events queue */
     private String eventsQueue;
 
-    /* The Hazelcast distributed system metadata map */
+    /* The Hazelcast distributed map of nodes */
     private IMap<NodeReference, Node> nodes;
 
     /* The Hazelcast distributed system metadata map */
@@ -139,6 +149,14 @@ public class ReplicationManager {
      * be operating on the same events and data
      */
     public ReplicationManager() {
+    	this(null);
+    }
+    
+    /**
+     * A for-testing-purposes constructor to get around configuration complications
+     * @param repAttemptHistoryRepos
+     */
+    public ReplicationManager(ReplicationAttemptHistoryRepository repAttemptHistoryRepos) {
 
         this.nodeMap = Settings.getConfiguration().getString("dataone.hazelcast.nodes");
         this.systemMetadataMap = Settings.getConfiguration().getString(
@@ -166,9 +184,13 @@ public class ReplicationManager {
         this.replicationTaskQueue = ReplicationFactory.getReplicationTaskQueue();
         this.replicationService = ReplicationFactory.getReplicationService();
 
-        this.replicationAttemptHistoryRepository = ReplicationFactory
+        if (repAttemptHistoryRepos == null) {
+        	this.replicationAttemptHistoryRepository = ReplicationFactory
                 .getReplicationTryHistoryRepository();
-
+        } else {
+        	this.replicationAttemptHistoryRepository = repAttemptHistoryRepos;
+        }
+        
         startStaleRequestedAuditing();
         startStaleQueuedAuditing();
 
@@ -200,16 +222,14 @@ public class ReplicationManager {
     private void init() {
         log.info("initialization");
         CNode cnode = null;
-        // Get an CNode reference to communicate with
-        try {
-            log.debug("D1Client.CN_URL = "
-                    + Settings.getConfiguration().getProperty("D1Client.CN_URL"));
+        String settingsBaseUrl = Settings.getConfiguration().getString("D1Client.CN_URL");
+        log.debug("D1Client.CN_URL = " + settingsBaseUrl);
 
+        // Get an CNode reference to communicate with
+        try {           
             cnode = D1Client.getCN();
             log.info("ReplicationManager D1Client base_url is: " + cnode.getNodeBaseServiceUrl());
         } catch (BaseException e) {
-
-            // try again, then fail
             try {
                 try {
                     Thread.sleep(5000L);
@@ -220,10 +240,15 @@ public class ReplicationManager {
                 cnode = D1Client.getCN();
 
             } catch (BaseException e1) {
-                log.error("There was a problem getting a Coordinating Node reference "
-                        + " for the ReplicationManager. ", e1);
-                throw new RuntimeException(e1);
-
+            	log.warn("Building CNode without baseURL check.");
+            	try {
+            		cnode = D1NodeFactory.buildCNode(new DefaultHttpMultipartRestClient(),
+				  		URI.create(settingsBaseUrl));
+            	} catch (ClientSideException e2) {
+            		log.error("There was a problem getting a Coordinating Node reference "
+                            + " for the ReplicationManager. ", e2);
+            		throw new RuntimeException(e2);
+            	}
             }
         }
         this.cnReplication = cnode;
@@ -233,6 +258,71 @@ public class ReplicationManager {
         return this.nodes.get(nodeRef);
     }
 
+    protected List<String> getObjectVersion(SystemMetadata sysmeta) {
+    	
+    	List versions = new LinkedList<String>();    	
+    	Node n = nodes.get(sysmeta.getAuthoritativeMemberNode());
+    	for (Service s : n.getServices().getServiceList()) {
+    		if (s.getName().equals("MNReplication")) {
+    			versions.add(s.getVersion());
+    		}
+    	}
+    	return versions;
+    }
+    
+    private Set<NodeReference> determinePossibleReplicationTargets(final SystemMetadata sysmeta) {
+    	
+    	Set<NodeReference> possibleReplicationTargets = null;
+    	
+    	if (sysmeta.getReplicationPolicy() != null) {
+    		if (sysmeta.getReplicationPolicy().getReplicationAllowed()) {
+    			
+    			possibleReplicationTargets = nodes.keySet(new Predicate<NodeReference, Node>(){
+
+					@Override
+					public boolean apply(MapEntry<NodeReference, Node> mapEntry) {
+						// order of conditionals is important!
+						Node node = mapEntry.getValue();
+						if (node.getType() != NodeType.MN) 
+							return false;
+						
+						if (!node.isReplicate()) 
+							return false;
+						
+						if (sysmeta.getAuthoritativeMemberNode().equals(node.getIdentifier()))
+							return false;
+						
+						if (getCurrentReplicaList(sysmeta).contains(node.getIdentifier()))
+							return false;
+
+						if (sysmeta.getReplicationPolicy() != null && 
+								sysmeta.getReplicationPolicy().getBlockedMemberNodeList().contains(node.getIdentifier())) 
+							return false;
+						
+						if (node.getNodeReplicationPolicy() == null) 
+							return true;
+						
+						if (node.getNodeReplicationPolicy().getMaxObjectSize().compareTo(sysmeta.getSize()) < 0)
+							return false;
+						
+						List<ObjectFormatIdentifier> allowedFormats = node.getNodeReplicationPolicy().getAllowedObjectFormatList();
+						if (allowedFormats != null && !allowedFormats.contains(sysmeta.getFormatId())) 
+							return false;
+						
+						List<NodeReference> allowedNodes = node.getNodeReplicationPolicy().getAllowedNodeList();
+						if (allowedNodes != null && !allowedNodes.contains(sysmeta.getAuthoritativeMemberNode()))
+							return false;
+						
+						return true;
+					}    				
+    			});
+    		}
+    	}
+    	return possibleReplicationTargets;    	
+    }
+    
+    
+    
     /**
      * Create replication tasks given the identifier of an object by evaluating
      * its system metadata and the capabilities of the target replication nodes.
@@ -280,13 +370,13 @@ public class ReplicationManager {
             if (isLocked) {
                 // if replication isn't allowed, return
                 allowed = isAllowed(pid);
-                log.debug("Replication is allowed for identifier " + pid.getValue());
                 if (!allowed) {
                     log.debug("Replication is not allowed for the object identified by "
                             + pid.getValue());
                     return 0;
-
                 }
+                log.debug("Replication is allowed for identifier " + pid.getValue());
+                
                 // get the system metadata for the pid
                 log.debug("Getting the replica list for identifier " + pid.getValue());
                 sysmeta = this.systemMetadata.get(pid);
@@ -332,7 +422,8 @@ public class ReplicationManager {
                             && node.isReplicate()
                             && !node.getIdentifier().getValue()
                                     .equals(authoritativeNode.getIdentifier().getValue())
-                            && isUnderReplicationAttemptsPerDay(pid, nodeReference)) {
+                            && isUnderReplicationAttemptsPerDay(pid, nodeReference))
+                    {
                         potentialNodeList.add(node.getIdentifier());
 
                     }
