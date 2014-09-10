@@ -22,25 +22,31 @@ package org.dataone.service.cn.replication.v2;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
+import java.io.InputStream;
 import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
-import javax.annotation.Resource;
+import javax.naming.ldap.LdapContext;
 
+import org.apache.directory.server.core.integ.AbstractLdapTestUnit;
+import org.apache.directory.server.integ.ServerIntegrationUtils;
+import org.apache.log4j.Logger;
 import org.dataone.cn.dao.MetacatDataSourceFactory;
 import org.dataone.cn.dao.ReplicationDaoMetacatImplTestUtil;
-import org.dataone.cn.ldap.v2.NodeLdapPopulation;
+import org.dataone.cn.data.repository.ReplicationAttemptHistoryH2RepositoryFactory;
+import org.dataone.cn.data.repository.ReplicationAttemptHistoryRepository;
 import org.dataone.configuration.Settings;
 import org.dataone.service.cn.replication.MNReplicationTask;
-import org.dataone.service.cn.replication.ReplicationFactory;
 import org.dataone.service.cn.replication.ReplicationManager;
 import org.dataone.service.cn.v2.CNReplication;
 import org.dataone.service.types.v1.Identifier;
-import org.dataone.service.types.v1.Node;
 import org.dataone.service.types.v1.NodeReference;
+import org.dataone.service.types.v2.Node;
 import org.dataone.service.types.v2.SystemMetadata;
 import org.dataone.service.util.TypeMarshaller;
+import org.dataone.test.apache.directory.server.integ.ApacheDSSuiteRunner;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,11 +62,14 @@ import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IMap;
 import com.hazelcast.core.Member;
 import com.hazelcast.core.MultiMap;
+//import org.dataone.cn.service.ldap.tests.v1.HazelcastLdapStoreTestUnit;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/org/dataone/configuration/testApplicationContext.xml" })
-public class ReplicationManagerTest {
+public class ReplicationManagerTestUnit extends AbstractLdapTestUnit {
 
+    static Logger logger = Logger.getLogger(ReplicationManagerTestUnit.class);
+    
     private HazelcastInstance hzMember;
     private HazelcastInstance h1;
     private HazelcastInstance h2;
@@ -68,12 +77,6 @@ public class ReplicationManagerTest {
     private Config hzConfig;
     private IMap<Identifier, SystemMetadata> sysMetaMap;
     private MultiMap<String, MNReplicationTask> replicationTaskMap;
-    private NodeLdapPopulation cnLdapPopulation;
-
-    @Resource
-    public void setCNLdapPopulation(NodeLdapPopulation ldapPopulation) {
-        this.cnLdapPopulation = ldapPopulation;
-    }
 
     @Autowired
     @Qualifier("readSystemMetadataResource")
@@ -82,10 +85,29 @@ public class ReplicationManagerTest {
 
     private JdbcTemplate jdbc = new JdbcTemplate(MetacatDataSourceFactory.getMetacatDataSource());
 
-    //XX@Before
+    @BeforeClass
+    public static void beforeClass() throws Exception {
+            int ldapTimeoutCount = 0;
+
+        if (ApacheDSSuiteRunner.getLdapServer() == null) {
+            throw new Exception("ApacheDSSuiteRunner was not automatically configured. FATAL ERROR!");
+        }
+        while (!ApacheDSSuiteRunner.getLdapServer().isStarted() && ldapTimeoutCount < 10) {
+            Thread.sleep(500L);
+            logger.info("LdapServer is not yet started");
+            ldapTimeoutCount++;
+        }
+        if (!ApacheDSSuiteRunner.getLdapServer().isStarted()) {
+                throw new IllegalStateException("Service is not running");
+        }
+        final LdapContext ctx = ServerIntegrationUtils.getWiredContext(
+				ApacheDSSuiteRunner.getLdapServer(), null);
+        ctx.lookup("dc=dataone,dc=org");
+    }
+    
+    @Before
     public void setUp() throws Exception {
         // get reference to hazelcast.xml file and test exists
-        cnLdapPopulation.populateTestMNs();
         // Hazelcast Config testing
 
         hzConfig = new ClasspathXmlConfig("org/dataone/configuration/hazelcast.xml");
@@ -118,18 +140,16 @@ public class ReplicationManagerTest {
             System.out.println(hzMember.getName() + "'s InetSocketAddress: "
                     + m.getInetSocketAddress());
         }
-
         ReplicationDaoMetacatImplTestUtil.createTables(jdbc);
     }
 
-    //XX@After
+    @After
     public void tearDown() throws Exception {
-        cnLdapPopulation.deletePopulatedMns();
-        Hazelcast.shutdownAll();
+    	Hazelcast.shutdownAll();
         ReplicationDaoMetacatImplTestUtil.dropTables(jdbc);
     }
 
-    @Test
+//    @Test
     public void emptyTest() {
         return;
     }
@@ -140,7 +160,7 @@ public class ReplicationManagerTest {
      * 
      * Test creating and queueing tasks on a SystemMetadata change
      */
-    //XX@Test
+    @Test
     public void testCreateAndQueueTasks() {
         assertEquals(3, hzMember.getCluster().getMembers().size());
         // get the name of the Hazelcast SystemMetadata IMap
@@ -153,15 +173,21 @@ public class ReplicationManagerTest {
         // create a new SystemMetadata object for testing
         SystemMetadata sysmeta = null;
         try {
-            sysmeta = TypeMarshaller.unmarshalTypeFromStream(SystemMetadata.class,
-                    readSystemMetadataResource.getInputStream());
+        	InputStream is = readSystemMetadataResource.getInputStream();
+            sysmeta = TypeMarshaller.unmarshalTypeFromStream(SystemMetadata.class, is);
         } catch (Exception ex) {
             ex.printStackTrace();
             fail("Test SystemMetadata misconfiguration - Exception " + ex);
         }
 
         // create the ReplicationManager
-        replicationManager = ReplicationFactory.getReplicationManager();
+        // with a testing replicationattemptrepository
+        ReplicationAttemptHistoryH2RepositoryFactory repositoryFactory = 
+        		new ReplicationAttemptHistoryH2RepositoryFactory();
+        ReplicationAttemptHistoryRepository tryRepo = repositoryFactory.getReplicationTryHistoryRepository();
+        replicationManager = new ReplicationManager(tryRepo);
+
+
         CNReplication cnReplication = new CNReplicationImpl();
         // inject a mock CNReplication Class so that we don't need a
         // CN running on a remote server somewhere in order to unit test
@@ -172,10 +198,10 @@ public class ReplicationManagerTest {
         replicationTaskMap = hzMember.getMultiMap("hzReplicationTaskMultiMap");
 
         try {
-            // replicationManager.createAndQueueTasks(pid);
+            int queuedTaskCount = replicationManager.createAndQueueTasks(sysmeta.getIdentifier());
             // expect numberReplicas less the already created replica
-            assertEquals((int) sysmeta.getReplicationPolicy().getNumberReplicas(),
-                    (int) replicationManager.createAndQueueTasks(sysmeta.getIdentifier()));
+            assertEquals("The number of tasks created should equal the replication policy numberOfReplicas.", (int) sysmeta.getReplicationPolicy().getNumberReplicas(),
+                    queuedTaskCount);
         } catch (Exception e) {
             e.printStackTrace();
             fail("Test ReplicationPolicy - Exception " + e);
@@ -186,8 +212,7 @@ public class ReplicationManagerTest {
             try {
                 Thread.sleep(500L);
             } catch (InterruptedException ex) {
-                Logger.getLogger(ReplicationManagerTest.class.getName())
-                        .log(Level.SEVERE, null, ex);
+            	logger.error(null, ex);
             }
         }
         // Perform a query to see if the map has pending tasks

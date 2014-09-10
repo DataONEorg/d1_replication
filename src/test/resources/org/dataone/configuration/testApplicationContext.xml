@@ -24,15 +24,6 @@
             </spring:list>
         </spring:property>
     </spring:bean>
-
-    <spring:bean id="contextSourceConfiguration" class="org.dataone.cn.ldap.v2.ContextSourceConfiguration" />
-
-    <spring:bean id="contextSource" class="org.springframework.ldap.core.support.LdapContextSource"
-        factory-bean="contextSourceConfiguration" factory-method="getLdapContextSource" />
-
-    <spring:bean id="ldapTemplate" class="org.springframework.ldap.core.LdapTemplate">
-        <spring:constructor-arg ref="contextSource" />
-    </spring:bean>
     <context:component-scan base-package="org.dataone.cn.ldap.v2" />
     
     <spring:bean id="readSystemMetadataResource" class="org.springframework.core.io.ClassPathResource" >

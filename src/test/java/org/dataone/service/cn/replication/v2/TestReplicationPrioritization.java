@@ -26,7 +26,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 public class TestReplicationPrioritization {
 
-    private ReplicationPrioritizationStrategy prioritiyStrategy = new ReplicationPrioritizationStrategy();
+    private ReplicationPrioritizationStrategy priorityStrategy = new ReplicationPrioritizationStrategy();
 
     private JdbcTemplate jdbc = new JdbcTemplate(
             MetacatDataSourceFactory.getMetacatDataSource());
@@ -96,7 +96,7 @@ public class TestReplicationPrioritization {
         // nodelist : node1, node2, node3, node4
         List<NodeReference> nodeIds = createNodeList();
 
-        Map<NodeReference, Float> requestFactors = prioritiyStrategy
+        Map<NodeReference, Float> requestFactors = priorityStrategy
                 .getPendingRequestFactors(nodeIds, false);
         for (NodeReference nodeRef : requestFactors.keySet()) {
             System.out.println("Node: " + nodeRef.getValue() + " request factor: "
@@ -169,7 +169,7 @@ public class TestReplicationPrioritization {
         // nodelist : node1, node2, node3, node4
         List<NodeReference> nodeIds = createNodeList();
 
-        Map<NodeReference, Float> requestFactors = prioritiyStrategy
+        Map<NodeReference, Float> requestFactors = priorityStrategy
                 .getFailureFactors(nodeIds, false);
         for (NodeReference nodeRef : requestFactors.keySet()) {
             System.out.println("Node: " + nodeRef.getValue() + " request factor: "
@@ -302,7 +302,7 @@ public class TestReplicationPrioritization {
 
         SystemMetadata sysmeta = createSystemMetadata("testPid1", preferredNodes,
                 blockedNodes);
-        List<NodeReference> nodes = prioritiyStrategy.prioritizeNodes(nodeIds,
+        List<NodeReference> nodes = priorityStrategy.prioritizeNodes(nodeIds,
                 sysmeta);
         for (NodeReference node : nodes) {
             System.out.println("Node: " + node.getValue());

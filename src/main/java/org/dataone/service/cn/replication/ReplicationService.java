@@ -22,11 +22,17 @@
 package org.dataone.service.cn.replication;
 
 import java.io.InputStream;
+import java.net.URI;
 import java.util.List;
 
 import org.apache.log4j.Logger;
+import org.dataone.client.exception.ClientSideException;
+import org.dataone.client.rest.DefaultHttpMultipartRestClient;
+import org.dataone.client.rest.MultipartRestClient;
 import org.dataone.client.v2.CNode;
+import org.dataone.client.v2.impl.D1NodeFactory;
 import org.dataone.client.v2.itk.D1Client;
+import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.InvalidRequest;
 import org.dataone.service.exceptions.InvalidToken;
@@ -52,6 +58,7 @@ import org.dataone.service.types.v2.SystemMetadata;
  */
 public class ReplicationService {
 
+	private MultipartRestClient mrc = new DefaultHttpMultipartRestClient();
     private CNode cn;
 
     public static Logger log = Logger.getLogger(ReplicationService.class);
@@ -375,23 +382,33 @@ public class ReplicationService {
         return updated;
     }
 
+    // TODO: consolidate with ReplicationManager CN - if falling back to Factory.buildCNode,
+    // you end up with 2 MultipartRestClients (2 HttpClients, 2 ConnectionManagers...)
     private void initializeCN() {
+    	
         try {
             this.cn = D1Client.getCN();
         } catch (BaseException e) {
             log.warn("Caught a ServiceFailure while getting a reference to the CN ", e);
             // try again, then fail
             try {
-                Thread.sleep(5000L);
+                try {
+					Thread.sleep(5000L);
+				} catch (InterruptedException e1) {
+					log.error("There was a problem getting a Coordinating Node reference.", e1);
+				}
                 this.cn = D1Client.getCN();
 
             } catch (BaseException e1) {
                 log.warn("Second ServiceFailure while getting a reference to the CN", e1);
-                this.cn = null;
-
-            } catch (InterruptedException ie) {
-                log.error("Caught InterruptedException while getting a reference to the CN ", ie);
-                this.cn = null;
+                try {
+                	log.warn("...Building CNode without baseURL check.");
+                	this.cn = D1NodeFactory.buildCNode(new DefaultHttpMultipartRestClient(),
+    				  		URI.create(Settings.getConfiguration().getString("D1Client.CN_URL")));
+                } catch (ClientSideException e2) {
+                	log.error("ClientSideException trying to build a CNode.", e2);
+                	this.cn = null;
+                }
             }
         }
     }
