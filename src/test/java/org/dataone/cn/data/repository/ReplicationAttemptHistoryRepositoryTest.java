@@ -22,6 +22,7 @@
 package org.dataone.cn.data.repository;
 
 import org.dataone.client.D1TypeBuilder;
+import org.dataone.service.cn.replication.v1.ReplicationRepositoryFactory;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -33,7 +34,7 @@ import org.springframework.data.domain.Sort;
 public class ReplicationAttemptHistoryRepositoryTest {
 
     private ReplicationAttemptHistoryRepository repository;
-    private ReplicationAttemptHistoryH2RepositoryFactory repositoryFactory = new ReplicationAttemptHistoryH2RepositoryFactory();
+    private ReplicationRepositoryFactory repositoryFactory = new ReplicationH2RepositoryFactory();
 
     @Test
     public void testSimpleCreateReadTest() {

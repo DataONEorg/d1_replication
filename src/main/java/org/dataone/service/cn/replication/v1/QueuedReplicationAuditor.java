@@ -45,7 +45,8 @@ public class QueuedReplicationAuditor implements Runnable {
 
     private static Logger log = Logger.getLogger(QueuedReplicationAuditor.class);
 
-    private ReplicationTaskQueue replicationTaskQueue = new ReplicationTaskQueue();
+    private ReplicationTaskQueue replicationTaskQueue = ReplicationFactory
+            .getReplicationTaskQueue();
     private ReplicationDao replicationDao = DaoFactory.getReplicationDao();
     private static final String QUEUED_REPLICATION_LOCK_NAME = "queuedReplicationAuditingLock";
     private static HazelcastInstance hzMember = HazelcastInstanceFactory.getProcessingInstance();

@@ -428,7 +428,8 @@ public class ReplicationPrioritizationStrategy {
                 ReplicationStatus nodeStatus = replica.getReplicationStatus();
                 if (nodeIdStr == nodeId.getValue()
                         && (nodeStatus == ReplicationStatus.QUEUED
-                                || nodeStatus == ReplicationStatus.REQUESTED || nodeStatus == ReplicationStatus.COMPLETED)) {
+                                || nodeStatus == ReplicationStatus.REQUESTED
+                                || nodeStatus == ReplicationStatus.COMPLETED || nodeStatus == ReplicationStatus.INVALIDATED)) {
                     score = new Float(0.0f);
                     log.debug("Node " + nodeId.getValue() + " is already listed " + "as a "
                             + nodeStatus.toString() + " replica for identifier" + pid.getValue());

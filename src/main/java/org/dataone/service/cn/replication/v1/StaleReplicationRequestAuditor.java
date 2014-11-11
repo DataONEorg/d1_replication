@@ -63,7 +63,8 @@ import com.hazelcast.core.ILock;
 public class StaleReplicationRequestAuditor implements Runnable {
 
     private static Logger log = Logger.getLogger(StaleReplicationRequestAuditor.class);
-    private static ReplicationService replicationService = new ReplicationService();
+    private static ReplicationService replicationService = ReplicationFactory
+            .getReplicationService();
     private static final String STALE_REPLICATION_LOCK_NAME = "staleReplicationAuditingLock";
     private static HazelcastInstance hzMember = HazelcastInstanceFactory.getProcessingInstance();
 

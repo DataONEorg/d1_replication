@@ -477,5 +477,4 @@ public class ReplicationService {
         }
         return targetMN;
     }
-
 }

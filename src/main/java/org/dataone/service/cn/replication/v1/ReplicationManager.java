@@ -40,16 +40,14 @@ import org.dataone.cn.dao.DaoFactory;
 import org.dataone.cn.dao.exceptions.DataAccessException;
 import org.dataone.cn.data.repository.ReplicationAttemptHistory;
 import org.dataone.cn.data.repository.ReplicationAttemptHistoryRepository;
+import org.dataone.cn.data.repository.ReplicationTask;
+import org.dataone.cn.data.repository.ReplicationTaskRepository;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.configuration.Settings;
 import org.dataone.service.cn.v1.CNReplication;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.InvalidRequest;
-import org.dataone.service.exceptions.InvalidToken;
-import org.dataone.service.exceptions.NotAuthorized;
-import org.dataone.service.exceptions.NotFound;
-import org.dataone.service.exceptions.NotImplemented;
 import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.exceptions.VersionMismatch;
 import org.dataone.service.types.v1.Identifier;
@@ -66,7 +64,6 @@ import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.ILock;
 import com.hazelcast.core.IMap;
-import com.hazelcast.core.IQueue;
 
 /**
  * A DataONE Coordinating Node implementation which manages replication queues
@@ -97,9 +94,6 @@ public class ReplicationManager {
     /* The name of the system metadata map */
     private String systemMetadataMap;
 
-    /* The name of the replication events queue */
-    private String eventsQueue;
-
     /* The Hazelcast distributed system metadata map */
     private IMap<NodeReference, Node> nodes;
 
@@ -107,9 +101,6 @@ public class ReplicationManager {
     private IMap<Identifier, SystemMetadata> systemMetadata;
 
     private ReplicationTaskQueue replicationTaskQueue;
-
-    /* The Hazelcast distributed replication events queue */
-    private IQueue<Identifier> replicationEvents;
 
     /* The Hazelcast distributed counts by node-status map name */
     private String nodeReplicationStatusMap;
@@ -126,7 +117,11 @@ public class ReplicationManager {
     private static ScheduledExecutorService staleRequestedReplicaAuditScheduler;
     private static ScheduledExecutorService staleQueuedReplicaAuditScheduler;
 
+    private static ScheduledExecutorService replicationTaskProcessingScheduler;
+
     private ReplicationAttemptHistoryRepository replicationAttemptHistoryRepository;
+    private ReplicationTaskRepository taskRepository;
+
     private static final Integer REPLICATION_ATTEMPTS_PER_DAY = Integer.valueOf(10);
 
     /* The router hostname for the CN cluster (round robin) */
@@ -143,8 +138,6 @@ public class ReplicationManager {
         this.nodeMap = Settings.getConfiguration().getString("dataone.hazelcast.nodes");
         this.systemMetadataMap = Settings.getConfiguration().getString(
                 "dataone.hazelcast.systemMetadata");
-        this.eventsQueue = Settings.getConfiguration().getString(
-                "dataone.hazelcast.replicationQueuedEvents");
         this.nodeReplicationStatusMap = Settings.getConfiguration().getString(
                 "dataone.hazelcast.nodeReplicationStatusMap");
 
@@ -160,7 +153,6 @@ public class ReplicationManager {
         // get references to cluster structures
         this.nodes = this.hzMember.getMap(this.nodeMap);
         this.systemMetadata = this.hzClient.getMap(this.systemMetadataMap);
-        this.replicationEvents = this.hzMember.getQueue(eventsQueue);
         this.nodeReplicationStatus = this.hzMember.getMap(this.nodeReplicationStatusMap);
 
         this.replicationTaskQueue = ReplicationFactory.getReplicationTaskQueue();
@@ -168,9 +160,12 @@ public class ReplicationManager {
 
         this.replicationAttemptHistoryRepository = ReplicationFactory
                 .getReplicationTryHistoryRepository();
+        this.taskRepository = ReplicationFactory.getReplicationTaskRepository();
 
         startStaleRequestedAuditing();
         startStaleQueuedAuditing();
+
+        startReplicationTaskProcessing();
 
         // Report node status statistics on a scheduled basis
         // TODO: hold off on scheduling code for now
@@ -237,15 +232,8 @@ public class ReplicationManager {
      * @param pid
      *            - the identifier of the object to be replicated
      * @return count - the number of replication tasks queued
-     * 
-     * @throws ServiceFailure
-     * @throws NotImplemented
-     * @throws InvalidToken
-     * @throws NotAuthorized
-     * @throws InvalidRequest
-     * @throws NotFound
      */
-    public int createAndQueueTasks(Identifier pid) throws NotImplemented, InvalidRequest {
+    public int createAndQueueTasks(Identifier pid) {
 
         log.debug("ReplicationManager.createAndQueueTasks called.");
 
@@ -538,17 +526,7 @@ public class ReplicationManager {
         } catch (InterruptedException ie) {
             log.info("The lock was interrupted while evaluating identifier " + pid.getValue()
                     + ". Re-queuing the identifer.");
-            try {
-                if (!this.replicationEvents.contains(pid)) {
-                    boolean taken = this.replicationEvents.offer(pid);
-                    if (taken == false) {
-                        log.error("ReplicationEvents.offer() returned false for pid: " + pid);
-                    }
-                }
-            } catch (Exception e) {
-                log.error("Couldn't resubmit identifier " + pid.getValue()
-                        + " back onto the hzReplicationEvents queue.");
-            }
+            requeueReplicationTask(pid);
         } catch (Exception e) {
             log.error(
                     "Unhandled Exception for pid: " + pid.getValue() + ". Error is : "
@@ -565,6 +543,24 @@ public class ReplicationManager {
 
         return taskCount;
 
+    }
+
+    private void requeueReplicationTask(Identifier pid) {
+        List<ReplicationTask> taskList = taskRepository.findByPid(pid.getValue());
+        if (taskList.size() == 1) {
+            ReplicationTask task = taskList.get(0);
+            task.markNew();
+            taskRepository.save(task);
+        } else if (taskList.size() == 0) {
+            log.warn("In Replication Manager, task that should exist 'in process' does not exist.  Creating new task for pid: "
+                    + pid.getValue());
+            taskRepository.save(new ReplicationTask(pid));
+        } else if (taskList.size() > 1) {
+            log.warn("In Replication Manager, more than one task found for pid: " + pid.getValue()
+                    + ". Deleting all and creating new task.");
+            taskRepository.delete(taskList);
+            taskRepository.save(new ReplicationTask(pid));
+        }
     }
 
     /**
@@ -671,7 +667,8 @@ public class ReplicationManager {
             }
             if (listedStatus == ReplicationStatus.QUEUED
                     || listedStatus == ReplicationStatus.REQUESTED
-                    || listedStatus == ReplicationStatus.COMPLETED) {
+                    || listedStatus == ReplicationStatus.COMPLETED
+                    || listedStatus == ReplicationStatus.INVALIDATED) {
                 listedReplicaNodes.add(nodeId);
             }
         }
@@ -779,22 +776,7 @@ public class ReplicationManager {
         } else {
             log.debug("There are not enough target nodes to fulfill the replication "
                     + "policy. Resubmitting identifier " + pid.getValue());
-            if (!this.replicationEvents.contains(pid)) {
-                boolean resubmitted = this.replicationEvents.offer(pid);
-                if (resubmitted) {
-                    log.debug("Successfully resubmitted identifier " + pid.getValue());
-
-                } else {
-                    log.error("Couldn't resubmit identifier to ReplicationEvents " + pid.getValue());
-
-                }
-
-            } else {
-                log.debug("Identifier " + pid.getValue() + " is already in "
-                        + "the hzReplicationEvents queue, not resubmitting.");
-
-            }
-
+            requeueReplicationTask(pid);
         }
         return nodesByPriority;
     }
@@ -814,6 +796,15 @@ public class ReplicationManager {
             staleRequestedReplicaAuditScheduler = Executors.newSingleThreadScheduledExecutor();
             staleRequestedReplicaAuditScheduler.scheduleAtFixedRate(
                     new StaleReplicationRequestAuditor(), 0L, 1L, TimeUnit.HOURS);
+        }
+    }
+
+    private void startReplicationTaskProcessing() {
+        if (replicationTaskProcessingScheduler == null
+                || replicationTaskProcessingScheduler.isShutdown()) {
+            replicationTaskProcessingScheduler = Executors.newSingleThreadScheduledExecutor();
+            replicationTaskProcessingScheduler.scheduleAtFixedRate(new ReplicationTaskProcessor(),
+                    0L, 2L, TimeUnit.MINUTES);
         }
     }
 
