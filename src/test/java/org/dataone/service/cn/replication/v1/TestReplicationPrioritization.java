@@ -27,8 +27,7 @@ public class TestReplicationPrioritization {
 
     private ReplicationPrioritizationStrategy prioritiyStrategy = new ReplicationPrioritizationStrategy();
 
-    private JdbcTemplate jdbc = new JdbcTemplate(
-            MetacatDataSourceFactory.getMetacatDataSource());
+    private JdbcTemplate jdbc = new JdbcTemplate(MetacatDataSourceFactory.getMetacatDataSource());
 
     @Test
     public void testRequestFactorCalculation() throws Exception {
@@ -36,67 +35,67 @@ public class TestReplicationPrioritization {
         // Statuses: COMPLETE, REQUESTED, QUEUED, FAILED, INVALIDATED
 
         // 11 Pending requests for node1 should max it out.
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid", "node1", "QUEUED", "2010-01-01 12:00:00");
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid", "node1", "QUEUED", "2010-01-01 12:00:00");
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid", "node1", "REQUESTED", "2010-01-01 12:00:00");
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid2", "node1", "REQUESTED", "2010-01-01 12:00:00");
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid2", "node1", "REQUESTED", "2010-01-01 12:00:00");
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid2", "node1", "REQUESTED", "2010-01-01 12:00:00");
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid2", "node1", "REQUESTED", "2010-01-01 12:00:00");
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid2", "node1", "REQUESTED", "2010-01-01 12:00:00");
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid2", "node1", "REQUESTED", "2010-01-01 12:00:00");
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid2", "node1", "REQUESTED", "2010-01-01 12:00:00");
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid2", "node1", "REQUESTED", "2010-01-01 12:00:00");
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid", "node1",
+                "QUEUED", "2010-01-01 12:00:00");
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid", "node1",
+                "QUEUED", "2010-01-01 12:00:00");
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid", "node1",
+                "REQUESTED", "2010-01-01 12:00:00");
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid2",
+                "node1", "REQUESTED", "2010-01-01 12:00:00");
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid2",
+                "node1", "REQUESTED", "2010-01-01 12:00:00");
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid2",
+                "node1", "REQUESTED", "2010-01-01 12:00:00");
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid2",
+                "node1", "REQUESTED", "2010-01-01 12:00:00");
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid2",
+                "node1", "REQUESTED", "2010-01-01 12:00:00");
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid2",
+                "node1", "REQUESTED", "2010-01-01 12:00:00");
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid2",
+                "node1", "REQUESTED", "2010-01-01 12:00:00");
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid2",
+                "node1", "REQUESTED", "2010-01-01 12:00:00");
 
         // noise to make sure other nodes remain open with less than 10 AND with
         // records that aren't 'pending'
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid3", "node2", "REQUESTED", "2010-01-01 12:00:00");
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid3", "node2", "FAILED", "2010-01-01 12:00:00");
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid4", "node2", "COMPLETED", "2010-01-01 12:00:00");
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid1", "node2", "FAILED", "2010-01-01 12:00:00");
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid2", "node2", "QUEUED", "2010-01-01 12:00:00");
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid3", "node2", "COMPLETED", "2010-01-01 12:00:00");
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid4", "node2", "FAILED", "2010-01-01 12:00:00");
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid", "node2", "COMPLETED", "2010-01-01 12:00:00");
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid2", "node2", "FAILED", "2010-01-01 12:00:00");
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid3", "node2", "FAILED", "2010-01-01 12:00:00");
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid4", "node2", "COMPLETED", "2010-01-01 12:00:00");
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid3",
+                "node2", "REQUESTED", "2010-01-01 12:00:00");
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid3",
+                "node2", "FAILED", "2010-01-01 12:00:00");
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid4",
+                "node2", "COMPLETED", "2010-01-01 12:00:00");
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid1",
+                "node2", "FAILED", "2010-01-01 12:00:00");
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid2",
+                "node2", "QUEUED", "2010-01-01 12:00:00");
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid3",
+                "node2", "COMPLETED", "2010-01-01 12:00:00");
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid4",
+                "node2", "FAILED", "2010-01-01 12:00:00");
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid", "node2",
+                "COMPLETED", "2010-01-01 12:00:00");
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid2",
+                "node2", "FAILED", "2010-01-01 12:00:00");
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid3",
+                "node2", "FAILED", "2010-01-01 12:00:00");
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid4",
+                "node2", "COMPLETED", "2010-01-01 12:00:00");
 
         // node 3 - 2 queued tasks - below threshold
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid3", "node3", "QUEUED", "2010-01-01 12:00:00");
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid4", "node3", "QUEUED", "2010-01-01 12:00:00");
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid3",
+                "node3", "QUEUED", "2010-01-01 12:00:00");
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid4",
+                "node3", "QUEUED", "2010-01-01 12:00:00");
 
         // node 4 is boostrap test - no data
 
         // nodelist : node1, node2, node3, node4
         List<NodeReference> nodeIds = createNodeList();
 
-        Map<NodeReference, Float> requestFactors = prioritiyStrategy
-                .getPendingRequestFactors(nodeIds, false);
+        Map<NodeReference, Float> requestFactors = prioritiyStrategy.getPendingRequestFactors(
+                nodeIds, false);
         for (NodeReference nodeRef : requestFactors.keySet()) {
             System.out.println("Node: " + nodeRef.getValue() + " request factor: "
                     + requestFactors.get(nodeRef));
@@ -119,57 +118,57 @@ public class TestReplicationPrioritization {
         cal.set(Calendar.DATE, cal.get(Calendar.DATE) - 2);
 
         // node1 - all success and noise
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid", "node1", "COMPLETED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid", "node1", "COMPLETED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid", "node1", "COMPLETED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid", "node1", "QUEUED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid", "node1", "REQUESTED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid", "node1", "INVALIDATED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid", "node1",
+                "COMPLETED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid", "node1",
+                "COMPLETED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid", "node1",
+                "COMPLETED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid", "node1",
+                "QUEUED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid", "node1",
+                "REQUESTED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid", "node1",
+                "INVALIDATED", cal.getTime());
 
         // node2 - 2 failures, 4 completed -
         // .666 success factor below threshold of .8
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid3", "node2", "FAILED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid3", "node2", "FAILED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid3",
+                "node2", "FAILED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid3",
+                "node2", "FAILED", cal.getTime());
 
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid2", "node2", "COMPLETED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid3", "node2", "COMPLETED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid4", "node2", "COMPLETED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid", "node2", "COMPLETED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid2",
+                "node2", "COMPLETED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid3",
+                "node2", "COMPLETED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid4",
+                "node2", "COMPLETED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid", "node2",
+                "COMPLETED", cal.getTime());
 
         // node3 - 1 failure - 5 completed - above threshold.
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid3", "node3", "FAILED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid3",
+                "node3", "FAILED", cal.getTime());
 
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid3", "node3", "COMPLETED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid2", "node3", "COMPLETED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid3", "node3", "COMPLETED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid4", "node3", "COMPLETED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid", "node3", "COMPLETED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid3",
+                "node3", "COMPLETED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid2",
+                "node3", "COMPLETED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid3",
+                "node3", "COMPLETED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid4",
+                "node3", "COMPLETED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid", "node3",
+                "COMPLETED", cal.getTime());
 
         // node4 is bootstrap test - no data.
 
         // nodelist : node1, node2, node3, node4
         List<NodeReference> nodeIds = createNodeList();
 
-        Map<NodeReference, Float> requestFactors = prioritiyStrategy
-                .getFailureFactors(nodeIds, false);
+        Map<NodeReference, Float> requestFactors = prioritiyStrategy.getFailureFactors(nodeIds,
+                false);
         for (NodeReference nodeRef : requestFactors.keySet()) {
             System.out.println("Node: " + nodeRef.getValue() + " request factor: "
                     + requestFactors.get(nodeRef));
@@ -178,8 +177,7 @@ public class TestReplicationPrioritization {
             } else if ("node2".equals(nodeRef.getValue())) {
                 Assert.assertTrue(requestFactors.get(nodeRef) == 0.0f);
             } else if ("node3".equals(nodeRef.getValue())) {
-                Assert.assertEquals(0.8333333f, requestFactors.get(nodeRef)
-                        .floatValue());
+                Assert.assertEquals(0.8333333f, requestFactors.get(nodeRef).floatValue());
             } else if ("node4".equals(nodeRef.getValue())) {
                 Assert.assertEquals(requestFactors.get(nodeRef), 1.0f);
             }
@@ -194,98 +192,98 @@ public class TestReplicationPrioritization {
         cal.set(Calendar.DATE, cal.get(Calendar.DATE) - 2);
 
         // node1 will be only node that makes it. few queued and few failures
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid", "node1", "COMPLETED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid", "node1", "COMPLETED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid", "node1", "COMPLETED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid", "node1", "QUEUED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid", "node1", "QUEUED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid", "node1", "INVALIDATED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid", "node1",
+                "COMPLETED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid", "node1",
+                "COMPLETED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid", "node1",
+                "COMPLETED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid", "node1",
+                "QUEUED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid", "node1",
+                "QUEUED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid", "node1",
+                "INVALIDATED", cal.getTime());
 
         // node2 is the blocked node - this is really just noise
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid3", "node2", "REQUESTED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid3", "node2", "FAILED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid4", "node2", "COMPLETED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid1", "node2", "FAILED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid2", "node2", "QUEUED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid3", "node2", "COMPLETED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid4", "node2", "FAILED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid", "node2", "COMPLETED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid2", "node2", "FAILED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid3", "node2", "FAILED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid4", "node2", "COMPLETED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid3",
+                "node2", "REQUESTED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid3",
+                "node2", "FAILED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid4",
+                "node2", "COMPLETED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid1",
+                "node2", "FAILED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid2",
+                "node2", "QUEUED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid3",
+                "node2", "COMPLETED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid4",
+                "node2", "FAILED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid", "node2",
+                "COMPLETED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid2",
+                "node2", "FAILED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid3",
+                "node2", "FAILED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid4",
+                "node2", "COMPLETED", cal.getTime());
 
         // node3 - 1 failure - 5 completed - above threshold but will be 'full'
         // with queued
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid3", "node3", "FAILED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid3", "node3", "COMPLETED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid2", "node3", "COMPLETED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid3", "node3", "COMPLETED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid4", "node3", "COMPLETED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid", "node3", "COMPLETED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid", "node3", "QUEUED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid", "node3", "QUEUED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid", "node3", "REQUESTED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid2", "node3", "REQUESTED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid2", "node3", "REQUESTED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid2", "node3", "REQUESTED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid2", "node3", "REQUESTED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid2", "node3", "REQUESTED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid2", "node3", "REQUESTED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid2", "node3", "REQUESTED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid2", "node3", "REQUESTED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid3",
+                "node3", "FAILED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid3",
+                "node3", "COMPLETED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid2",
+                "node3", "COMPLETED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid3",
+                "node3", "COMPLETED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid4",
+                "node3", "COMPLETED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid", "node3",
+                "COMPLETED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid", "node3",
+                "QUEUED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid", "node3",
+                "QUEUED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid", "node3",
+                "REQUESTED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid2",
+                "node3", "REQUESTED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid2",
+                "node3", "REQUESTED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid2",
+                "node3", "REQUESTED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid2",
+                "node3", "REQUESTED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid2",
+                "node3", "REQUESTED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid2",
+                "node3", "REQUESTED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid2",
+                "node3", "REQUESTED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid2",
+                "node3", "REQUESTED", cal.getTime());
 
         // node 4 will score 0 due to many failures even though it is preferred
         // member node
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid3", "node4", "FAILED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid4", "node4", "COMPLETED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid3", "node4", "FAILED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid4", "node4", "COMPLETED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid3", "node4", "FAILED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid4", "node4", "COMPLETED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid3", "node4", "FAILED", cal.getTime());
-        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc,
-                "test_guid4", "node4", "COMPLETED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid3",
+                "node4", "FAILED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid4",
+                "node4", "COMPLETED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid3",
+                "node4", "FAILED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid4",
+                "node4", "COMPLETED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid3",
+                "node4", "FAILED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid4",
+                "node4", "COMPLETED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid3",
+                "node4", "FAILED", cal.getTime());
+        ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid4",
+                "node4", "COMPLETED", cal.getTime());
 
         List<NodeReference> nodeIds = createNodeList();
         // need system metadata object with blocked and preferred member nodes.
@@ -299,10 +297,8 @@ public class TestReplicationPrioritization {
             }
         }
 
-        SystemMetadata sysmeta = createSystemMetadata("testPid1", preferredNodes,
-                blockedNodes);
-        List<NodeReference> nodes = prioritiyStrategy.prioritizeNodes(nodeIds,
-                sysmeta);
+        SystemMetadata sysmeta = createSystemMetadata("testPid1", preferredNodes, blockedNodes);
+        List<NodeReference> nodes = prioritiyStrategy.prioritizeNodes(nodeIds, sysmeta);
         for (NodeReference node : nodes) {
             System.out.println("Node: " + node.getValue());
         }
@@ -312,7 +308,7 @@ public class TestReplicationPrioritization {
         // metrics
         // node3 is full, too many queued
         // node4 has too many failures: 
-        
+
         //updated: not using failure factor at the moment, node4 succeeds
         //Assert.assertTrue(nodes.size() == 1);
         Assert.assertTrue(nodes.size() == 2);

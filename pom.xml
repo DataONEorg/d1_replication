@@ -4,7 +4,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.dataone</groupId>
     <artifactId>d1_replication</artifactId>
-    <version>1.2.0</version>
+    <version>1.2.1</version>
     <name>DataONE_Replication</name>
     <description>DataONE Coordinating Node replication manager</description>
     <url>http://dataone.org</url>
@@ -14,7 +14,7 @@
         <hazelcast.version>2.4.1</hazelcast.version>
         <d1_libclient_version>1.3.1</d1_libclient_version>
         <d1_cn_noderegistry_version>1.2.1</d1_cn_noderegistry_version>
-        <d1_cn_common_version>1.2.0</d1_cn_common_version>
+        <d1_cn_common_version>1.2.2</d1_cn_common_version>
     </properties>
     <build>
         <plugins>
