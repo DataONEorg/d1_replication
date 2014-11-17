@@ -555,9 +555,7 @@ public class ReplicationManager {
         if (pid != null) {
             log.info("removing replication tasks for pid: " + pid.getValue());
             List<ReplicationTask> tasks = taskRepository.findByPid(pid.getValue());
-            for (ReplicationTask task : tasks) {
-                taskRepository.delete(task);
-            }
+            taskRepository.delete(tasks);
         }
     }
 
