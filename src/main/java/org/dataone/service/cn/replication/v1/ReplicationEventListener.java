@@ -108,7 +108,7 @@ public class ReplicationEventListener implements EntryListener<Identifier, Syste
                 createReplicationTask(event.getKey());
             } else {
                 log.info("Authoritative replica is not valid, not queueing to replication for pid: "
-                        + event.getKey());
+                        + event.getKey().getValue());
             }
         }
     }
@@ -130,7 +130,7 @@ public class ReplicationEventListener implements EntryListener<Identifier, Syste
                 createReplicationTask(event.getKey());
             } else {
                 log.info("Authoritative replica is not valid, not queueing to replication for pid: "
-                        + event.getValue());
+                        + event.getKey().getValue());
             }
         }
     }

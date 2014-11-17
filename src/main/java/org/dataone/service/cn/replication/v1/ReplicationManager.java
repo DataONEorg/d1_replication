@@ -266,6 +266,7 @@ public class ReplicationManager {
                 allowed = isAllowed(pid);
                 log.debug("Replication is allowed for identifier " + pid.getValue());
                 if (!allowed) {
+                    removeReplicationTasksForPid(pid);
                     log.debug("Replication is not allowed for the object identified by "
                             + pid.getValue());
                     return 0;
@@ -352,6 +353,10 @@ public class ReplicationManager {
                     // in the ' 0 > any negative nuber' scenario
                     if (desiredReplicasLessListed < 0) {
                         desiredReplicasLessListed = 0;
+                    }
+
+                    if (desiredReplicasLessListed == 0) {
+                        removeReplicationTasksForPid(pid);
                     }
 
                     // for each node in the potential node list up to the
@@ -493,6 +498,7 @@ public class ReplicationManager {
                             }
                             if (updated) {
                                 taskCount++;
+                                removeReplicationTasksForPid(pid);
                                 this.replicationTaskQueue.processAllTasksForMN(targetNode
                                         .getIdentifier().getValue());
                             } else {
@@ -543,6 +549,16 @@ public class ReplicationManager {
 
         return taskCount;
 
+    }
+
+    private void removeReplicationTasksForPid(Identifier pid) {
+        if (pid != null) {
+            log.info("removing replication tasks for pid: " + pid.getValue());
+            List<ReplicationTask> tasks = taskRepository.findByPid(pid.getValue());
+            for (ReplicationTask task : tasks) {
+                taskRepository.delete(task);
+            }
+        }
     }
 
     private void requeueReplicationTask(Identifier pid) {
