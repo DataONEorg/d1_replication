@@ -74,14 +74,14 @@ public class ReplicationEventListener implements EntryListener<Identifier, Syste
     public ReplicationEventListener() {
         // connect to both the process and storage cluster
         this.hzClient = HazelcastClientFactory.getStorageClient();
-
         // get references to the system metadata map and events queue
         this.systemMetadata = this.hzClient.getMap(systemMetadataMap);
-
         // listen for changes on system metadata
         this.systemMetadata.addEntryListener(this, true);
         log.info("Added a listener to the " + this.systemMetadata.getName() + " map.");
         this.replicationTaskRepository = ReplicationFactory.getReplicationTaskRepository();
+        // start replication manager
+        ReplicationFactory.getReplicationManager();
     }
 
     /**
