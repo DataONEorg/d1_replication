@@ -546,6 +546,9 @@ public class ReplicationManager {
 
         // return the number of replication tasks queued
         log.info("Added " + taskCount + " MNReplicationTasks to the queue for " + pid.getValue());
+        if (taskCount == 0) {
+            requeueReplicationTask(pid);
+        }
 
         return taskCount;
 
