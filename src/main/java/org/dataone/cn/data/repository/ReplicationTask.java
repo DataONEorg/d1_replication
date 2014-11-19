@@ -30,7 +30,7 @@ public class ReplicationTask implements Serializable {
     private final FastDateFormat format = FastDateFormat.getInstance("MM/dd/yyyy:HH:mm:ss:SS");
 
     @Transient
-    private static final int ALLOWED_RETRIES = 2;
+    private static final int ALLOWED_RETRIES = 1;
 
     @Transient
     public static final String STATUS_NEW = "NEW";
@@ -46,6 +46,7 @@ public class ReplicationTask implements Serializable {
     @Column(columnDefinition = "TEXT", nullable = false)
     private String pid;
 
+    @Index(name = "index_exec_task")
     @Column(nullable = false)
     private long nextExecution = 0;
 

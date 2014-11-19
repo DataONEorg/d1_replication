@@ -49,8 +49,9 @@ public class ReplicationTaskProcessor implements Runnable {
         if (ComponentActivationUtility.replicationIsActive()) {
             long now = System.currentTimeMillis();
             Pageable page = new PageRequest(0, PAGE_SIZE);
-            List<ReplicationTask> taskList = taskRepository.findByStatusAndNextExecutionLessThan(
-                    ReplicationTask.STATUS_NEW, now, page);
+            List<ReplicationTask> taskList = taskRepository
+                    .findByStatusAndNextExecutionLessThanOrderByNextExecutionAsc(
+                            ReplicationTask.STATUS_NEW, now, page);
             for (ReplicationTask task : taskList) {
                 task.markInProcess();
                 taskRepository.save(task);

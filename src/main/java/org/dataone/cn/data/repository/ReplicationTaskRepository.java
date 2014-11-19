@@ -14,7 +14,7 @@ public interface ReplicationTaskRepository extends
 
     List<ReplicationTask> findByStatusAndNextExecutionLessThan(String status, long time);
 
-    List<ReplicationTask> findByStatusAndNextExecutionLessThan(String status, long time,
-            Pageable page);
+    List<ReplicationTask> findByStatusAndNextExecutionLessThanOrderByNextExecutionAsc(
+            String status, long time, Pageable page);
 
 }

@@ -50,7 +50,7 @@ public class ReplicationTaskRepositoryTest {
         }
         long now = System.currentTimeMillis();
         results = repository.findByStatusAndNextExecutionLessThan(ReplicationTask.STATUS_NEW, now);
-        Assert.assertEquals("did not find expected tasks for execution", 2, results.size());
+        Assert.assertEquals("did not find expected tasks for execution", 1, results.size());
 
         results = repository.findByPid("foo_pid");
         for (ReplicationTask task : results) {
@@ -78,25 +78,34 @@ public class ReplicationTaskRepositoryTest {
     }
 
     @Test
-    public void testFindByStatusAndNextExecutionPaging() {
+    public void testFindByStatusAndNextExecutionPagingWithSort() {
         repository.deleteAll();
         createAndSaveReplicationTask();
+
+        ReplicationTask task = new ReplicationTask(D1TypeBuilder.buildIdentifier("new_pid"));
+        task.setNextExecution(100);
+        repository.save(task);
+
         Pageable page = new PageRequest(0, 1);
-        Iterable<ReplicationTask> results = repository.findByStatusAndNextExecutionLessThan(
-                ReplicationTask.STATUS_NEW, System.currentTimeMillis(), page);
+        Iterable<ReplicationTask> results = repository
+                .findByStatusAndNextExecutionLessThanOrderByNextExecutionAsc(
+                        ReplicationTask.STATUS_NEW, System.currentTimeMillis(), page);
         System.out.println("Results found with findbyStatusAndNextExecution:");
         System.out.println("--------------------------------------------");
         int count = 0;
         for (ReplicationTask result : results) {
             System.out.println(result);
             count++;
+            Assert.assertEquals(
+                    "page 1 of findByStatusAndNextExecution with sort did not find expected pid",
+                    "new_pid", result.getPid());
         }
         Assert.assertEquals("findbyStatusAndNextExecution found more records than expected", 1,
                 count);
 
         page = new PageRequest(0, 20);
-        results = repository.findByStatusAndNextExecutionLessThan(ReplicationTask.STATUS_NEW,
-                System.currentTimeMillis(), page);
+        results = repository.findByStatusAndNextExecutionLessThanOrderByNextExecutionAsc(
+                ReplicationTask.STATUS_NEW, System.currentTimeMillis(), page);
         System.out.println("Results found with findbyStatusAndNextExecution:");
         System.out.println("--------------------------------------------");
         count = 0;
@@ -104,7 +113,7 @@ public class ReplicationTaskRepositoryTest {
             System.out.println(result);
             count++;
         }
-        Assert.assertEquals("findbyStatusAndNextExecution found more records than expected", 2,
+        Assert.assertEquals("findbyStatusAndNextExecution found more records than expected", 3,
                 count);
     }
 
