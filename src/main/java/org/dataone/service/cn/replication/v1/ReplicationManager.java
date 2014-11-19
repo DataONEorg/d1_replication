@@ -292,6 +292,17 @@ public class ReplicationManager {
                 log.debug("Desired replica count less already listed replica count is "
                         + desiredReplicasLessListed);
 
+                // reset desiredReplicasLessListed to avoid task creation
+                // in the ' 0 > any negative nuber' scenario
+                if (desiredReplicasLessListed < 0) {
+                    desiredReplicasLessListed = 0;
+                }
+
+                if (desiredReplicasLessListed == 0) {
+                    removeReplicationTasksForPid(pid);
+                    return 0;
+                }
+
                 // List of Nodes for building MNReplicationTasks
                 log.debug("Building a potential target node list for identifier " + pid.getValue());
                 nodeList = (Set<NodeReference>) this.nodes.keySet();
@@ -347,16 +358,6 @@ public class ReplicationManager {
                         log.info("Changed the desired replicas for identifier " + pid.getValue()
                                 + " to the size of the potential target node list: "
                                 + potentialNodeList.size());
-                    }
-
-                    // reset desiredReplicasLessListed to avoid task creation
-                    // in the ' 0 > any negative nuber' scenario
-                    if (desiredReplicasLessListed < 0) {
-                        desiredReplicasLessListed = 0;
-                    }
-
-                    if (desiredReplicasLessListed == 0) {
-                        removeReplicationTasksForPid(pid);
                     }
 
                     // for each node in the potential node list up to the
@@ -498,7 +499,7 @@ public class ReplicationManager {
                             }
                             if (updated) {
                                 taskCount++;
-                                removeReplicationTasksForPid(pid);
+                                requeueReplicationTask(pid);
                                 this.replicationTaskQueue.processAllTasksForMN(targetNode
                                         .getIdentifier().getValue());
                             } else {
@@ -566,8 +567,10 @@ public class ReplicationManager {
         List<ReplicationTask> taskList = taskRepository.findByPid(pid.getValue());
         if (taskList.size() == 1) {
             ReplicationTask task = taskList.get(0);
-            task.markNew();
-            taskRepository.save(task);
+            if (ReplicationTask.STATUS_IN_PROCESS.equals(task.getStatus())) {
+                task.markNew();
+                taskRepository.save(task);
+            }
         } else if (taskList.size() == 0) {
             log.warn("In Replication Manager, task that should exist 'in process' does not exist.  Creating new task for pid: "
                     + pid.getValue());
