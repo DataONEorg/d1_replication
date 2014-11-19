@@ -2,6 +2,7 @@ package org.dataone.cn.data.repository;
 
 import java.util.List;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.PagingAndSortingRepository;
 import org.springframework.stereotype.Repository;
 
@@ -12,5 +13,8 @@ public interface ReplicationTaskRepository extends
     List<ReplicationTask> findByPid(String pid);
 
     List<ReplicationTask> findByStatusAndNextExecutionLessThan(String status, long time);
+
+    List<ReplicationTask> findByStatusAndNextExecutionLessThan(String status, long time,
+            Pageable page);
 
 }

@@ -8,6 +8,8 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 public class ReplicationTaskRepositoryTest {
 
@@ -73,6 +75,37 @@ public class ReplicationTaskRepositoryTest {
             count++;
         }
         Assert.assertEquals("Find by pid found more records than expected", 1, count);
+    }
+
+    @Test
+    public void testFindByStatusAndNextExecutionPaging() {
+        repository.deleteAll();
+        createAndSaveReplicationTask();
+        Pageable page = new PageRequest(0, 1);
+        Iterable<ReplicationTask> results = repository.findByStatusAndNextExecutionLessThan(
+                ReplicationTask.STATUS_NEW, System.currentTimeMillis(), page);
+        System.out.println("Results found with findbyStatusAndNextExecution:");
+        System.out.println("--------------------------------------------");
+        int count = 0;
+        for (ReplicationTask result : results) {
+            System.out.println(result);
+            count++;
+        }
+        Assert.assertEquals("findbyStatusAndNextExecution found more records than expected", 1,
+                count);
+
+        page = new PageRequest(0, 20);
+        results = repository.findByStatusAndNextExecutionLessThan(ReplicationTask.STATUS_NEW,
+                System.currentTimeMillis(), page);
+        System.out.println("Results found with findbyStatusAndNextExecution:");
+        System.out.println("--------------------------------------------");
+        count = 0;
+        for (ReplicationTask result : results) {
+            System.out.println(result);
+            count++;
+        }
+        Assert.assertEquals("findbyStatusAndNextExecution found more records than expected", 2,
+                count);
     }
 
     private int createAndSaveReplicationTask() {

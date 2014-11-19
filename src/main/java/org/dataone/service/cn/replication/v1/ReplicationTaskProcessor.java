@@ -28,6 +28,9 @@ import org.dataone.client.D1TypeBuilder;
 import org.dataone.cn.ComponentActivationUtility;
 import org.dataone.cn.data.repository.ReplicationTask;
 import org.dataone.cn.data.repository.ReplicationTaskRepository;
+import org.dataone.configuration.Settings;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 public class ReplicationTaskProcessor implements Runnable {
 
@@ -38,12 +41,16 @@ public class ReplicationTaskProcessor implements Runnable {
     private static ReplicationManager replicationManager = ReplicationFactory
             .getReplicationManager();
 
+    private static final int PAGE_SIZE = Settings.getConfiguration().getInt(
+            "dataone.cn.replication.task.page.size", 200);
+
     @Override
     public void run() {
         if (ComponentActivationUtility.replicationIsActive()) {
             long now = System.currentTimeMillis();
+            Pageable page = new PageRequest(0, PAGE_SIZE);
             List<ReplicationTask> taskList = taskRepository.findByStatusAndNextExecutionLessThan(
-                    ReplicationTask.STATUS_NEW, now);
+                    ReplicationTask.STATUS_NEW, now, page);
             for (ReplicationTask task : taskList) {
                 task.markInProcess();
                 taskRepository.save(task);
