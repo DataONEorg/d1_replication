@@ -19,8 +19,9 @@
  */
 package org.dataone.service.cn.replication;
 
-import org.dataone.cn.data.repository.ReplicationAttemptHistoryPostgresRepositoryFactory;
 import org.dataone.cn.data.repository.ReplicationAttemptHistoryRepository;
+import org.dataone.cn.data.repository.ReplicationPostgresRepositoryFactory;
+import org.dataone.cn.data.repository.ReplicationTaskRepository;
 
 /**
  * Factory class to provide consumers handle on replication objects
@@ -33,8 +34,9 @@ public class ReplicationFactory {
     private static ReplicationManager replicationManager;
     private static ReplicationService replicationService;
     private static ReplicationTaskQueue replicationTaskQueue;
-    private static ReplicationAttemptHistoryPostgresRepositoryFactory repositoryFactory;
+    private static ReplicationRepositoryFactory repositoryFactory;
     private static ReplicationAttemptHistoryRepository tryHistoryRepository;
+    private static ReplicationTaskRepository replicationTaskRepository;
 
     private ReplicationFactory() {
     }
@@ -62,12 +64,21 @@ public class ReplicationFactory {
 
     public static ReplicationAttemptHistoryRepository getReplicationTryHistoryRepository() {
         if (repositoryFactory == null) {
-            repositoryFactory = new ReplicationAttemptHistoryPostgresRepositoryFactory();
-            repositoryFactory.initContext();
+            repositoryFactory = new ReplicationPostgresRepositoryFactory();
         }
         if (tryHistoryRepository == null) {
             tryHistoryRepository = repositoryFactory.getReplicationTryHistoryRepository();
         }
         return tryHistoryRepository;
+    }
+
+    public static ReplicationTaskRepository getReplicationTaskRepository() {
+        if (repositoryFactory == null) {
+            repositoryFactory = new ReplicationPostgresRepositoryFactory();
+        }
+        if (replicationTaskRepository == null) {
+            replicationTaskRepository = repositoryFactory.getReplicationTaskRepository();
+        }
+        return replicationTaskRepository;
     }
 }

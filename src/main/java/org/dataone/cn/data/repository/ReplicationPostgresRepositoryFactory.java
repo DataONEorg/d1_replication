@@ -26,6 +26,7 @@ import javax.sql.DataSource;
 import org.apache.commons.dbcp.BasicDataSource;
 import org.dataone.cn.model.repository.PostgresRepositoryConfiguration;
 import org.dataone.configuration.Settings;
+import org.dataone.service.cn.replication.ReplicationRepositoryFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
@@ -34,8 +35,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 @Configuration
 @EnableJpaRepositories("org.dataone.cn.data.repository")
 @ComponentScan("org.dataone.cn.data.repository")
-public class ReplicationAttemptHistoryPostgresRepositoryFactory extends
-        PostgresRepositoryConfiguration {
+public class ReplicationPostgresRepositoryFactory extends PostgresRepositoryConfiguration implements
+        ReplicationRepositoryFactory {
 
     private static final String urlProp = "datasource.replication.history.url";
     private static final String driverClassProp = "datasource.replication.history.driverClass";
@@ -56,8 +57,16 @@ public class ReplicationAttemptHistoryPostgresRepositoryFactory extends
 
     private static BasicDataSource postgresDataSource;
 
+    @Override
     public ReplicationAttemptHistoryRepository getReplicationTryHistoryRepository() {
+        initContext();
         return context.getBean(ReplicationAttemptHistoryRepository.class);
+    }
+
+    @Override
+    public ReplicationTaskRepository getReplicationTaskRepository() {
+        initContext();
+        return context.getBean(ReplicationTaskRepository.class);
     }
 
     @Bean
