@@ -43,9 +43,10 @@ import com.hazelcast.core.ILock;
  */
 public class QueuedReplicationAuditor implements Runnable {
 
-    public static Logger log = Logger.getLogger(RejectedReplicationTaskHandler.class);
+    private static Logger log = Logger.getLogger(QueuedReplicationAuditor.class);
 
-    private ReplicationTaskQueue replicationTaskQueue = new ReplicationTaskQueue();
+    private ReplicationTaskQueue replicationTaskQueue = ReplicationFactory
+            .getReplicationTaskQueue();
     private ReplicationDao replicationDao = DaoFactory.getReplicationDao();
     private static final String QUEUED_REPLICATION_LOCK_NAME = "queuedReplicationAuditingLock";
     private static HazelcastInstance hzMember = HazelcastInstanceFactory.getProcessingInstance();

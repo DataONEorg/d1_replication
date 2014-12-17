@@ -4,15 +4,17 @@ import org.dataone.client.v2.MNode;
 import org.dataone.client.v2.itk.D1Client;
 import org.dataone.service.cn.replication.ReplicationCommunication;
 import org.dataone.service.exceptions.BaseException;
+import org.dataone.service.exceptions.NotFound;
 import org.dataone.service.types.v1.Checksum;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
 import org.dataone.service.types.v2.SystemMetadata;
 
 public class MNCommunication extends ReplicationCommunication {
-	
-	@Override
-	public boolean requestReplication(NodeReference targetNodeId, SystemMetadata sysmeta) throws BaseException {
+
+    @Override
+    public boolean requestReplication(NodeReference targetNodeId, SystemMetadata sysmeta)
+            throws BaseException {
 
         if (sysmeta == null) {
             return false;
@@ -26,7 +28,7 @@ public class MNCommunication extends ReplicationCommunication {
                     + sysmeta.getIdentifier().getValue());
             return false;
         }
-        
+
         NodeReference originatingNode = replicationService.determineReplicationSourceNode(sysmeta);
         if (originatingNode == null) {
             log.error("Could not determine replication source node for replication request for pid: "
@@ -51,23 +53,19 @@ public class MNCommunication extends ReplicationCommunication {
                 sysmeta = replicationService.getSystemMetadata(sysmeta.getIdentifier());
                 if (sysmeta != null) {
                     success = targetMN.replicate(null, sysmeta, originatingNode);
-                    log.info("Called replicate() at targetNode " + targetNodeId
-                            + ", identifier " + sysmeta.getIdentifier().getValue() + ". Success: "
-                            + success);
+                    log.info("Called replicate() at targetNode " + targetNodeId + ", identifier "
+                            + sysmeta.getIdentifier().getValue() + ". Success: " + success);
                 }
             } catch (BaseException e1) {
                 log.error(
                         "Caught base exception attempting to call replicate for pid: "
                                 + sysmeta.getIdentifier().getValue() + " with exception: "
                                 + e.getDescription() + " and message: " + e.getMessage(), e);
-                log.error(
-                        "There was a second problem calling replicate() on " + targetNodeId
-                                + " for identifier " + sysmeta.getIdentifier().getValue(), e1);
+                log.error("There was a second problem calling replicate() on " + targetNodeId
+                        + " for identifier " + sysmeta.getIdentifier().getValue(), e1);
             } catch (InterruptedException ie) {
-                log.error(
-                        "Caught InterruptedException while calling replicate() for identifier "
-                                + sysmeta.getIdentifier().getValue() + ", target node "
-                                + targetNodeId, ie);
+                log.error("Caught InterruptedException while calling replicate() for identifier "
+                        + sysmeta.getIdentifier().getValue() + ", target node " + targetNodeId, ie);
             }
         } catch (Exception e) {
             log.error("Unknown exception during replication for identifier "
@@ -76,19 +74,23 @@ public class MNCommunication extends ReplicationCommunication {
         }
         return success;
     }
-	
-	@Override
-	public Checksum getChecksumFromMN(Identifier identifier, NodeReference nodeId, SystemMetadata sysmeta) throws BaseException {
 
-		MNode mn = D1Client.getMN(nodeId);
+    @Override
+    public Checksum getChecksumFromMN(Identifier identifier, NodeReference nodeId,
+            SystemMetadata sysmeta) throws NotFound, BaseException {
+
+        MNode mn = D1Client.getMN(nodeId);
 
         Checksum mnChecksum = null;
         try {
             mnChecksum = mn.getChecksum(null, identifier, sysmeta.getChecksum().getAlgorithm());
-        } catch (BaseException e) {
+        } catch (NotFound e) {
             log.debug(
-                    "Stale Replica Status Audit: Cannot get checksum from MN: " + nodeId.getValue()
-                            + " for pid: " + identifier.getValue(), e);
+                    "Checksum NotFound from MN: " + nodeId.getValue() + " for pid: "
+                            + identifier.getValue(), e);
+        } catch (BaseException e) {
+            log.debug("Cannot get checksum from MN: " + nodeId.getValue() + " for pid: "
+                    + identifier.getValue(), e);
         }
         return mnChecksum;
     }
