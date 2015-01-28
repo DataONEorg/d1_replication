@@ -35,11 +35,11 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
+import org.dataone.client.D1NodeFactory;
 import org.dataone.client.auth.CertificateManager;
 import org.dataone.client.exception.ClientSideException;
 import org.dataone.client.rest.DefaultHttpMultipartRestClient;
 import org.dataone.client.v2.CNode;
-import org.dataone.client.v2.impl.D1NodeFactory;
 import org.dataone.client.v2.itk.D1Client;
 import org.dataone.cn.dao.DaoFactory;
 import org.dataone.cn.dao.exceptions.DataAccessException;
@@ -237,8 +237,8 @@ public class ReplicationManager {
             } catch (BaseException e1) {
                 log.warn("Building CNode without baseURL check.");
                 try {
-                    cnode = D1NodeFactory.buildCNode(new DefaultHttpMultipartRestClient(),
-                            URI.create(settingsBaseUrl));
+                    cnode = D1NodeFactory.buildNode(CNode.class,
+                            new DefaultHttpMultipartRestClient(), URI.create(settingsBaseUrl));
                 } catch (ClientSideException e2) {
                     log.error("There was a problem getting a Coordinating Node reference "
                             + " for the ReplicationManager. ", e2);
