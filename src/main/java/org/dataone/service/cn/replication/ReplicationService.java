@@ -219,7 +219,8 @@ public class ReplicationService {
                 log.error(
                         "Error in calling setReplicationStatus() for identifier " + pid.getValue()
                                 + ", target node " + targetNode.getValue() + " and status of "
-                                + status.toString() + ": " + be.getMessage(), be);
+                                + status.toString() + ": " + be.getMessage() + ", detail code " 
+                                + be.getDetail_code() + ", description: " + be.getDescription() , be);
             }
         }
         if (!updated) {
