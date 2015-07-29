@@ -92,7 +92,7 @@ public class ReplicationService {
         } catch (NotFound e) {
         }
         if (sysmeta == null) {
-            log.error("Unable to get system metadata for: " + identifier + ". exiting...");
+            log.error("Unable to get system metadata for: " + identifier.getValue() + ". exiting...");
             return;
         }
 
@@ -111,7 +111,7 @@ public class ReplicationService {
 
         boolean updated = setReplicaToRequested(identifier, targetNode);
         if (updated == false) {
-            log.error("Unable to set replication status to 'requested' for: " + identifier
+            log.error("Unable to set replication status to 'requested' for: " + identifier.getValue()
                     + " for node: " + targetNode.getValue() + ". exiting...");
             return;
         }
@@ -176,7 +176,7 @@ public class ReplicationService {
             }
         }
         if (!deleted) {
-            log.error("Ultimately unable to delete replica metadata for: " + pid + " on node: "
+            log.error("Ultimately unable to delete replica metadata for: " + pid.getValue() + " on node: "
                     + targetNode.getValue());
         }
         return deleted;
@@ -224,7 +224,7 @@ public class ReplicationService {
             }
         }
         if (!updated) {
-            log.error("Ultimately unable to update status: " + status + " for: " + pid
+            log.error("Ultimately unable to update status: " + status + " for: " + pid.getValue()
                     + " on node: " + targetNode.getValue());
         }
         return updated;
