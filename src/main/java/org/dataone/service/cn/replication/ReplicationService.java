@@ -27,7 +27,6 @@ import java.util.List;
 
 import org.apache.log4j.Logger;
 import org.dataone.client.D1NodeFactory;
-import org.dataone.client.exception.ClientSideException;
 import org.dataone.client.rest.HttpMultipartRestClient;
 import org.dataone.client.v2.CNode;
 import org.dataone.client.v2.itk.D1Client;
@@ -92,7 +91,8 @@ public class ReplicationService {
         } catch (NotFound e) {
         }
         if (sysmeta == null) {
-            log.error("Unable to get system metadata for: " + identifier.getValue() + ". exiting...");
+            log.error("Unable to get system metadata for: " + identifier.getValue()
+                    + ". exiting...");
             return;
         }
 
@@ -102,17 +102,18 @@ public class ReplicationService {
             return;
         }
 
-        hasQueuedReplica(sysmeta, targetNode);
-        // if (hasQueuedReplica(sysmeta, targetNode) == false) {
-        // log.debug("Replica not queued for: " + identifier + " for node: "
-        // + targetNode.getValue() + ". exiting...");
-        // return;
-        // }
+        //        hasQueuedReplica(sysmeta, targetNode);
+        //        if (hasQueuedReplica(sysmeta, targetNode) == false) {
+        //            log.debug("Replica not queued for: " + identifier + " for node: "
+        //                    + targetNode.getValue() + ". exiting...");
+        //            return;
+        //        }
 
         boolean updated = setReplicaToRequested(identifier, targetNode);
         if (updated == false) {
-            log.error("Unable to set replication status to 'requested' for: " + identifier.getValue()
-                    + " for node: " + targetNode.getValue() + ". exiting...");
+            log.error("Unable to set replication status to 'requested' for: "
+                    + identifier.getValue() + " for node: " + targetNode.getValue()
+                    + ". exiting...");
             return;
         }
 
@@ -176,8 +177,8 @@ public class ReplicationService {
             }
         }
         if (!deleted) {
-            log.error("Ultimately unable to delete replica metadata for: " + pid.getValue() + " on node: "
-                    + targetNode.getValue());
+            log.error("Ultimately unable to delete replica metadata for: " + pid.getValue()
+                    + " on node: " + targetNode.getValue());
         }
         return deleted;
     }
@@ -219,8 +220,8 @@ public class ReplicationService {
                 log.error(
                         "Error in calling setReplicationStatus() for identifier " + pid.getValue()
                                 + ", target node " + targetNode.getValue() + " and status of "
-                                + status.toString() + ": " + be.getMessage() + ", detail code " 
-                                + be.getDetail_code() + ", description: " + be.getDescription() , be);
+                                + status.toString() + ": " + be.getMessage() + ", detail code "
+                                + be.getDetail_code() + ", description: " + be.getDescription(), be);
             }
         }
         if (!updated) {
@@ -398,8 +399,7 @@ public class ReplicationService {
                 log.warn("Second ServiceFailure while getting a reference to the CN", e1);
                 try {
                     log.warn("...Building CNode without baseURL check.");
-                    this.cn = D1NodeFactory.buildNode(CNode.class,
-                            new HttpMultipartRestClient(),
+                    this.cn = D1NodeFactory.buildNode(CNode.class, new HttpMultipartRestClient(),
                             URI.create(Settings.getConfiguration().getString("D1Client.CN_URL")));
                 } catch (Exception e2) {
                     log.error("ClientSideException trying to build a CNode.", e2);

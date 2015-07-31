@@ -236,8 +236,8 @@ public class ReplicationManager {
             } catch (BaseException e1) {
                 log.warn("Building CNode without baseURL check.");
                 try {
-                    cnode = D1NodeFactory.buildNode(CNode.class,
-                            new HttpMultipartRestClient(), URI.create(settingsBaseUrl));
+                    cnode = D1NodeFactory.buildNode(CNode.class, new HttpMultipartRestClient(),
+                            URI.create(settingsBaseUrl));
                 } catch (Exception e2) {
                     log.error("There was a problem getting a Coordinating Node reference "
                             + " for the ReplicationManager. ", e2);
@@ -701,7 +701,7 @@ public class ReplicationManager {
             isAllowed = policy.getReplicationAllowed().booleanValue();
 
         } catch (NullPointerException e) {
-            log.error("NullPointerException caught in ReplicationManager.isAllowed() "
+            log.debug("NullPointerException caught in ReplicationManager.isAllowed() "
                     + "for identifier " + pid.getValue());
             log.debug("ReplicationManager.isAllowed() = " + isAllowed + " for " + pid.getValue());
             isAllowed = false;
