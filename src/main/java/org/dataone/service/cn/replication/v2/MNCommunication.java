@@ -38,39 +38,47 @@ public class MNCommunication extends ReplicationCommunication {
         boolean success = false;
         try {
             success = targetMN.replicate(null, sysmeta, originatingNode);
-            log.info("Called replicate() at targetNode " + targetNodeId + ", identifier "
-                    + sysmeta.getIdentifier().getValue() + ". Success: " + success);
+            log.info("Called replicate() at targetNode " + targetNodeId.getValue()
+                    + ", identifier " + sysmeta.getIdentifier().getValue() + ". Success: "
+                    + success);
         } catch (BaseException e) {
             log.error("Caught base exception attempting to call replicate for pid: "
-                    + sysmeta.getIdentifier().getValue() + " with exception: " + e.getDescription()
-                    + " and message: " + e.getMessage(), e);
+                    + sysmeta.getIdentifier().getValue() + " at target: " + targetNodeId.getValue()
+                    + "with exception: " + e.getDescription() + " and message: " + e.getMessage(),
+                    e);
             try {
                 log.info("The call to MN.replicate() failed for "
-                        + sysmeta.getIdentifier().getValue() + " on " + targetNodeId
+                        + sysmeta.getIdentifier().getValue() + " on " + targetNodeId.getValue()
                         + ". Trying again in 5 seconds.");
                 Thread.sleep(5000L);
 
                 sysmeta = replicationService.getSystemMetadata(sysmeta.getIdentifier());
                 if (sysmeta != null) {
                     success = targetMN.replicate(null, sysmeta, originatingNode);
-                    log.info("Called replicate() at targetNode " + targetNodeId + ", identifier "
-                            + sysmeta.getIdentifier().getValue() + ". Success: " + success);
+                    log.info("Called replicate() at targetNode " + targetNodeId.getValue()
+                            + ", identifier " + sysmeta.getIdentifier().getValue() + ". Success: "
+                            + success);
                 }
             } catch (BaseException e1) {
                 log.error(
                         "Caught base exception attempting to call replicate for pid: "
                                 + sysmeta.getIdentifier().getValue() + " with exception: "
                                 + e.getDescription() + " and message: " + e.getMessage(), e);
-                log.error("There was a second problem calling replicate() on " + targetNodeId
-                        + " for identifier " + sysmeta.getIdentifier().getValue(), e1);
+                log.error(
+                        "There was a second problem calling replicate() on "
+                                + targetNodeId.getValue() + " for identifier "
+                                + sysmeta.getIdentifier().getValue(), e1);
             } catch (InterruptedException ie) {
-                log.error("Caught InterruptedException while calling replicate() for identifier "
-                        + sysmeta.getIdentifier().getValue() + ", target node " + targetNodeId, ie);
+                log.error(
+                        "Caught InterruptedException while calling replicate() for identifier "
+                                + sysmeta.getIdentifier().getValue() + ", target node "
+                                + targetNodeId.getValue(), ie);
             }
         } catch (Exception e) {
-            log.error("Unknown exception during replication for identifier "
-                    + sysmeta.getIdentifier().getValue() + ", target node " + targetNodeId
-                    + ". Error message: " + e.getMessage(), e);
+            log.error(
+                    "Unknown exception during replication for identifier "
+                            + sysmeta.getIdentifier().getValue() + ", target node "
+                            + targetNodeId.getValue() + ". Error message: " + e.getMessage(), e);
         }
         return success;
     }
