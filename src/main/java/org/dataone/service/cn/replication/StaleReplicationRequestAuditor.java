@@ -34,7 +34,7 @@ import org.dataone.cn.ComponentActivationUtility;
 import org.dataone.cn.dao.DaoFactory;
 import org.dataone.cn.dao.ReplicationDao.ReplicaDto;
 import org.dataone.cn.dao.exceptions.DataAccessException;
-import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
+import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.NotFound;
@@ -63,13 +63,13 @@ public class StaleReplicationRequestAuditor implements Runnable {
     private static ReplicationService replicationService = ReplicationFactory
             .getReplicationService();
     private static final String STALE_REPLICATION_LOCK_NAME = "staleReplicationAuditingLock";
-    private static HazelcastInstance hzMember = HazelcastInstanceFactory.getProcessingInstance();
+    private static HazelcastInstance hzClient = HazelcastClientFactory.getProcessingClient();
 
     @Override
     public void run() {
         if (ComponentActivationUtility.replicationIsActive()) {
             boolean isLocked = false;
-            ILock lock = hzMember.getLock(STALE_REPLICATION_LOCK_NAME);
+            ILock lock = hzClient.getLock(STALE_REPLICATION_LOCK_NAME);
             try {
                 isLocked = lock.tryLock();
                 if (isLocked) {

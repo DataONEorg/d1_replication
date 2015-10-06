@@ -28,7 +28,7 @@ import org.dataone.cn.dao.DaoFactory;
 import org.dataone.cn.dao.ReplicationDao;
 import org.dataone.cn.dao.ReplicationDao.ReplicaDto;
 import org.dataone.cn.dao.exceptions.DataAccessException;
-import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
+import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
 
@@ -54,12 +54,12 @@ public class ReplicationTaskQueue {
 
     private ReplicationDao replicationDao;
     private ReplicationService replicationService;
-    private HazelcastInstance hzMember;
+    private HazelcastInstance hzClient;
 
     public ReplicationTaskQueue() {
         replicationDao = DaoFactory.getReplicationDao();
         replicationService = ReplicationFactory.getReplicationService();
-        hzMember = HazelcastInstanceFactory.getProcessingInstance();
+        hzClient = HazelcastClientFactory.getProcessingClient();
     }
 
     public void logState() {
@@ -145,7 +145,7 @@ public class ReplicationTaskQueue {
             if (queuedCount > 0) {
                 log.debug(queuedCount + " tasks for mn: " + mnId);
                 // LOCK THIS MEMBER NODE FOR PROCESSING
-                ILock lock = hzMember.getLock(memberNodeIdentifierValue);
+                ILock lock = hzClient.getLock(memberNodeIdentifierValue);
                 try {
                     isLocked = lock.tryLock();
 

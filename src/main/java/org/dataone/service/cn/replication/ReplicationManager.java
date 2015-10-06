@@ -26,6 +26,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -47,11 +48,14 @@ import org.dataone.cn.data.repository.ReplicationAttemptHistoryRepository;
 import org.dataone.cn.data.repository.ReplicationTask;
 import org.dataone.cn.data.repository.ReplicationTaskRepository;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
-import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
 import org.dataone.configuration.Settings;
+import org.dataone.service.cn.impl.v2.NodeRegistryService;
 import org.dataone.service.cn.v2.CNReplication;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.InvalidRequest;
+import org.dataone.service.exceptions.NotFound;
+import org.dataone.service.exceptions.NotImplemented;
+import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.exceptions.VersionMismatch;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
@@ -65,11 +69,8 @@ import org.dataone.service.types.v2.Node;
 import org.dataone.service.types.v2.SystemMetadata;
 
 import com.hazelcast.client.HazelcastClient;
-import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.ILock;
 import com.hazelcast.core.IMap;
-import com.hazelcast.core.MapEntry;
-import com.hazelcast.query.Predicate;
 
 /**
  * A DataONE Coordinating Node implementation which manages replication queues
@@ -91,17 +92,12 @@ public class ReplicationManager {
     /* The instance of the Hazelcast storage cluster client */
     private HazelcastClient hzClient;
 
-    /* the instance of the Hazelcast processing cluster member */
-    private HazelcastInstance hzMember;
+    private HazelcastClient hzProcessingClient;
 
-    /* The name of the node map */
-    private String nodeMap;
+    private NodeRegistryService nodeService = new NodeRegistryService();
 
     /* The name of the system metadata map */
     private String systemMetadataMap;
-
-    /* The Hazelcast distributed system metadata map */
-    private IMap<NodeReference, Node> nodes;
 
     /* The Hazelcast distributed system metadata map */
     private IMap<Identifier, SystemMetadata> systemMetadata;
@@ -149,7 +145,6 @@ public class ReplicationManager {
      */
     public ReplicationManager(ReplicationRepositoryFactory repositoryFactory) {
 
-        this.nodeMap = Settings.getConfiguration().getString("dataone.hazelcast.nodes");
         this.systemMetadataMap = Settings.getConfiguration().getString(
                 "dataone.hazelcast.systemMetadata");
         this.nodeReplicationStatusMap = Settings.getConfiguration().getString(
@@ -162,12 +157,11 @@ public class ReplicationManager {
 
         // Connect to the Hazelcast process cluster
         log.info("Becoming a DataONE Process cluster hazelcast member with the default instance.");
-        this.hzMember = HazelcastInstanceFactory.getProcessingInstance();
+        this.hzProcessingClient = HazelcastClientFactory.getProcessingClient();
 
         // get references to cluster structures
-        this.nodes = this.hzMember.getMap(this.nodeMap);
         this.systemMetadata = this.hzClient.getMap(this.systemMetadataMap);
-        this.nodeReplicationStatus = this.hzMember.getMap(this.nodeReplicationStatusMap);
+        this.nodeReplicationStatus = this.hzProcessingClient.getMap(this.nodeReplicationStatusMap);
 
         this.replicationTaskQueue = ReplicationFactory.getReplicationTaskQueue();
         this.replicationService = ReplicationFactory.getReplicationService();
@@ -249,13 +243,27 @@ public class ReplicationManager {
     }
 
     public Node getNode(NodeReference nodeRef) {
-        return this.nodes.get(nodeRef);
+        Node node = null;
+        try {
+            node = this.nodeService.getNode(nodeRef);
+        } catch (ServiceFailure e) {
+            log.error(
+                    "Unable to locate node from node service for node ref: " + nodeRef.getValue(),
+                    e);
+            e.printStackTrace();
+        } catch (NotFound e) {
+            log.error(
+                    "Unable to locate node from node service for node ref: " + nodeRef.getValue(),
+                    e);
+            e.printStackTrace();
+        }
+        return node;
     }
 
     protected List<String> getObjectVersion(SystemMetadata sysmeta) {
 
         List versions = new LinkedList<String>();
-        Node n = nodes.get(sysmeta.getAuthoritativeMemberNode());
+        Node n = getNode(sysmeta.getAuthoritativeMemberNode());
         for (Service s : n.getServices().getServiceList()) {
             if (s.getName().equals("MNReplication")) {
                 versions.add(s.getVersion());
@@ -266,59 +274,66 @@ public class ReplicationManager {
 
     private Set<NodeReference> determinePossibleReplicationTargets(final SystemMetadata sysmeta) {
 
-        Set<NodeReference> possibleReplicationTargets = null;
+        Set<NodeReference> possibleReplicationTargets = new HashSet<NodeReference>();
 
         if (sysmeta.getReplicationPolicy() != null) {
-            if (sysmeta.getReplicationPolicy().getReplicationAllowed()) {
-
-                possibleReplicationTargets = nodes.keySet(new Predicate<NodeReference, Node>() {
-
-                    @Override
-                    public boolean apply(MapEntry<NodeReference, Node> mapEntry) {
-                        // order of conditionals is important!
-                        Node node = mapEntry.getValue();
-                        if (node.getType() != NodeType.MN)
-                            return false;
-
-                        if (!node.isReplicate())
-                            return false;
-
-                        if (sysmeta.getAuthoritativeMemberNode().equals(node.getIdentifier()))
-                            return false;
-
-                        if (getCurrentReplicaList(sysmeta).contains(node.getIdentifier()))
-                            return false;
-
-                        if (sysmeta.getReplicationPolicy() != null
-                                && sysmeta.getReplicationPolicy().getBlockedMemberNodeList()
-                                        .contains(node.getIdentifier()))
-                            return false;
-
-                        if (node.getNodeReplicationPolicy() == null)
-                            return true;
-
-                        if (node.getNodeReplicationPolicy().getMaxObjectSize()
-                                .compareTo(sysmeta.getSize()) < 0)
-                            return false;
-
-                        List<ObjectFormatIdentifier> allowedFormats = node
-                                .getNodeReplicationPolicy().getAllowedObjectFormatList();
-                        if (allowedFormats != null
-                                && !allowedFormats.contains(sysmeta.getFormatId()))
-                            return false;
-
-                        List<NodeReference> allowedNodes = node.getNodeReplicationPolicy()
-                                .getAllowedNodeList();
-                        if (allowedNodes != null
-                                && !allowedNodes.contains(sysmeta.getAuthoritativeMemberNode()))
-                            return false;
-
-                        return true;
+            try {
+                if (sysmeta.getReplicationPolicy().getReplicationAllowed()) {
+                    for (Node node : nodeService.listNodes().getNodeList()) {
+                        if (isPossibleReplicationTarget(node, sysmeta)) {
+                            NodeReference nodeRef = new NodeReference();
+                            nodeRef.setValue(node.getIdentifier().getValue());
+                            possibleReplicationTargets.add(nodeRef);
+                        }
                     }
-                });
+
+                }
+            } catch (NotImplemented ni) {
+                log.error("Unable to get node list from node registry service", ni);
+                ni.printStackTrace();
+            } catch (ServiceFailure sf) {
+                log.error("Unable to get node list from node registry service", sf);
+                sf.printStackTrace();
             }
+
         }
         return possibleReplicationTargets;
+    }
+
+    public boolean isPossibleReplicationTarget(Node node, SystemMetadata sysmeta) {
+        if (node.getType() != NodeType.MN)
+            return false;
+
+        if (!node.isReplicate())
+            return false;
+
+        if (sysmeta.getAuthoritativeMemberNode().equals(node.getIdentifier()))
+            return false;
+
+        if (getCurrentReplicaList(sysmeta).contains(node.getIdentifier()))
+            return false;
+
+        if (sysmeta.getReplicationPolicy() != null
+                && sysmeta.getReplicationPolicy().getBlockedMemberNodeList()
+                        .contains(node.getIdentifier()))
+            return false;
+
+        if (node.getNodeReplicationPolicy() == null)
+            return true;
+
+        if (node.getNodeReplicationPolicy().getMaxObjectSize().compareTo(sysmeta.getSize()) < 0)
+            return false;
+
+        List<ObjectFormatIdentifier> allowedFormats = node.getNodeReplicationPolicy()
+                .getAllowedObjectFormatList();
+        if (allowedFormats != null && !allowedFormats.contains(sysmeta.getFormatId()))
+            return false;
+
+        List<NodeReference> allowedNodes = node.getNodeReplicationPolicy().getAllowedNodeList();
+        if (allowedNodes != null && !allowedNodes.contains(sysmeta.getAuthoritativeMemberNode()))
+            return false;
+
+        return true;
     }
 
     /**
@@ -342,7 +357,6 @@ public class ReplicationManager {
         int desiredReplicas = 3;
         long timeToWait = 5L;
         List<NodeReference> listedReplicaNodes = new ArrayList<NodeReference>();
-        Set<NodeReference> nodeList; // the full nodes list
         List<NodeReference> potentialNodeList; // the MN subset of the nodes
                                                // list
         Node targetNode = new Node(); // the target node for the replica
@@ -352,7 +366,7 @@ public class ReplicationManager {
         // use the distributed lock
         lock = null;
         String lockPid = pid.getValue();
-        lock = this.hzMember.getLock(lockPid);
+        lock = this.hzProcessingClient.getLock(lockPid);
         boolean isLocked = false;
         try {
             isLocked = lock.tryLock(timeToWait, TimeUnit.MILLISECONDS);
@@ -402,13 +416,13 @@ public class ReplicationManager {
 
                 // List of Nodes for building MNReplicationTasks
                 log.debug("Building a potential target node list for identifier " + pid.getValue());
-                nodeList = (Set<NodeReference>) this.nodes.keySet();
+                Set<NodeReference> nodeList = nodeService.getNodeReferences();
                 potentialNodeList = new ArrayList<NodeReference>(); // will be
                                                                     // our short
                                                                     // list
                 // authoritative member node to replicate from
                 try {
-                    authoritativeNode = this.nodes.get(sysmeta.getAuthoritativeMemberNode());
+                    authoritativeNode = nodeService.getNode(sysmeta.getAuthoritativeMemberNode());
 
                 } catch (NullPointerException npe) {
                     throw new InvalidRequest("1080", "Object " + pid.getValue()
@@ -418,7 +432,7 @@ public class ReplicationManager {
                 // build the potential list of target nodes
                 // TODO: only include nodes that can handle the version of our object (v1 or v2)
                 for (NodeReference nodeReference : nodeList) {
-                    Node node = this.nodes.get(nodeReference);
+                    Node node = nodeService.getNode(nodeReference);
                     // only add MNs as targets, excluding the authoritative MN
                     // and MNs that are not tagged to replicate
                     if ((node.getType() == NodeType.MN)
@@ -467,7 +481,7 @@ public class ReplicationManager {
                                 + " in the potential node list.");
                         NodeReference potentialNode = potentialNodeList.get(j);
 
-                        targetNode = this.nodes.get(potentialNode);
+                        targetNode = this.nodeService.getNode(potentialNode);
                         log.debug("currently evaluating " + targetNode.getIdentifier().getValue()
                                 + " for task creation " + "for identifier " + pid.getValue());
 
@@ -766,7 +780,7 @@ public class ReplicationManager {
             Node node = new Node();
             NodeType nodeType = null;
             try {
-                node = this.nodes.get(nodeId);
+                node = this.nodeService.getNode(nodeId);
                 if (node != null) {
                     log.debug("The potential target node id is: " + node.getIdentifier().getValue());
                     nodeType = node.getType();
