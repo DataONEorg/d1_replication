@@ -260,6 +260,24 @@ public class ReplicationManager {
         return node;
     }
 
+    public Set<NodeReference> getNodeReferences() {
+        Set<NodeReference> nodeRefs = new HashSet<NodeReference>();
+        try {
+            for (Node node : nodeService.listNodes().getNodeList()) {
+                NodeReference nodeRef = new NodeReference();
+                nodeRef.setValue(node.getIdentifier().getValue());
+                nodeRefs.add(nodeRef);
+            }
+        } catch (NotImplemented ni) {
+            log.error("Unable to get node list from node registry service", ni);
+            ni.printStackTrace();
+        } catch (ServiceFailure sf) {
+            log.error("Unable to get node list from node registry service", sf);
+            sf.printStackTrace();
+        }
+        return nodeRefs;
+    }
+
     protected List<String> getObjectVersion(SystemMetadata sysmeta) {
 
         List versions = new LinkedList<String>();
@@ -416,7 +434,7 @@ public class ReplicationManager {
 
                 // List of Nodes for building MNReplicationTasks
                 log.debug("Building a potential target node list for identifier " + pid.getValue());
-                Set<NodeReference> nodeList = nodeService.getNodeReferences();
+                Set<NodeReference> nodeList = getNodeReferences();
                 potentialNodeList = new ArrayList<NodeReference>(); // will be
                                                                     // our short
                                                                     // list
