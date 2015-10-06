@@ -153,15 +153,15 @@ public class TestReplicationPrioritization {
                 "node3", "FAILED", cal.getTime());
 
         ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid31",
-                "node3", "FAILED", cal.getTime());
+                "node3", "COMPLETED", cal.getTime());
         ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid2",
-                "node3", "FAILED", cal.getTime());
+                "node3", "COMPLETED", cal.getTime());
         ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid32",
-                "node3", "FAILED", cal.getTime());
+                "node3", "COMPLETED", cal.getTime());
         ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid4",
-                "node3", "FAILED", cal.getTime());
+                "node3", "COMPLETED", cal.getTime());
         ReplicationDaoMetacatImplTestUtil.createReplicationStatusRecord(jdbc, "test_guid", "node3",
-                "FAILED", cal.getTime());
+                "COMPLETED", cal.getTime());
 
         // node4 is bootstrap test - no data.
 
