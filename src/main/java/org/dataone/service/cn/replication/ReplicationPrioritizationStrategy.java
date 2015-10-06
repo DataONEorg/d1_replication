@@ -231,7 +231,7 @@ public class ReplicationPrioritizationStrategy {
 
             } else {
                 // for MNs that are young, give 'em 5 attempts before calculating
-                if (failedRequests.size() + completedRequests.size() < 5) {
+                if (failures + successes < 5) {
                     failureFactor = new Float(1.0f);
                     log.debug("Gave node " + nodeId.getValue() + " a pass "
                             + "since it has less than 5 replica attempts.");
