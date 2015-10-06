@@ -26,7 +26,7 @@ import org.dataone.cn.ComponentActivationUtility;
 import org.dataone.cn.dao.DaoFactory;
 import org.dataone.cn.dao.ReplicationDao;
 import org.dataone.cn.dao.exceptions.DataAccessException;
-import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
+import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.service.types.v1.NodeReference;
 
 import com.hazelcast.core.HazelcastInstance;
@@ -49,7 +49,7 @@ public class QueuedReplicationAuditor implements Runnable {
             .getReplicationTaskQueue();
     private ReplicationDao replicationDao = DaoFactory.getReplicationDao();
     private static final String QUEUED_REPLICATION_LOCK_NAME = "queuedReplicationAuditingLock";
-    private static HazelcastInstance hzMember = HazelcastInstanceFactory.getProcessingInstance();
+    private static HazelcastInstance hzClient = HazelcastClientFactory.getProcessingClient();
 
     public QueuedReplicationAuditor() {
     }
@@ -58,7 +58,7 @@ public class QueuedReplicationAuditor implements Runnable {
     public void run() {
         if (ComponentActivationUtility.replicationIsActive()) {
             boolean isLocked = false;
-            ILock lock = hzMember.getLock(QUEUED_REPLICATION_LOCK_NAME);
+            ILock lock = hzClient.getLock(QUEUED_REPLICATION_LOCK_NAME);
             try {
                 isLocked = lock.tryLock();
                 if (isLocked) {

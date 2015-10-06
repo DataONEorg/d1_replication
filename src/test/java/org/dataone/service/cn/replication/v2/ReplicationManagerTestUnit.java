@@ -34,13 +34,10 @@ import org.dataone.cn.dao.MetacatDataSourceFactory;
 import org.dataone.cn.dao.ReplicationDaoMetacatImplTestUtil;
 import org.dataone.cn.data.repository.ReplicationH2RepositoryFactory;
 import org.dataone.configuration.Settings;
-import org.dataone.service.cn.replication.MNReplicationTask;
 import org.dataone.service.cn.replication.ReplicationManager;
 import org.dataone.service.cn.replication.ReplicationRepositoryFactory;
 import org.dataone.service.cn.v2.CNReplication;
 import org.dataone.service.types.v1.Identifier;
-import org.dataone.service.types.v1.NodeReference;
-import org.dataone.service.types.v2.Node;
 import org.dataone.service.types.v2.SystemMetadata;
 import org.dataone.service.util.TypeMarshaller;
 import org.dataone.test.apache.directory.server.integ.ApacheDSSuiteRunner;
@@ -61,7 +58,6 @@ import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IMap;
 import com.hazelcast.core.Member;
-import com.hazelcast.core.MultiMap;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(locations = { "classpath:/org/dataone/configuration/testApplicationContext.xml" })
@@ -75,14 +71,12 @@ public class ReplicationManagerTestUnit extends AbstractLdapTestUnit {
     private ReplicationManager replicationManager;
     private Config hzConfig;
     private IMap<Identifier, SystemMetadata> sysMetaMap;
-    private MultiMap<String, MNReplicationTask> replicationTaskMap;
 
     private ReplicationRepositoryFactory repositoryFactory = new ReplicationH2RepositoryFactory();
 
     @Autowired
     @Qualifier("readSystemMetadataResource")
     private org.springframework.core.io.Resource readSystemMetadataResource;
-    private IMap<NodeReference, Node> nodes;
 
     private JdbcTemplate jdbc = new JdbcTemplate(MetacatDataSourceFactory.getMetacatDataSource());
 
@@ -188,10 +182,8 @@ public class ReplicationManagerTestUnit extends AbstractLdapTestUnit {
         // inject a mock CNReplication Class so that we don't need a
         // CN running on a remote server somewhere in order to unit test
         replicationManager.setCnReplication(cnReplication);
-        nodes = hzMember.getMap(nodeMapName);
         sysMetaMap = hzMember.getMap(systemMetadataMapName);
         sysMetaMap.putAsync(sysmeta.getIdentifier(), sysmeta);
-        replicationTaskMap = hzMember.getMultiMap("hzReplicationTaskMultiMap");
 
         try {
             int queuedTaskCount = replicationManager.createAndQueueTasks(sysmeta.getIdentifier());

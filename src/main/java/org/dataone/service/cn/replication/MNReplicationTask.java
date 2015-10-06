@@ -31,7 +31,7 @@ import org.apache.log4j.Logger;
 import org.dataone.client.auth.CertificateManager;
 import org.dataone.client.v2.CNode;
 import org.dataone.client.v2.itk.D1Client;
-import org.dataone.cn.hazelcast.HazelcastInstanceFactory;
+import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.configuration.Settings;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.InvalidRequest;
@@ -100,8 +100,8 @@ public class MNReplicationTask implements Serializable, Callable<String> {
     /* The name of the hzReplicationTasks property */
     private String tasksQueue;
 
-    /* The instance of the Hazelcast processing cluster member */
-    private HazelcastInstance hzMember;
+    /* The client of the Hazelcast processing cluster member */
+    private HazelcastInstance hzClient;
 
     private String cnRouterHostname;
 
@@ -121,7 +121,7 @@ public class MNReplicationTask implements Serializable, Callable<String> {
     public MNReplicationTask(String taskid, Identifier pid, NodeReference originatingNode,
             NodeReference targetNode) {
         this.taskid = taskid;
-        this.hzMember = HazelcastInstanceFactory.getProcessingInstance();
+        this.hzClient = HazelcastClientFactory.getProcessingClient();
 
         this.pid = pid;
         this.originatingNode = originatingNode;
