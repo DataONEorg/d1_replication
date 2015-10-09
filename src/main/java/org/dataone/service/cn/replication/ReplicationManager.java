@@ -96,9 +96,6 @@ public class ReplicationManager {
 
     private NodeRegistryService nodeService = new NodeRegistryService();
 
-    /* The name of the system metadata map */
-    private String systemMetadataMap;
-
     /* The Hazelcast distributed system metadata map */
     private IMap<Identifier, SystemMetadata> systemMetadata;
 
@@ -118,16 +115,12 @@ public class ReplicationManager {
 
     private static ScheduledExecutorService staleRequestedReplicaAuditScheduler;
     private static ScheduledExecutorService staleQueuedReplicaAuditScheduler;
-
     private static ScheduledExecutorService replicationTaskProcessingScheduler;
 
     private ReplicationAttemptHistoryRepository replicationAttemptHistoryRepository;
     private ReplicationTaskRepository taskRepository;
 
     private static final Integer REPLICATION_ATTEMPTS_PER_DAY = Integer.valueOf(10);
-
-    /* The router hostname for the CN cluster (round robin) */
-    private String cnRouterHostname;
 
     /**
      * Constructor - singleton pattern, enforced by Spring application. Although
@@ -145,22 +138,17 @@ public class ReplicationManager {
      */
     public ReplicationManager(ReplicationRepositoryFactory repositoryFactory) {
 
-        this.systemMetadataMap = Settings.getConfiguration().getString(
-                "dataone.hazelcast.systemMetadata");
         this.nodeReplicationStatusMap = Settings.getConfiguration().getString(
                 "dataone.hazelcast.nodeReplicationStatusMap");
-
-        this.cnRouterHostname = Settings.getConfiguration().getString("cn.router.hostname");
 
         // Connect to the Hazelcast storage cluster
         this.hzClient = HazelcastClientFactory.getStorageClient();
 
         // Connect to the Hazelcast process cluster
-        log.info("Becoming a DataONE Process cluster hazelcast member with the default instance.");
         this.hzProcessingClient = HazelcastClientFactory.getProcessingClient();
 
         // get references to cluster structures
-        this.systemMetadata = this.hzClient.getMap(this.systemMetadataMap);
+        this.systemMetadata = HazelcastClientFactory.getSystemMetadataMap();
         this.nodeReplicationStatus = this.hzProcessingClient.getMap(this.nodeReplicationStatusMap);
 
         this.replicationTaskQueue = ReplicationFactory.getReplicationTaskQueue();
