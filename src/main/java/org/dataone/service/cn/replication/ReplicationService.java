@@ -102,13 +102,6 @@ public class ReplicationService {
             return;
         }
 
-        //        hasQueuedReplica(sysmeta, targetNode);
-        //        if (hasQueuedReplica(sysmeta, targetNode) == false) {
-        //            log.debug("Replica not queued for: " + identifier + " for node: "
-        //                    + targetNode.getValue() + ". exiting...");
-        //            return;
-        //        }
-
         boolean updated = setReplicaToRequested(identifier, targetNode);
         if (updated == false) {
             log.error("Unable to set replication status to 'requested' for: "
