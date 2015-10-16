@@ -509,15 +509,19 @@ public class ReplicationManager {
                         boolean targetSupportsV1 = false;
                         boolean targetSupportsV2 = false;
 
-                        for (Service service : targetNode.getServices().getServiceList()) {
-                            if (service.getName().equals("MNReplication") && service.getAvailable()) {
-                                if (ApiVersion.isV1(service.getVersion())
-                                        && targetSupportsV1 == false) {
-                                    targetSupportsV1 = true;
-                                }
-                                if (ApiVersion.isV2(service.getVersion())
-                                        && targetSupportsV2 == false) {
-                                    targetSupportsV2 = true;
+                        if (targetNode != null && targetNode.getServices() != null
+                                && targetNode.getServices().getServiceList() != null) {
+                            for (Service service : targetNode.getServices().getServiceList()) {
+                                if (service.getName().equals("MNReplication")
+                                        && service.getAvailable()) {
+                                    if (ApiVersion.isV1(service.getVersion())
+                                            && targetSupportsV1 == false) {
+                                        targetSupportsV1 = true;
+                                    }
+                                    if (ApiVersion.isV2(service.getVersion())
+                                            && targetSupportsV2 == false) {
+                                        targetSupportsV2 = true;
+                                    }
                                 }
                             }
                         }
@@ -531,6 +535,9 @@ public class ReplicationManager {
 
                         // source and target do not share any api versions
                         if (targetApiVersion == null) {
+                            log.debug("target node: " + targetNode.getIdentifier().getValue()
+                                    + " does not share an api version with source node: "
+                                    + authoritativeNode.getIdentifier().getValue());
                             continue;
                         }
 
