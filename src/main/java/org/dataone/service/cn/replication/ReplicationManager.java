@@ -384,6 +384,7 @@ public class ReplicationManager {
                 if (!allowed) {
                     log.debug("Replication is not allowed for the object identified by "
                             + pid.getValue());
+                    removeReplicationTasksForPid(pid);
                     return 0;
 
                 }
@@ -646,27 +647,14 @@ public class ReplicationManager {
             } else {
                 log.info("Couldn't get a lock while evaluating identifier " + pid.getValue()
                         + ". Assuming another CN handled it.");
-                // try {
-                // if ( !this.replicationEvents.contains(pid) ) {
-                // boolean taken = this.replicationEvents.offer(pid);
-                // if (taken == false) {
-                // log.error("ReplicationEvents.offer() returned false for pid: "
-                // + pid);
-                // }
-                // }
-                //
-                // } catch (Exception e) {
-                // log.error("Couldn't resubmit identifier " + pid.getValue() +
-                // " back onto the hzReplicationEvents queue.");
-                // }
-
             } // end if(isLocked)
 
         } catch (InterruptedException ie) {
+            requeueReplicationTask(pid);
             log.info("The lock was interrupted while evaluating identifier " + pid.getValue()
                     + ". Re-queuing the identifer.");
-            requeueReplicationTask(pid);
         } catch (Exception e) {
+            requeueReplicationTask(pid);
             log.error(
                     "Unhandled Exception for pid: " + pid.getValue() + ". Error is : "
                             + e.getMessage(), e);

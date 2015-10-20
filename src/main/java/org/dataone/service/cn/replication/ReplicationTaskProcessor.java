@@ -36,6 +36,7 @@ public class ReplicationTaskProcessor implements Runnable {
                 taskRepository.save(task);
                 replicationManager
                         .createAndQueueTasks(D1TypeBuilder.buildIdentifier(task.getPid()));
+                // DOES THIS LEAVE THE OBJECT 'IN PROCESS'?? if say no replication policy?
             }
         }
     }
