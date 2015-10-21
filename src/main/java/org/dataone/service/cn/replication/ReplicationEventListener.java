@@ -162,12 +162,18 @@ public class ReplicationEventListener implements EntryListener<Identifier, Syste
 
     private ReplicationStatus getAuthoritativeMNReplicaStatus(SystemMetadata sysMeta) {
         NodeReference authNode = sysMeta.getAuthoritativeMemberNode();
+        if (authNode == null) {
+            log.debug("authoritative MN is null for pid: " + sysMeta.getIdentifier().getValue());
+            return null;
+        }
         if (sysMeta.getReplicaList() != null) {
             for (Replica replica : sysMeta.getReplicaList()) {
                 if (authNode.equals(replica.getReplicaMemberNode())) {
                     return replica.getReplicationStatus();
                 }
             }
+        } else {
+            log.debug("replica list is null for pid: " + sysMeta.getIdentifier().getValue());
         }
         return null;
     }
