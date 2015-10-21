@@ -30,10 +30,13 @@ public abstract class ReplicationCommunication {
         // default to v1, but use v2 if we find it enabled
         ReplicationCommunication impl = new org.dataone.service.cn.replication.v1.MNCommunication();
 
-        for (Service service : targetNode.getServices().getServiceList()) {
-            if (service.getName().equals("MNReplication") && service.getVersion().equals("v2")) {
-                impl = new MNCommunication();
-                break;
+        if (targetNode != null && targetNode.getServices() != null
+                && targetNode.getServices().getServiceList() != null) {
+            for (Service service : targetNode.getServices().getServiceList()) {
+                if (service.getName().equals("MNReplication") && service.getVersion().equals("v2")) {
+                    impl = new MNCommunication();
+                    break;
+                }
             }
         }
 
