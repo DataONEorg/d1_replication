@@ -268,11 +268,13 @@ public class ReplicationManager {
 
     protected List<String> getObjectVersion(SystemMetadata sysmeta) {
 
-        List versions = new LinkedList<String>();
+        List<String> versions = new LinkedList<String>();
         Node n = getNode(sysmeta.getAuthoritativeMemberNode());
-        for (Service s : n.getServices().getServiceList()) {
-            if (s.getName().equals("MNReplication")) {
-                versions.add(s.getVersion());
+        if (n != null && n.getServices() != null && n.getServices().getServiceList() != null) {
+            for (Service s : n.getServices().getServiceList()) {
+                if (s.getName().equals("MNReplication")) {
+                    versions.add(s.getVersion());
+                }
             }
         }
         return versions;
@@ -433,14 +435,20 @@ public class ReplicationManager {
                 try {
                     authoritativeNode = nodeService.getNode(sysmeta.getAuthoritativeMemberNode());
                     // calculate supported versions of replication on source
-                    List<Service> nodeServices = authoritativeNode.getServices().getServiceList();
-                    for (Service service : nodeServices) {
-                        if (service.getName().equals("MNReplication") && service.getAvailable()) {
-                            if (sourceSupportsV1Replication == false) {
-                                sourceSupportsV1Replication = ApiVersion.isV1(service.getVersion());
-                            }
-                            if (sourceSupportsV2Replication == false) {
-                                sourceSupportsV2Replication = ApiVersion.isV2(service.getVersion());
+                    if (authoritativeNode != null && authoritativeNode.getServices() != null
+                            && authoritativeNode.getServices().getServiceList() != null) {
+                        List<Service> nodeServices = authoritativeNode.getServices()
+                                .getServiceList();
+                        for (Service service : nodeServices) {
+                            if (service.getName().equals("MNReplication") && service.getAvailable()) {
+                                if (sourceSupportsV1Replication == false) {
+                                    sourceSupportsV1Replication = ApiVersion.isV1(service
+                                            .getVersion());
+                                }
+                                if (sourceSupportsV2Replication == false) {
+                                    sourceSupportsV2Replication = ApiVersion.isV2(service
+                                            .getVersion());
+                                }
                             }
                         }
                     }
