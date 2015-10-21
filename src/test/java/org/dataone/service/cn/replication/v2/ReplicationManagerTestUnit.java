@@ -195,17 +195,5 @@ public class ReplicationManagerTestUnit extends AbstractLdapTestUnit {
             e.printStackTrace();
             fail("Test ReplicationPolicy - Exception " + e);
         }
-        boolean stayAlive = true;
-
-        for (int i = 0; i < 120; i++) {
-            try {
-                Thread.sleep(500L);
-            } catch (InterruptedException ex) {
-                logger.error(null, ex);
-            }
-        }
-        // Perform a query to see if the map has pending tasks
-        // assertEquals((int) repPolicy.getNumberReplicas(),
-        // (int) replicationTasks.size());
     }
 }

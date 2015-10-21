@@ -535,11 +535,11 @@ public class ReplicationManager {
                             }
                         }
 
-                        if (targetSupportsV1 && sourceSupportsV1Replication) {
-                            targetApiVersion = ApiVersion.getV1Version();
-                        }
                         if (targetSupportsV2 && sourceSupportsV2Replication) {
                             targetApiVersion = ApiVersion.getV2Version();
+                        } else if (sourceSupportsV2Replication == false && targetSupportsV1
+                                && sourceSupportsV1Replication) {
+                            targetApiVersion = ApiVersion.getV1Version();
                         }
 
                         // source and target do not share any api versions
