@@ -128,6 +128,14 @@ d1NodeServiceVersion: v1
 d1NodeServiceAvailable: TRUE
 objectclass: d1NodeService
 
+dn: d1NodeServiceId=MNReplication-v2,cn=urn:node:testmn1,dc=dataone,dc=org
+d1NodeServiceId: MNReplication-v2
+d1NodeId: urn:node:testmn1
+d1NodeServiceName: MNReplication
+d1NodeServiceVersion: v2
+d1NodeServiceAvailable: TRUE
+objectclass: d1NodeService
+
 dn: cn=urn:node:testmn2,dc=dataone,dc=org
 cn: urn:node:testmn2
 d1NodeId: urn:node:testmn2
@@ -190,6 +198,14 @@ d1NodeServiceId: MNReplication-v1
 d1NodeId: urn:node:testmn2
 d1NodeServiceName: MNReplication
 d1NodeServiceVersion: v1
+d1NodeServiceAvailable: TRUE
+objectclass: d1NodeService
+
+dn: d1NodeServiceId=MNReplication-v2,cn=urn:node:testmn2,dc=dataone,dc=org
+d1NodeServiceId: MNReplication-v2
+d1NodeId: urn:node:testmn2
+d1NodeServiceName: MNReplication
+d1NodeServiceVersion: v2
 d1NodeServiceAvailable: TRUE
 objectclass: d1NodeService
 

@@ -6,7 +6,7 @@ public class ApiVersion implements Comparable<ApiVersion> {
     private int apiValue = 0;
 
     private static final String VERSION_ONE_STRING = "v1";
-    private static final String VERSION_TWO_STRING = "V2";
+    private static final String VERSION_TWO_STRING = "v2";
 
     public static final ApiVersion V1 = new ApiVersion(VERSION_ONE_STRING, 1);
     public static final ApiVersion V2 = new ApiVersion(VERSION_TWO_STRING, 2);

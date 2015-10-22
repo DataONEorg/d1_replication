@@ -441,6 +441,10 @@ public class ReplicationManager {
                                 .getServiceList();
                         for (Service service : nodeServices) {
                             if (service.getName().equals("MNReplication") && service.getAvailable()) {
+                                log.info("for pid: " + pid.getValue() + " source MN: "
+                                        + authoritativeNode.getIdentifier().getValue()
+                                        + " service info: " + service.getName() + " "
+                                        + service.getVersion());
                                 if (sourceSupportsV1Replication == false) {
                                     sourceSupportsV1Replication = ApiVersion.isV1(service
                                             .getVersion());
@@ -455,6 +459,25 @@ public class ReplicationManager {
                 } catch (NullPointerException npe) {
                     throw new InvalidRequest("1080", "Object " + pid.getValue()
                             + " has no authoritative Member Node in its SystemMetadata");
+                }
+
+                if (sourceSupportsV1Replication) {
+                    log.info("for pid: " + pid.getValue() + " source MN: "
+                            + authoritativeNode.getIdentifier().getValue()
+                            + " supports V1 replication.");
+                } else {
+                    log.info("for pid: " + pid.getValue() + " source MN: "
+                            + authoritativeNode.getIdentifier().getValue()
+                            + " DOES NOT support V1 replication.");
+                }
+                if (sourceSupportsV2Replication) {
+                    log.info("for pid: " + pid.getValue() + " source MN: "
+                            + authoritativeNode.getIdentifier().getValue()
+                            + " supports V2 replication.");
+                } else {
+                    log.info("for pid: " + pid.getValue() + " source MN: "
+                            + authoritativeNode.getIdentifier().getValue()
+                            + " DOES NOT support V2 replication.");
                 }
 
                 if (sourceSupportsV1Replication == true || sourceSupportsV2Replication == true) {
@@ -523,6 +546,12 @@ public class ReplicationManager {
                             for (Service service : targetNode.getServices().getServiceList()) {
                                 if (service.getName().equals("MNReplication")
                                         && service.getAvailable()) {
+
+                                    log.info("for pid: " + pid.getValue() + " target MN: "
+                                            + targetNode.getIdentifier().getValue()
+                                            + " service info: " + service.getName() + " "
+                                            + service.getVersion());
+
                                     if (ApiVersion.isV1(service.getVersion())
                                             && targetSupportsV1 == false) {
                                         targetSupportsV1 = true;
@@ -535,6 +564,26 @@ public class ReplicationManager {
                             }
                         }
 
+                        if (targetSupportsV1) {
+                            log.info("for pid: " + pid.getValue() + " target MN: "
+                                    + targetNode.getIdentifier().getValue()
+                                    + " supports V1 replication.");
+                        } else {
+                            log.info("for pid: " + pid.getValue() + " target MN: "
+                                    + targetNode.getIdentifier().getValue()
+                                    + " DOES NOT support V1 replication.");
+                        }
+
+                        if (targetSupportsV2) {
+                            log.info("for pid: " + pid.getValue() + " target MN: "
+                                    + targetNode.getIdentifier().getValue()
+                                    + " supports V2 replication.");
+                        } else {
+                            log.info("for pid: " + pid.getValue() + " target MN: "
+                                    + targetNode.getIdentifier().getValue()
+                                    + " DOES NOT support V2 replication.");
+                        }
+
                         if (targetSupportsV2 && sourceSupportsV2Replication) {
                             targetApiVersion = ApiVersion.getV2Version();
                         } else if (sourceSupportsV2Replication == false && targetSupportsV1
@@ -544,10 +593,15 @@ public class ReplicationManager {
 
                         // source and target do not share any api versions
                         if (targetApiVersion == null) {
-                            log.debug("target node: " + targetNode.getIdentifier().getValue()
+                            log.info("target node: " + targetNode.getIdentifier().getValue()
                                     + " does not share an api version with source node: "
                                     + authoritativeNode.getIdentifier().getValue());
                             continue;
+                        } else {
+                            log.info("for pid:" + pid.getValue() + " target node: "
+                                    + targetNode.getIdentifier().getValue() + " api "
+                                    + targetApiVersion.getV1Version().getApiLabel()
+                                    + " was chosen.");
                         }
 
                         // a replica doesn't exist. add it
