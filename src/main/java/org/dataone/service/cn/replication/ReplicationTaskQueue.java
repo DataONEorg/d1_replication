@@ -142,8 +142,8 @@ public class ReplicationTaskQueue {
             log.debug("ReplicationTaskQueue. Processing all tasks for node: " + mnId + ".");
             Collection<ReplicaDto> queuedReplicas = getQueuedReplicas(mnId);
             int queuedCount = queuedReplicas.size();
+            log.debug(queuedCount + " tasks for mn: " + mnId);
             if (queuedCount > 0) {
-                log.debug(queuedCount + " tasks for mn: " + mnId);
                 // LOCK THIS MEMBER NODE FOR PROCESSING
                 ILock lock = hzClient.getLock(memberNodeIdentifierValue);
                 try {

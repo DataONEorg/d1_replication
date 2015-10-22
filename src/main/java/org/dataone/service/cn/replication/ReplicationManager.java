@@ -483,7 +483,6 @@ public class ReplicationManager {
                 if (sourceSupportsV1Replication == true || sourceSupportsV2Replication == true) {
 
                     // build the potential list of target nodes
-                    // TODO: only include nodes that can handle the version of our object (v1 or v2)
                     for (NodeReference nodeReference : nodeList) {
                         Node node = nodeService.getNode(nodeReference);
                         // only add MNs as targets, excluding the authoritative MN
@@ -493,7 +492,72 @@ public class ReplicationManager {
                                 && !node.getIdentifier().getValue()
                                         .equals(authoritativeNode.getIdentifier().getValue())
                                 && isUnderReplicationAttemptsPerDay(pid, nodeReference)) {
-                            potentialNodeList.add(node.getIdentifier());
+
+                            ApiVersion targetApiVersion = null;
+                            boolean targetSupportsV1 = false;
+                            boolean targetSupportsV2 = false;
+
+                            if (node != null && node.getServices() != null
+                                    && node.getServices().getServiceList() != null) {
+                                for (Service service : node.getServices().getServiceList()) {
+                                    if (service.getName().equals("MNReplication")
+                                            && service.getAvailable()) {
+
+                                        log.info("for pid: " + pid.getValue() + " target MN: "
+                                                + node.getIdentifier().getValue()
+                                                + " service info: " + service.getName() + " "
+                                                + service.getVersion());
+
+                                        if (ApiVersion.isV1(service.getVersion())
+                                                && targetSupportsV1 == false) {
+                                            targetSupportsV1 = true;
+                                        }
+                                        if (ApiVersion.isV2(service.getVersion())
+                                                && targetSupportsV2 == false) {
+                                            targetSupportsV2 = true;
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (targetSupportsV1) {
+                                log.info("for pid: " + pid.getValue() + " target MN: "
+                                        + node.getIdentifier().getValue()
+                                        + " supports V1 replication.");
+                            } else {
+                                log.info("for pid: " + pid.getValue() + " target MN: "
+                                        + node.getIdentifier().getValue()
+                                        + " DOES NOT support V1 replication.");
+                            }
+
+                            if (targetSupportsV2) {
+                                log.info("for pid: " + pid.getValue() + " target MN: "
+                                        + node.getIdentifier().getValue()
+                                        + " supports V2 replication.");
+                            } else {
+                                log.info("for pid: " + pid.getValue() + " target MN: "
+                                        + node.getIdentifier().getValue()
+                                        + " DOES NOT support V2 replication.");
+                            }
+
+                            if (targetSupportsV2 && sourceSupportsV2Replication) {
+                                targetApiVersion = ApiVersion.getV2Version();
+                            } else if (sourceSupportsV2Replication == false && targetSupportsV1
+                                    && sourceSupportsV1Replication) {
+                                targetApiVersion = ApiVersion.getV1Version();
+                            }
+
+                            if (targetApiVersion == null) {
+                                log.info("target node: " + node.getIdentifier().getValue()
+                                        + " does not share an api version with source node: "
+                                        + authoritativeNode.getIdentifier().getValue());
+                            } else {
+                                log.info("for pid:" + pid.getValue() + " target node: "
+                                        + node.getIdentifier().getValue() + " api "
+                                        + targetApiVersion.getApiLabel() + " was chosen.");
+                                potentialNodeList.add(node.getIdentifier());
+                            }
+
                         }
                     }
 
@@ -536,72 +600,6 @@ public class ReplicationManager {
                         targetNode = this.nodeService.getNode(potentialNode);
                         log.debug("currently evaluating " + targetNode.getIdentifier().getValue()
                                 + " for task creation " + "for identifier " + pid.getValue());
-
-                        ApiVersion targetApiVersion = null;
-                        boolean targetSupportsV1 = false;
-                        boolean targetSupportsV2 = false;
-
-                        if (targetNode != null && targetNode.getServices() != null
-                                && targetNode.getServices().getServiceList() != null) {
-                            for (Service service : targetNode.getServices().getServiceList()) {
-                                if (service.getName().equals("MNReplication")
-                                        && service.getAvailable()) {
-
-                                    log.info("for pid: " + pid.getValue() + " target MN: "
-                                            + targetNode.getIdentifier().getValue()
-                                            + " service info: " + service.getName() + " "
-                                            + service.getVersion());
-
-                                    if (ApiVersion.isV1(service.getVersion())
-                                            && targetSupportsV1 == false) {
-                                        targetSupportsV1 = true;
-                                    }
-                                    if (ApiVersion.isV2(service.getVersion())
-                                            && targetSupportsV2 == false) {
-                                        targetSupportsV2 = true;
-                                    }
-                                }
-                            }
-                        }
-
-                        if (targetSupportsV1) {
-                            log.info("for pid: " + pid.getValue() + " target MN: "
-                                    + targetNode.getIdentifier().getValue()
-                                    + " supports V1 replication.");
-                        } else {
-                            log.info("for pid: " + pid.getValue() + " target MN: "
-                                    + targetNode.getIdentifier().getValue()
-                                    + " DOES NOT support V1 replication.");
-                        }
-
-                        if (targetSupportsV2) {
-                            log.info("for pid: " + pid.getValue() + " target MN: "
-                                    + targetNode.getIdentifier().getValue()
-                                    + " supports V2 replication.");
-                        } else {
-                            log.info("for pid: " + pid.getValue() + " target MN: "
-                                    + targetNode.getIdentifier().getValue()
-                                    + " DOES NOT support V2 replication.");
-                        }
-
-                        if (targetSupportsV2 && sourceSupportsV2Replication) {
-                            targetApiVersion = ApiVersion.getV2Version();
-                        } else if (sourceSupportsV2Replication == false && targetSupportsV1
-                                && sourceSupportsV1Replication) {
-                            targetApiVersion = ApiVersion.getV1Version();
-                        }
-
-                        // source and target do not share any api versions
-                        if (targetApiVersion == null) {
-                            log.info("target node: " + targetNode.getIdentifier().getValue()
-                                    + " does not share an api version with source node: "
-                                    + authoritativeNode.getIdentifier().getValue());
-                            continue;
-                        } else {
-                            log.info("for pid:" + pid.getValue() + " target node: "
-                                    + targetNode.getIdentifier().getValue() + " api "
-                                    + targetApiVersion.getApiLabel() + " was chosen.");
-                        }
 
                         // a replica doesn't exist. add it
                         boolean updated = false;
