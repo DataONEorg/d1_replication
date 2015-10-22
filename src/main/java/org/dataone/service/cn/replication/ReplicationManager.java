@@ -600,8 +600,7 @@ public class ReplicationManager {
                         } else {
                             log.info("for pid:" + pid.getValue() + " target node: "
                                     + targetNode.getIdentifier().getValue() + " api "
-                                    + targetApiVersion.getV1Version().getApiLabel()
-                                    + " was chosen.");
+                                    + targetApiVersion.getApiLabel() + " was chosen.");
                         }
 
                         // a replica doesn't exist. add it
