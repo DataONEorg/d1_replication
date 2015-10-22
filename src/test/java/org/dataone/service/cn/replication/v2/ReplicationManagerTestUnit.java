@@ -188,9 +188,10 @@ public class ReplicationManagerTestUnit extends AbstractLdapTestUnit {
         try {
             int queuedTaskCount = replicationManager.createAndQueueTasks(sysmeta.getIdentifier());
             // expect numberReplicas less the already created replica
+            // only 1 target node implements v2 so only 1 replicat will be made (source implements v2)
             assertEquals(
                     "The number of tasks created should equal the replication policy numberOfReplicas.",
-                    (int) sysmeta.getReplicationPolicy().getNumberReplicas(), queuedTaskCount);
+                    (int) sysmeta.getReplicationPolicy().getNumberReplicas() - 2, queuedTaskCount);
         } catch (Exception e) {
             e.printStackTrace();
             fail("Test ReplicationPolicy - Exception " + e);
