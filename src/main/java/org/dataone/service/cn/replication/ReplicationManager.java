@@ -349,6 +349,21 @@ public class ReplicationManager {
      * its system metadata and the capabilities of the target replication nodes.
      * Queue the tasks for processing.
      * 
+     * Current logic uses the following truth table to determine target MN for
+     * replication:
+     *  
+     * Replication source/target truth table:
+     * Source    Target    Ok to Replicate
+     *  v1        v1          yes (v1)
+     *  v1        v2          no 
+     *  v1        v1,v2       yes (v1)
+     *  v2        v1          no        
+     *  v2        v2          yes (v2)
+     *  v2        v1,v2       yes (v2)
+     *  v1,v2     v1          no
+     *  v1,v2     v2          yes (v2)
+     *  v1,v2     v1,v2       yes (v2)
+     * 
      * @param pid
      *            - the identifier of the object to be replicated
      * @return count - the number of replication tasks queued
