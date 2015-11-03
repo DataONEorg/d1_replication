@@ -26,11 +26,13 @@ public class ReplicationTaskProcessor implements Runnable {
     @Override
     public void run() {
         if (ComponentActivationUtility.replicationIsActive()) {
+            log.debug("Replication task processor executing.");
             long now = System.currentTimeMillis();
             Pageable page = new PageRequest(0, PAGE_SIZE);
             List<ReplicationTask> taskList = taskRepository
                     .findByStatusAndNextExecutionLessThanOrderByNextExecutionAsc(
                             ReplicationTask.STATUS_NEW, now, page);
+            log.debug("Replication task processor found: " + taskList.size() + " tasks to process.");
             for (ReplicationTask task : taskList) {
                 task.markInProcess();
                 taskRepository.save(task);
