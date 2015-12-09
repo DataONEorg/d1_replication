@@ -198,6 +198,7 @@
                 </exclusion>
             </exclusions>
             <type>jar</type>
+            <scope>test</scope>
         </dependency>
 		 
         <dependency>
