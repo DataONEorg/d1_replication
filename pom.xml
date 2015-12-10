@@ -13,9 +13,7 @@
         <d1_libclient_version>2.1.0-SNAPSHOT</d1_libclient_version>
         <d1_cn_noderegistry_version>2.1.0-SNAPSHOT</d1_cn_noderegistry_version>
         <d1_cn_common_version>2.1.0-SNAPSHOT</d1_cn_common_version>
-        <d1_test_resources_version>2.1.0-SNAPSHOT</d1_test_resources_version>
-        <apache.ds.version>2.0.0-M17</apache.ds.version>
-        <apacheds-jdbm.version>2.0.0-M5</apacheds-jdbm.version>      
+        <d1_test_resources_version>2.1.0-SNAPSHOT</d1_test_resources_version> 
     </properties>
     <build>
         <plugins>
@@ -180,95 +178,6 @@
             <version>${d1_test_resources_version}</version>
             <type>jar</type>
             <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.directory.server</groupId>
-            <artifactId>apacheds-all</artifactId>
-            <version>${apache.ds.version}</version>
-            <exclusions>
-                <!-- exclude additional LDIF schema files to avoid conflicts through 
-                multiple copies -->
-                <exclusion>
-                    <groupId>org.apache.directory.shared</groupId>
-                    <artifactId>shared-ldap-schema</artifactId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>api-ldap-schema-data</artifactId>
-                    <groupId>org.apache.directory.api</groupId>
-                </exclusion>
-            </exclusions>
-            <type>jar</type>
-            <scope>test</scope>
-        </dependency>
-		 
-        <dependency>
-            <groupId>org.apache.directory.server</groupId>
-            <artifactId>apacheds-server-integ</artifactId>
-            <version>${apache.ds.version}</version>
-            <exclusions>
-                <!-- exclude additional LDIF schema files to avoid conflicts through 
-                multiple copies -->
-                <exclusion>
-                    <groupId>org.apache.directory.shared</groupId>
-                    <artifactId>shared-ldap-schema</artifactId>
-                </exclusion>
-                <!-- this dependency is specifically excluded because of the broken dependency tree -->
-                <!-- org.apache.directory.server apacheds-jdbm is included below for correct functionality -->
-                <exclusion>
-                    <artifactId>apacheds-jdbm1</artifactId>
-                    <groupId>org.apache.directory.jdbm</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>api-ldap-schema-data</artifactId>
-                    <groupId>org.apache.directory.api</groupId>
-                </exclusion>
-            </exclusions>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.directory.server</groupId>
-            <artifactId>apacheds-core-integ</artifactId>
-            <version>${apache.ds.version}</version>
-            <exclusions>
-                <!-- exclude additional LDIF schema files to avoid conflicts through 
-                multiple copies -->
-                <exclusion>
-                    <groupId>org.apache.directory.shared</groupId>
-                    <artifactId>shared-ldap-schema</artifactId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>api-ldap-schema-data</artifactId>
-                    <groupId>org.apache.directory.api</groupId>
-                </exclusion>
-            </exclusions>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.directory.server</groupId>
-            <artifactId>apacheds-server-jndi</artifactId>
-            <version>${apache.ds.version}</version>
-            <exclusions>
-                <!-- exclude additional LDIF schema files to avoid conflicts through 
-                multiple copies -->
-                <exclusion>
-                    <groupId>org.apache.directory.shared</groupId>
-                    <artifactId>shared-ldap-schema</artifactId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>api-ldap-schema-data</artifactId>
-                    <groupId>org.apache.directory.api</groupId>
-                </exclusion>
-            </exclusions>
-            <scope>test</scope>
-        </dependency>
-        <!-- this dependency is now specifically included because of the broken dependency tree 
-             of apacheds-server-integ.  Do not know when/if apacheds will fix this. It has been a problem
-             for a couple of years now -->
-        <dependency>
-                <groupId>org.apache.directory.server</groupId>
-                <artifactId>apacheds-jdbm</artifactId>
-                <version>${apacheds-jdbm.version}</version>
-                <scope>test</scope>
         </dependency>
         
     </dependencies>
