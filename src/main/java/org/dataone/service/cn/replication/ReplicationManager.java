@@ -59,6 +59,7 @@ import org.dataone.service.exceptions.ServiceFailure;
 import org.dataone.service.exceptions.VersionMismatch;
 import org.dataone.service.types.v1.Identifier;
 import org.dataone.service.types.v1.NodeReference;
+import org.dataone.service.types.v1.NodeReplicationPolicy;
 import org.dataone.service.types.v1.NodeType;
 import org.dataone.service.types.v1.ObjectFormatIdentifier;
 import org.dataone.service.types.v1.Replica;
@@ -280,6 +281,12 @@ public class ReplicationManager {
         return versions;
     }
 
+    /**
+     * uses the system metadata and cn NodeList to determine the set of target
+     * nodes available as replication targets for that object.  
+     * @param sysmeta
+     * @return
+     */
     private Set<NodeReference> determinePossibleReplicationTargets(final SystemMetadata sysmeta) {
 
         Set<NodeReference> possibleReplicationTargets = new HashSet<NodeReference>();
@@ -326,18 +333,19 @@ public class ReplicationManager {
                         .contains(node.getIdentifier()))
             return false;
 
+        // if the target node doesn't have a policy, there are no more criteria to meet
         if (node.getNodeReplicationPolicy() == null)
             return true;
-
-        if (node.getNodeReplicationPolicy().getMaxObjectSize().compareTo(sysmeta.getSize()) < 0)
+        
+        NodeReplicationPolicy nrp = node.getNodeReplicationPolicy();
+        if (nrp.getMaxObjectSize() != null && nrp.getMaxObjectSize().compareTo(sysmeta.getSize()) < 0)
             return false;
 
-        List<ObjectFormatIdentifier> allowedFormats = node.getNodeReplicationPolicy()
-                .getAllowedObjectFormatList();
+        List<ObjectFormatIdentifier> allowedFormats = nrp.getAllowedObjectFormatList();
         if (allowedFormats != null && !allowedFormats.contains(sysmeta.getFormatId()))
             return false;
 
-        List<NodeReference> allowedNodes = node.getNodeReplicationPolicy().getAllowedNodeList();
+        List<NodeReference> allowedNodes = nrp.getAllowedNodeList();
         if (allowedNodes != null && !allowedNodes.contains(sysmeta.getAuthoritativeMemberNode()))
             return false;
 
@@ -428,7 +436,7 @@ public class ReplicationManager {
                         + desiredReplicasLessListed);
 
                 // reset desiredReplicasLessListed to avoid task creation
-                // in the ' 0 > any negative nuber' scenario
+                // in the ' 0 > any negative number' scenario
                 if (desiredReplicasLessListed < 0) {
                     desiredReplicasLessListed = 0;
                 }
@@ -455,7 +463,7 @@ public class ReplicationManager {
                         List<Service> nodeServices = authoritativeNode.getServices()
                                 .getServiceList();
                         for (Service service : nodeServices) {
-                            if (service.getName().equals("MNReplication") && service.getAvailable()) {
+                            if (service.getName().equals("MNRead") && service.getAvailable()) {
                                 log.info("for pid: " + pid.getValue() + " source MN: "
                                         + authoritativeNode.getIdentifier().getValue()
                                         + " service info: " + service.getName() + " "
