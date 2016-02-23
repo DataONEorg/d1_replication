@@ -104,6 +104,14 @@ d1NodeServiceVersion: v1
 d1NodeServiceAvailable: TRUE
 objectclass: d1NodeService
 
+dn: d1NodeServiceId=MNRead-v2,cn=urn:node:testmn1,dc=dataone,dc=org
+d1NodeServiceId: MNRead-v2
+d1NodeId: urn:node:testmn1
+d1NodeServiceName: MNRead
+d1NodeServiceVersion: v2
+d1NodeServiceAvailable: TRUE
+objectclass: d1NodeService
+
 dn: d1NodeServiceId=MNAuthorization-v1,cn=urn:node:testmn1,dc=dataone,dc=org
 d1NodeServiceId: MNAuthorization-v1
 d1NodeId: urn:node:testmn1
