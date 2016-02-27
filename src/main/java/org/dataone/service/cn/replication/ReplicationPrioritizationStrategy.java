@@ -105,11 +105,8 @@ public class ReplicationPrioritizationStrategy {
      */
     public Map<NodeReference, Float> getPendingRequestFactors(List<NodeReference> nodeIdentifiers,
             boolean useCache) {
-
         // TODO: implement the useCache parameter, ignored for now
 
-        // A map to store the raw pending replica counts
-        Map<NodeReference, Integer> pendingRequests = new HashMap<NodeReference, Integer>();
         // A map to store the current request factors per node
         Map<NodeReference, Float> requestFactors = new HashMap<NodeReference, Float>();
 
@@ -133,11 +130,16 @@ public class ReplicationPrioritizationStrategy {
 
         // query the systemmetadatastatus table to get counts of queued and
         // requested replicas by node identifier
+        
+        Map<NodeReference, Integer> pendingRequests;
         try {
             pendingRequests = DaoFactory.getReplicationDao().getPendingReplicasByNode();
         } catch (DataAccessException dataAccessEx) {
+            pendingRequests = new HashMap<>();
             log.error("Unable to retrieve pending replicas by node: " + dataAccessEx.getMessage());
         }
+        
+        
         Iterator<NodeReference> nodeIterator = nodeIdentifiers.iterator();
 
         // determine results for each MN in the list
@@ -299,7 +301,7 @@ public class ReplicationPrioritizationStrategy {
         Iterator<NodeReference> nodeIterator = nodeIdentifiers.iterator();
 
         while (nodeIterator.hasNext()) {
-            bandwidthFactors.put((NodeReference) nodeIterator.next(), new Float(1.0f));
+            bandwidthFactors.put(nodeIterator.next(), new Float(1.0f));
         }
 
         return bandwidthFactors;
@@ -315,7 +317,7 @@ public class ReplicationPrioritizationStrategy {
      * 
      * @return nodesByPriority a list of nodes by descending priority
      */
-    @SuppressWarnings("unchecked")
+ //   @SuppressWarnings("unchecked")
     public List<NodeReference> prioritizeNodes(List<NodeReference> potentialNodeList,
             SystemMetadata sysmeta) {
         List<NodeReference> nodesByPriority = new ArrayList<NodeReference>();
@@ -356,7 +358,7 @@ public class ReplicationPrioritizationStrategy {
         // iterate through the potential node list and calculate performance
         // scores
         while (nodeIterator.hasNext()) {
-            NodeReference nodeId = (NodeReference) nodeIterator.next();
+            NodeReference nodeId = nodeIterator.next();
             Float preferenceFactor = 1.0f; // default preference for all nodes
 
             // increase preference for preferred nodes
@@ -365,7 +367,7 @@ public class ReplicationPrioritizationStrategy {
 
             }
 
-            // decrease preference for preferred nodes
+            // decrease preference for blocked nodes
             if (blockedList != null && blockedList.contains(nodeId)) {
                 preferenceFactor = 0.0f;
 
@@ -549,15 +551,15 @@ public class ReplicationPrioritizationStrategy {
      * @author cjones
      * 
      */
-    private class ValueComparator implements Comparator {
-        Map incomingMap;
+    private class ValueComparator implements Comparator<Object> {
+        Map<NodeReference, Float> incomingMap;
 
         /**
          * Constructor - creates the map value comparator instnace
          * 
          * @param incomingMap
          */
-        public ValueComparator(Map incomingMap) {
+        public ValueComparator(Map<NodeReference, Float> incomingMap) {
             this.incomingMap = incomingMap;
 
         }
@@ -568,10 +570,10 @@ public class ReplicationPrioritizationStrategy {
          * @return integer showing a is less than, equal to, or greater than b
          */
         public int compare(Object a, Object b) {
-            if ((Float) incomingMap.get(a) < (Float) incomingMap.get(b)) {
+            if (incomingMap.get(a) < incomingMap.get(b)) {
                 return 1;
 
-            } else if ((Float) incomingMap.get(a) == (Float) incomingMap.get(b)) {
+            } else if (incomingMap.get(a) == incomingMap.get(b)) {
                 return 0;
 
             } else {

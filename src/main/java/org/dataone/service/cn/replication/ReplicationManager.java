@@ -299,40 +299,6 @@ public class ReplicationManager {
         return versions;
     }
 
-    /**
-     * uses the system metadata and cn NodeList to determine the set of target
-     * nodes available as replication targets for that object.  
-     * @param sysmeta
-     * @return
-     */
-//    private Set<NodeReference> determinePossibleReplicationTargets(final SystemMetadata sysmeta) {
-//
-//        Set<NodeReference> possibleReplicationTargets = new HashSet<NodeReference>();
-//
-//        if (sysmeta.getReplicationPolicy() != null) {
-//            try {
-//                if (sysmeta.getReplicationPolicy().getReplicationAllowed()) {
-//                    for (Node node : nodeService.listNodes().getNodeList()) {
-//                        if (passesReplicationPolicies(node, sysmeta)) {
-//                            NodeReference nodeRef = new NodeReference();
-//                            nodeRef.setValue(node.getIdentifier().getValue());
-//                            possibleReplicationTargets.add(nodeRef);
-//                        }
-//                    }
-//
-//                }
-//            } catch (NotImplemented ni) {
-//                log.error("Unable to get node list from node registry service", ni);
-//                ni.printStackTrace();
-//            } catch (ServiceFailure sf) {
-//                log.error("Unable to get node list from node registry service", sf);
-//                sf.printStackTrace();
-//            }
-//
-//        }
-//        return possibleReplicationTargets;
-//    }
-
 
     /**
      * Create replication tasks given the identifier of an object by evaluating
@@ -543,7 +509,7 @@ public class ReplicationManager {
                     + " has no authoritative Member Node in its SystemMetadata");
         }
 
-        log.info(String.format("for pid: %s, source MN: %s supports %s replication.",
+        log.info(String.format("for pid: %s, source MN: %s requires %s replication.",
                 pid.getValue(),
                 authoritativeNode.getIdentifier().getValue(),
                 sourceReplicationSupport.getApiLabel()
@@ -608,7 +574,7 @@ public class ReplicationManager {
                         log.info(String.format("for pid: %s, target MN: %s supports %s MNReplication.",
                                 pid.getValue(),
                                 node.getIdentifier().getValue(),
-                                sourceReplicationSupport.getApiValue()));
+                                sourceReplicationSupport.getApiLabel()));
 
                    } else {
                         if (log.isDebugEnabled()) {
