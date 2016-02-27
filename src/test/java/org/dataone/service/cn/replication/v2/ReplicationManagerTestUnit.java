@@ -155,9 +155,10 @@ public class ReplicationManagerTestUnit extends AbstractLdapTestUnit {
      * test, This single test is all we can run in this class at this time
      * 
      * Test creating and queueing tasks on a SystemMetadata change
+     * @throws InterruptedException 
      */
     @Test
-    public void testCreateAndQueueTasks() {
+    public void testCreateAndQueueTasks() throws InterruptedException {
         assertEquals(3, hzMember.getCluster().getMembers().size());
         // get the name of the Hazelcast SystemMetadata IMap
         String systemMetadataMapName = Settings.getConfiguration().getString(
@@ -184,6 +185,7 @@ public class ReplicationManagerTestUnit extends AbstractLdapTestUnit {
         replicationManager.setCnReplication(cnReplication);
         sysMetaMap = hzMember.getMap(systemMetadataMapName);
         sysMetaMap.putAsync(sysmeta.getIdentifier(), sysmeta);
+        Thread.sleep(1500);
 
         try {
             int queuedTaskCount = replicationManager.createAndQueueTasks(sysmeta.getIdentifier());
@@ -191,7 +193,7 @@ public class ReplicationManagerTestUnit extends AbstractLdapTestUnit {
             // only 1 target node implements v2 so only 1 replica will be made (source implements v2)
             assertEquals(
                     "The number of tasks created should equal the replication policy numberOfReplicas.",
-                    (int) sysmeta.getReplicationPolicy().getNumberReplicas() - 2, queuedTaskCount);
+                    (int) sysmeta.getReplicationPolicy().getNumberReplicas() - 1, queuedTaskCount);
         } catch (Exception e) {
             e.printStackTrace();
             fail("Test ReplicationPolicy - Exception " + e);

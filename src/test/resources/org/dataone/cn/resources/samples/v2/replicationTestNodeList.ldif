@@ -1,3 +1,14 @@
+##
+#  v2 CN
+#  1. v1,2 tier4
+#  2. v1,2 tier4
+#  3. v1   tier4
+#  4. v1   tier4
+#  5. v2   tier4
+#  6. v1,2 tier1
+#  7. v1   tier1
+
+####### testcn ########## 
 dn: cn=urn:node:testcn,dc=dataone,dc=org
 cn: urn:node:testcn
 d1NodeId: urn:node:testcn
@@ -62,7 +73,55 @@ d1NodeServiceVersion: v1
 d1NodeServiceAvailable: TRUE
 objectclass: d1NodeService
 
+dn: d1NodeServiceId=CNCore-v2,cn=urn:node:testcn,dc=dataone,dc=org
+d1NodeServiceId: CNCore-v2
+d1NodeId: urn:node:testcn
+d1NodeServiceName: CNCore
+d1NodeServiceVersion: v2
+d1NodeServiceAvailable: TRUE
+objectclass: d1NodeService
 
+dn: d1NodeServiceId=CNRead-v2,cn=urn:node:testcn,dc=dataone,dc=org
+d1NodeServiceId: CNRead-v2
+d1NodeId: urn:node:testcn
+d1NodeServiceName: CNRead
+d1NodeServiceVersion: v2
+d1NodeServiceAvailable: TRUE
+objectclass: d1NodeService
+
+dn: d1NodeServiceId=CNAuthorization-v2,cn=urn:node:testcn,dc=dataone,dc=org
+d1NodeServiceId: CNAuthorization-v2
+d1NodeId: urn:node:testcn
+d1NodeServiceName: CNAuthorization
+d1NodeServiceVersion: v2
+d1NodeServiceAvailable: TRUE
+objectclass: d1NodeService
+
+dn: d1NodeServiceId=CNIdentity-v2,cn=urn:node:testcn,dc=dataone,dc=org
+d1NodeServiceId: CNIdentity-v2
+d1NodeId: urn:node:testcn
+d1NodeServiceName: CNIdentity
+d1NodeServiceVersion: v2
+d1NodeServiceAvailable: TRUE
+objectclass: d1NodeService
+
+dn: d1NodeServiceId=CNReplication-v2,cn=urn:node:testcn,dc=dataone,dc=org
+d1NodeServiceId: CNReplication-v2
+d1NodeId: urn:node:testcn
+d1NodeServiceName: CNReplication
+d1NodeServiceVersion: v2
+d1NodeServiceAvailable: TRUE
+objectclass: d1NodeService
+
+dn: d1NodeServiceId=CNRegister-v2,cn=urn:node:testcn,dc=dataone,dc=org
+d1NodeServiceId: CNRegister-v2
+d1NodeId: urn:node:testcn
+d1NodeServiceName: CNRegister
+d1NodeServiceVersion: v2
+d1NodeServiceAvailable: TRUE
+objectclass: d1NodeService
+
+####### testmn1 (v2, tier4) ###########
 dn: cn=urn:node:testmn1,dc=dataone,dc=org
 cn: urn:node:testmn1
 d1NodeId: urn:node:testmn1
@@ -70,6 +129,10 @@ d1NodeName: mn-mock-1
 d1NodeDescription: Test Mock Generic Member Node
 d1NodeBaseURL: https://mn-mock-1.nowhere.dataone.org/mn
 d1NodeReplicate: TRUE
+d1ReplicationPolicyMaxObjectSize: 10000
+d1ReplicationPolicySpaceAllocated: 1234567890
+# d1ReplicationPolicyAllowedNode: urn:node:testmn2
+# d1ReplicationPolicyAllowedObjectFormat: text/xml
 d1NodeSynchronize: TRUE
 d1NodeState: up
 d1NodeType: mn
@@ -144,6 +207,7 @@ d1NodeServiceVersion: v2
 d1NodeServiceAvailable: TRUE
 objectclass: d1NodeService
 
+####### testmn2 (v2, tier4) ###########
 dn: cn=urn:node:testmn2,dc=dataone,dc=org
 cn: urn:node:testmn2
 d1NodeId: urn:node:testmn2
@@ -185,6 +249,14 @@ d1NodeServiceVersion: v1
 d1NodeServiceAvailable: TRUE
 objectclass: d1NodeService
 
+dn: d1NodeServiceId=MNRead-v2,cn=urn:node:testmn2,dc=dataone,dc=org
+d1NodeServiceId: MNRead-v2
+d1NodeId: urn:node:testmn2
+d1NodeServiceName: MNRead
+d1NodeServiceVersion: v2
+d1NodeServiceAvailable: TRUE
+objectclass: d1NodeService
+
 dn: d1NodeServiceId=MNAuthorization-v1,cn=urn:node:testmn2,dc=dataone,dc=org
 d1NodeServiceId: MNAuthorization-v1
 d1NodeId: urn:node:testmn2
@@ -217,6 +289,7 @@ d1NodeServiceVersion: v2
 d1NodeServiceAvailable: TRUE
 objectclass: d1NodeService
 
+####### testmn3 (v1 Tier4) ###########
 dn: cn=urn:node:testmn3,dc=dataone,dc=org
 cn: urn:node:testmn3
 d1NodeId: urn:node:testmn3
@@ -282,6 +355,7 @@ d1NodeServiceVersion: v1
 d1NodeServiceAvailable: TRUE
 objectclass: d1NodeService
 
+####### testmn4 (v1 tier4) ###########
 dn: cn=urn:node:testmn4,dc=dataone,dc=org
 cn: urn:node:testmn4
 d1NodeId: urn:node:testmn4
@@ -345,4 +419,235 @@ d1NodeId: urn:node:testmn4
 d1NodeServiceName: MNReplication
 d1NodeServiceVersion: v1
 d1NodeServiceAvailable: TRUE
+objectclass: d1NodeService
+
+
+####### testmn5 (v2 only Tier4) ###########
+dn: cn=urn:node:testmn5,dc=dataone,dc=org
+cn: urn:node:testmn5
+d1NodeId: urn:node:testmn5
+d1NodeName: mn-mock
+d1NodeDescription: Test Mock Generic Member Node
+d1NodeBaseURL: https://mn-mock-5.nowhere.dataone.org/mn
+d1NodeReplicate: TRUE
+d1NodeSynchronize: TRUE
+d1NodeState: up
+d1NodeType: mn
+d1NodeApproved: TRUE
+subject: cn=urn:node:testmn5,dc=dataone,dc=org
+d1NodeContactSubject: cn=Robert P Waltz A904,o=Google,c=US,dc=cilogon,dc=org
+d1NodeLastHarvested: 1900-01-01T00:00:00Z
+d1NodeLastCompleteHarvest: 1900-01-01T00:00:00Z
+d1NodeSynSchdSec: 0
+d1NodeSynSchdMin: 0,5,10,15,20,25,30,35,40,45,50,55
+d1NodeSynSchdHour: *
+d1NodeSynSchdMday: *
+d1NodeSynSchdMon: *
+d1NodeSynSchdWday: ?
+d1NodeSynSchdYear: *
+objectclass: device
+objectclass: d1Node
+
+dn: d1NodeServiceId=MNCore-v2,cn=urn:node:testmn5,dc=dataone,dc=org
+d1NodeServiceId: MNCore-v2
+d1NodeId: urn:node:testmn5
+d1NodeServiceName: MNCore
+d1NodeServiceVersion: v2
+d1NodeServiceAvailable: TRUE
+objectclass: d1NodeService
+
+dn: d1NodeServiceId=MNRead-v2,cn=urn:node:testmn5,dc=dataone,dc=org
+d1NodeServiceId: MNRead-v2
+d1NodeId: urn:node:testmn5
+d1NodeServiceName: MNRead
+d1NodeServiceVersion: v2
+d1NodeServiceAvailable: TRUE
+objectclass: d1NodeService
+
+dn: d1NodeServiceId=MNAuthorization-v2,cn=urn:node:testmn5,dc=dataone,dc=org
+d1NodeServiceId: MNAuthorization-v2
+d1NodeId: urn:node:testmn5
+d1NodeServiceName: MNAuthorization
+d1NodeServiceVersion: v2
+d1NodeServiceAvailable: TRUE
+objectclass: d1NodeService
+
+dn: d1NodeServiceId=MNStorage-v2,cn=urn:node:testmn5,dc=dataone,dc=org
+d1NodeServiceId: MNStorage-v2
+d1NodeId: urn:node:testmn5
+d1NodeServiceName: MNStorage
+d1NodeServiceVersion: v2
+d1NodeServiceAvailable: TRUE
+objectclass: d1NodeService
+
+dn: d1NodeServiceId=MNReplication-v2,cn=urn:node:testmn5,dc=dataone,dc=org
+d1NodeServiceId: MNReplication-v2
+d1NodeId: urn:node:testmn5
+d1NodeServiceName: MNReplication
+d1NodeServiceVersion: v2
+d1NodeServiceAvailable: TRUE
+objectclass: d1NodeService
+
+####### testmn6 (v1,v2 tier1) ###########
+dn: cn=urn:node:testmn6,dc=dataone,dc=org
+cn: urn:node:testmn6
+d1NodeId: urn:node:testmn6
+d1NodeName: mn-mock-6
+d1NodeDescription: Test Mock Generic Member Node
+d1NodeBaseURL: https://mn-mock-6.nowhere.dataone.org/mn
+d1NodeReplicate: FALSE
+d1NodeSynchronize: TRUE
+d1NodeState: up
+d1NodeType: mn
+d1NodeApproved: TRUE
+subject: cn=urn:node:testmn6,dc=dataone,dc=org
+d1NodeContactSubject: cn=Robert P Waltz A904,o=Google,c=US,dc=cilogon,dc=org
+d1NodeLastHarvested: 1900-01-01T00:00:00Z
+d1NodeLastCompleteHarvest: 1900-01-01T00:00:00Z
+d1NodeSynSchdSec: 0
+d1NodeSynSchdMin: 0,5,10,15,20,25,30,35,40,45,50,55
+d1NodeSynSchdHour: *
+d1NodeSynSchdMday: *
+d1NodeSynSchdMon: *
+d1NodeSynSchdWday: ?
+d1NodeSynSchdYear: *
+objectclass: device
+objectclass: d1Node
+
+dn: d1NodeServiceId=MNCore-v1,cn=urn:node:testmn6,dc=dataone,dc=org
+d1NodeServiceId: MNCore-v1
+d1NodeId: urn:node:testmn6
+d1NodeServiceName: MNCore
+d1NodeServiceVersion: v1
+d1NodeServiceAvailable: TRUE
+objectclass: d1NodeService
+
+dn: d1NodeServiceId=MNRead-v1,cn=urn:node:testmn6,dc=dataone,dc=org
+d1NodeServiceId: MNRead-v1
+d1NodeId: urn:node:testmn6
+d1NodeServiceName: MNRead
+d1NodeServiceVersion: v1
+d1NodeServiceAvailable: TRUE
+objectclass: d1NodeService
+
+dn: d1NodeServiceId=MNRead-v2,cn=urn:node:testmn6,dc=dataone,dc=org
+d1NodeServiceId: MNRead-v2
+d1NodeId: urn:node:testmn6
+d1NodeServiceName: MNRead
+d1NodeServiceVersion: v2
+d1NodeServiceAvailable: TRUE
+objectclass: d1NodeService
+
+dn: d1NodeServiceId=MNAuthorization-v1,cn=urn:node:testmn6,dc=dataone,dc=org
+d1NodeServiceId: MNAuthorization-v1
+d1NodeId: urn:node:testmn6
+d1NodeServiceName: MNAuthorization
+d1NodeServiceVersion: v1
+d1NodeServiceAvailable: FALSE
+objectclass: d1NodeService
+
+dn: d1NodeServiceId=MNStorage-v1,cn=urn:node:testmn6,dc=dataone,dc=org
+d1NodeServiceId: MNStorage-v1
+d1NodeId: urn:node:testmn6
+d1NodeServiceName: MNStorage
+d1NodeServiceVersion: v1
+d1NodeServiceAvailable: FALSE
+objectclass: d1NodeService
+
+dn: d1NodeServiceId=MNReplication-v1,cn=urn:node:testmn6,dc=dataone,dc=org
+d1NodeServiceId: MNReplication-v1
+d1NodeId: urn:node:testmn6
+d1NodeServiceName: MNReplication
+d1NodeServiceVersion: v1
+d1NodeServiceAvailable: FALSE
+objectclass: d1NodeService
+
+dn: d1NodeServiceId=MNAuthorization-v2,cn=urn:node:testmn6,dc=dataone,dc=org
+d1NodeServiceId: MNAuthorization-v2
+d1NodeId: urn:node:testmn6
+d1NodeServiceName: MNAuthorization
+d1NodeServiceVersion: v2
+d1NodeServiceAvailable: FALSE
+objectclass: d1NodeService
+
+dn: d1NodeServiceId=MNStorage-v2,cn=urn:node:testmn6,dc=dataone,dc=org
+d1NodeServiceId: MNStorage-v2
+d1NodeId: urn:node:testmn6
+d1NodeServiceName: MNStorage
+d1NodeServiceVersion: v2
+d1NodeServiceAvailable: FALSE
+objectclass: d1NodeService
+
+dn: d1NodeServiceId=MNReplication-v2,cn=urn:node:testmn6,dc=dataone,dc=org
+d1NodeServiceId: MNReplication-v2
+d1NodeId: urn:node:testmn6
+d1NodeServiceName: MNReplication
+d1NodeServiceVersion: v2
+d1NodeServiceAvailable: FALSE
+objectclass: d1NodeService
+
+####### testmn7 (v1 Tier 1) ###########
+dn: cn=urn:node:testmn7,dc=dataone,dc=org
+cn: urn:node:testmn7
+d1NodeId: urn:node:testmn7
+d1NodeName: mn-mock
+d1NodeDescription: Test Mock Generic Member Node
+d1NodeBaseURL: https://mn-mock-7.nowhere.dataone.org/mn
+d1NodeReplicate: FALSE
+d1NodeSynchronize: TRUE
+d1NodeState: up
+d1NodeType: mn
+d1NodeApproved: TRUE
+subject: cn=urn:node:testmn7,dc=dataone,dc=org
+d1NodeContactSubject: cn=Robert P Waltz A904,o=Google,c=US,dc=cilogon,dc=org
+d1NodeLastHarvested: 1900-01-01T00:00:00Z
+d1NodeLastCompleteHarvest: 1900-01-01T00:00:00Z
+d1NodeSynSchdSec: 0
+d1NodeSynSchdMin: 0,5,10,15,20,25,30,35,40,45,50,55
+d1NodeSynSchdHour: *
+d1NodeSynSchdMday: *
+d1NodeSynSchdMon: *
+d1NodeSynSchdWday: ?
+d1NodeSynSchdYear: *
+objectclass: device
+objectclass: d1Node
+
+dn: d1NodeServiceId=MNCore-v1,cn=urn:node:testmn7,dc=dataone,dc=org
+d1NodeServiceId: MNCore-v1
+d1NodeId: urn:node:testmn7
+d1NodeServiceName: MNCore
+d1NodeServiceVersion: v1
+d1NodeServiceAvailable: TRUE
+objectclass: d1NodeService
+
+dn: d1NodeServiceId=MNRead-v1,cn=urn:node:testmn7,dc=dataone,dc=org
+d1NodeServiceId: MNRead-v1
+d1NodeId: urn:node:testmn7
+d1NodeServiceName: MNRead
+d1NodeServiceVersion: v1
+d1NodeServiceAvailable: TRUE
+objectclass: d1NodeService
+
+dn: d1NodeServiceId=MNAuthorization-v1,cn=urn:node:testmn7,dc=dataone,dc=org
+d1NodeServiceId: MNAuthorization-v1
+d1NodeId: urn:node:testmn7
+d1NodeServiceName: MNAuthorization
+d1NodeServiceVersion: v1
+d1NodeServiceAvailable: FALSE
+objectclass: d1NodeService
+
+dn: d1NodeServiceId=MNStorage-v1,cn=urn:node:testmn7,dc=dataone,dc=org
+d1NodeServiceId: MNStorage-v1
+d1NodeId: urn:node:testmn7
+d1NodeServiceName: MNStorage
+d1NodeServiceVersion: v1
+d1NodeServiceAvailable: FALSE
+objectclass: d1NodeService
+
+dn: d1NodeServiceId=MNReplication-v1,cn=urn:node:testmn7,dc=dataone,dc=org
+d1NodeServiceId: MNReplication-v1
+d1NodeId: urn:node:testmn7
+d1NodeServiceName: MNReplication
+d1NodeServiceVersion: v1
+d1NodeServiceAvailable: FALSE
 objectclass: d1NodeService
