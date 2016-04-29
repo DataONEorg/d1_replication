@@ -28,7 +28,7 @@ import org.junit.runners.Suite;
 @Suite.SuiteClasses({  ReplicationManagerTestUnit.class })//, CNReplicationImpl.class })
 @CreateDS(allowAnonAccess = false, enableAccessControl=true,  authenticators ={@CreateAuthenticator(type = SimpleAuthenticator.class)} ,name = "org", partitions = { @CreatePartition(name = "org", suffix = "dc=org") })
 @ApplyLdifFiles({"org/dataone/test/apache/directory/server/dataone-schema.ldif", "org/dataone/test/apache/directory/server/dataone-base-data.ldif", "org/dataone/cn/resources/samples/v2/replicationTestNodeList.ldif"})
-@CreateLdapServer(transports = { @CreateTransport(protocol = "LDAP", port=11389) })
+@CreateLdapServer(transports = { @CreateTransport(address = "localhost", protocol = "LDAP", port=9389) })
 public class ReplicationManagerSuiteTest {
 
 
