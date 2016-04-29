@@ -25,10 +25,8 @@ import static org.junit.Assert.fail;
 import java.io.InputStream;
 import java.util.Set;
 
-import javax.naming.ldap.LdapContext;
 
 import org.apache.directory.server.core.integ.AbstractLdapTestUnit;
-import org.apache.directory.server.integ.ServerIntegrationUtils;
 import org.apache.log4j.Logger;
 import org.dataone.cn.dao.MetacatDataSourceFactory;
 import org.dataone.cn.dao.ReplicationDaoMetacatImplTestUtil;
@@ -96,9 +94,6 @@ public class ReplicationManagerTestUnit extends AbstractLdapTestUnit {
         if (!ApacheDSSuiteRunner.getLdapServer().isStarted()) {
             throw new IllegalStateException("Service is not running");
         }
-        final LdapContext ctx = ServerIntegrationUtils.getWiredContext(
-                ApacheDSSuiteRunner.getLdapServer(), null);
-        ctx.lookup("dc=dataone,dc=org");
     }
 
     @Before
@@ -185,8 +180,8 @@ public class ReplicationManagerTestUnit extends AbstractLdapTestUnit {
         replicationManager.setCnReplication(cnReplication);
         sysMetaMap = hzMember.getMap(systemMetadataMapName);
         sysMetaMap.putAsync(sysmeta.getIdentifier(), sysmeta);
-        Thread.sleep(1500);
-
+        Thread.sleep(2000);
+        logger.info("testCreateAndQueueTask replicationManager.createAndQueueTask");
         try {
             int queuedTaskCount = replicationManager.createAndQueueTasks(sysmeta.getIdentifier());
             // expect numberReplicas less the already created replica

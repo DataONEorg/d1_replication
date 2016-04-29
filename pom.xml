@@ -172,7 +172,7 @@
             <type>jar</type>
             <scope>compile</scope>
         </dependency>
-                <dependency>
+        <dependency>
             <groupId>org.dataone</groupId>
             <artifactId>d1_test_resources</artifactId>
             <version>${d1_test_resources.version}</version>

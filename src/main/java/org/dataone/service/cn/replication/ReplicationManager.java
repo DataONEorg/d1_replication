@@ -49,7 +49,6 @@ import org.dataone.cn.data.repository.ReplicationTask;
 import org.dataone.cn.data.repository.ReplicationTaskRepository;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.configuration.Settings;
-import org.dataone.service.cn.impl.v2.NodeRegistryService;
 import org.dataone.service.cn.v2.CNReplication;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.InvalidRequest;
@@ -72,6 +71,8 @@ import org.dataone.service.types.v2.SystemMetadata;
 import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.core.ILock;
 import com.hazelcast.core.IMap;
+import org.dataone.service.cn.v2.NodeRegistryService;
+import org.dataone.service.cn.v2.impl.NodeRegistryServiceImpl;
 
 /**
  * A DataONE Coordinating Node implementation which manages replication queues
@@ -95,7 +96,7 @@ public class ReplicationManager {
 
     private HazelcastClient hzProcessingClient;
 
-    private NodeRegistryService nodeService = new NodeRegistryService();
+    private NodeRegistryService nodeService = new NodeRegistryServiceImpl();
 
     /* The Hazelcast distributed system metadata map */
     private IMap<Identifier, SystemMetadata> systemMetadataMap;
@@ -243,7 +244,7 @@ public class ReplicationManager {
     public Node getNode(NodeReference nodeRef) {
         Node node = null;
         try {
-            node = this.nodeService.getNode(nodeRef);
+            node = this.nodeService.getNodeCapabilities(nodeRef);
         } catch (ServiceFailure e) {
             log.error(
                     "Unable to locate node from node service for node ref: " + nodeRef.getValue(),
@@ -391,7 +392,7 @@ public class ReplicationManager {
     private int processPid(Identifier pid) throws InvalidRequest, ServiceFailure, NotFound {
 
         SystemMetadata sysmeta = this.systemMetadataMap.get(pid);
-
+        if (sysmeta == null) throw new NotFound("-100", "Could not retreive sysmeta from map for pid " + pid.getValue());
         // if replication isn't allowed, clean-up and return
         boolean allowed = isAllowed(sysmeta);
         if (!allowed) {
@@ -427,7 +428,7 @@ public class ReplicationManager {
         // List of Nodes for building MNReplicationTasks
         log.debug("Building a potential target node list for identifier " + pid.getValue());
 
-        Node authoritativeNode = nodeService.getNode(sysmeta.getAuthoritativeMemberNode());
+        Node authoritativeNode = nodeService.getNodeCapabilities(sysmeta.getAuthoritativeMemberNode());
         ApiVersion sourceReplicationSupport = getSupportedReplicationVersion(pid, authoritativeNode);
 
 
@@ -563,7 +564,7 @@ public class ReplicationManager {
         for (NodeReference nodeReference : nodeList) {
 
             Identifier pid = smd.getIdentifier();
-            Node node = nodeService.getNode(nodeReference);
+            Node node = nodeService.getNodeCapabilities(nodeReference);
             if (!nodeReference.equals(smd.getAuthoritativeMemberNode())) {
                 if (isUnderReplicationAttemptsPerDay(pid, nodeReference)) {
                    if (targetNodeSupportsReplication(node, sourceReplicationSupport)
@@ -649,7 +650,7 @@ public class ReplicationManager {
                     + " in the potential node list.");
             NodeReference potentialNode = prioritizedNodes.get(j);
 
-            targetNode = this.nodeService.getNode(potentialNode);
+            targetNode = this.nodeService.getNodeCapabilities(potentialNode);
             log.debug("currently evaluating " + targetNode.getIdentifier().getValue()
                     + " for task creation for identifier " + pid.getValue());
 
@@ -853,7 +854,7 @@ public class ReplicationManager {
                 ReplicationStatus listedStatus = listedReplica.getReplicationStatus();
 
                 try {
-                    Node node = this.nodeService.getNode(nodeId);
+                    Node node = this.nodeService.getNodeCapabilities(nodeId);
                     if (node != null) {
                         log.debug("The potential replica node is: " + node.getIdentifier().getValue());
                         if (node.getType() == NodeType.CN) 
