@@ -21,7 +21,7 @@
 ====
 
 DataONE Replication Component
----------------------------
+-----------------------------
 
 d1_replication is a small set of java classes that manage Member Node to 
 Member Node replication of data and metadata objects by monitoring changes
@@ -33,6 +33,31 @@ SystemMetadata for the given object, along with the Node capabilities for
 potential replica Member Nodes, and builds replication tasks that are executed
 on a Coordinating Node.  These replication tasks initiate replication by
 calling MNReplication.replicate() on the target Member Node.
+
+Object Responsibilities
+~~~~~~~~~~~~~~~~~~~~~~~
+ReplicationEventListener
+ - listens on the systemMetadataMap for changes to SystemMetadata.
+ - creates ReplicationTasks in the ReplicationTaskRepository.
+ - it's instantiation also triggers the ReplicationManager's instantiation. 
+
+ReplicationManager 
+ - upon instantiation initializes scheduled task execution of:
+   - QueuedReplicationAuditor
+   - StaleReplicationRequestAuditor
+   - ReplicationTaskProcessor
+ - it contains the logic for evaluating a pid and determining which replicate requests to issue.
+   
+ReplicationTaskProcessor
+ - grabs a page of replicationTasks from the repo, and calls ReplicationManager.createAndQueueTasks
+ 
+StaleReplicationRequestAuditor
+ - grabs a page of replicationTasks older than the cutoff and in REQUESTED state
+ - resolves them by checking for presence of the replica on the MN.  either COMPLETE, or FAIL
+ 
+QueuedReplicationAuditor
+ - by MemberNode 
+
 
 Installation
 ------------

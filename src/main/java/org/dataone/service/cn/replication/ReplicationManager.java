@@ -118,6 +118,8 @@ public class ReplicationManager {
     private static ScheduledExecutorService staleRequestedReplicaAuditScheduler;
     private static ScheduledExecutorService staleQueuedReplicaAuditScheduler;
     private static ScheduledExecutorService replicationTaskProcessingScheduler;
+    private static ScheduledExecutorService replicationTaskMonitoringScheduler;
+    private static ScheduledExecutorService replicationStatusMonitoringScheduler;
 
     private ReplicationAttemptHistoryRepository replicationAttemptHistoryRepository;
     private ReplicationTaskRepository taskRepository;
@@ -171,6 +173,8 @@ public class ReplicationManager {
         startStaleQueuedAuditing();
 
         startReplicationTaskProcessing();
+        
+        startReplicationMonitoring();
 
         // Report node status statistics on a scheduled basis
         // TODO: hold off on scheduling code for now
@@ -1013,6 +1017,15 @@ public class ReplicationManager {
             replicationTaskProcessingScheduler = Executors.newSingleThreadScheduledExecutor();
             replicationTaskProcessingScheduler.scheduleAtFixedRate(new ReplicationTaskProcessor(),
                     0L, 2L, TimeUnit.MINUTES);
+        }
+    }
+    
+    private void startReplicationMonitoring() {
+        if (replicationTaskMonitoringScheduler == null
+                || replicationTaskMonitoringScheduler.isShutdown()) {
+            replicationTaskMonitoringScheduler = Executors.newSingleThreadScheduledExecutor();
+            replicationTaskMonitoringScheduler.scheduleAtFixedRate(new ReplicationTaskMonitor(),
+                    0L, 3L, TimeUnit.MINUTES);
         }
     }
 

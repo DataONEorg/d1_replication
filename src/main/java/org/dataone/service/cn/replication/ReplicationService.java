@@ -21,7 +21,6 @@
 
 package org.dataone.service.cn.replication;
 
-import java.io.InputStream;
 import java.net.URI;
 import java.util.List;
 
@@ -283,23 +282,23 @@ public class ReplicationService {
         return sysmeta;
     }
 
-    public InputStream getObjectFromCN(Identifier identifier) throws NotFound {
-        InputStream is = null;
-        if (identifier != null && identifier.getValue() != null) {
-            try {
-                is = cn.get(null, identifier);
-            } catch (InvalidToken e) {
-                log.error("Unable to get object from CN for pid: " + identifier.getValue(), e);
-            } catch (ServiceFailure e) {
-                log.error("Unable to get object from CN for pid: " + identifier.getValue(), e);
-            } catch (NotAuthorized e) {
-                log.error("Unable to get object from CN for pid: " + identifier.getValue(), e);
-            } catch (NotImplemented e) {
-                log.error("Unable to get object from CN for pid: " + identifier.getValue(), e);
-            }
-        }
-        return is;
-    }
+//    public InputStream getObjectFromCN(Identifier identifier) throws NotFound {
+//        InputStream is = null;
+//        if (identifier != null && identifier.getValue() != null) {
+//            try {
+//                is = cn.get(null, identifier);
+//            } catch (InvalidToken e) {
+//                log.error("Unable to get object from CN for pid: " + identifier.getValue(), e);
+//            } catch (ServiceFailure e) {
+//                log.error("Unable to get object from CN for pid: " + identifier.getValue(), e);
+//            } catch (NotAuthorized e) {
+//                log.error("Unable to get object from CN for pid: " + identifier.getValue(), e);
+//            } catch (NotImplemented e) {
+//                log.error("Unable to get object from CN for pid: " + identifier.getValue(), e);
+//            }
+//        }
+//        return is;
+//    }
 
     public NodeReference determineReplicationSourceNode(SystemMetadata sysMeta) {
         NodeReference source = null;
