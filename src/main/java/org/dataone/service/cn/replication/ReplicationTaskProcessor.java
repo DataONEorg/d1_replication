@@ -15,6 +15,8 @@ public class ReplicationTaskProcessor implements Runnable {
 
     private static Logger log = Logger.getLogger(ReplicationTaskProcessor.class);
 
+    //XXX why are these statics when we are getting them from a Factory?
+    //XXX (or why is the Factory exhibiting monostate behavior instead of building new things?)  
     private static ReplicationTaskRepository taskRepository = ReplicationFactory
             .getReplicationTaskRepository();
     private static ReplicationManager replicationManager = ReplicationFactory
@@ -22,7 +24,11 @@ public class ReplicationTaskProcessor implements Runnable {
 
     private static final int PAGE_SIZE = Settings.getConfiguration().getInt(
             "dataone.cn.replication.task.page.size", 200);
-
+    
+    /**
+     * queries the replication task repository for a page of 'NEW' tasks, and
+     * sends them to the ReplicationManager for execution. 
+     */
     @Override
     public void run() {
         if (ComponentActivationUtility.replicationIsActive()) {

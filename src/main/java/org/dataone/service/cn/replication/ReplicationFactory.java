@@ -24,7 +24,7 @@ import org.dataone.cn.data.repository.ReplicationPostgresRepositoryFactory;
 import org.dataone.cn.data.repository.ReplicationTaskRepository;
 
 /**
- * Factory class to provide consumers handle on replication objects
+ * Factory class to provide consumers a handle on various replication objects
  * 
  * @author sroseboo
  * 
@@ -63,22 +63,23 @@ public class ReplicationFactory {
     }
 
     public static ReplicationAttemptHistoryRepository getReplicationTryHistoryRepository() {
-        if (repositoryFactory == null) {
-            repositoryFactory = new ReplicationPostgresRepositoryFactory();
-        }
         if (tryHistoryRepository == null) {
-            tryHistoryRepository = repositoryFactory.getReplicationTryHistoryRepository();
+            tryHistoryRepository = getRepositoryFactory().getReplicationTryHistoryRepository();
         }
         return tryHistoryRepository;
     }
 
     public static ReplicationTaskRepository getReplicationTaskRepository() {
+        if (replicationTaskRepository == null) {
+            replicationTaskRepository = getRepositoryFactory().getReplicationTaskRepository();
+        }
+        return replicationTaskRepository;
+    }
+    
+    private static ReplicationRepositoryFactory getRepositoryFactory() {
         if (repositoryFactory == null) {
             repositoryFactory = new ReplicationPostgresRepositoryFactory();
         }
-        if (replicationTaskRepository == null) {
-            replicationTaskRepository = repositoryFactory.getReplicationTaskRepository();
-        }
-        return replicationTaskRepository;
+        return repositoryFactory;
     }
 }
