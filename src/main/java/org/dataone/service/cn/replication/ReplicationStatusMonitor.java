@@ -19,6 +19,7 @@
  */
 package org.dataone.service.cn.replication;
 
+import java.util.Date;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -52,6 +53,7 @@ public class ReplicationStatusMonitor implements Runnable {
     @Override
     public void run() {
         try {
+            Date reportDate = new Date();
             Map<String, Integer> summary = replicationDao.getCountsByNodeStatus();
             for (Entry<String, Integer> n : summary.entrySet()) {
                 String[] nodeStatusPair = StringUtils.split(n.getKey(),"-");
@@ -62,7 +64,8 @@ public class ReplicationStatusMonitor implements Runnable {
                         MetricEvent.REPLICA_STATUS, TypeFactory.buildNodeReference(nodeId));
                 metricLogEntry.setMessage(
                         String.format("Replica Status %s:  %d", status, n.getValue()));
-
+                metricLogEntry.setDateLogged(reportDate);
+                
                 MetricLogClientFactory.getMetricLogClient().logMetricEvent(metricLogEntry);
                 n.getValue();
             }

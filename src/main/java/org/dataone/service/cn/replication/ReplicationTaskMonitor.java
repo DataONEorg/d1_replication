@@ -1,5 +1,6 @@
 package org.dataone.service.cn.replication;
 
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -58,6 +59,8 @@ public class ReplicationTaskMonitor implements Runnable {
                 ReplicationTask task = it.next();
                 processCounters(task);
             }
+            
+            Date reportDate = new Date();
             // report tasks by Status
             for (Entry<String,Counter> n : statusCount.entrySet()) {
                 MetricLogEntry metricLogEntry = new MetricLogEntry(MetricEvent.REPLICATION_TASKS);
@@ -66,6 +69,7 @@ public class ReplicationTaskMonitor implements Runnable {
                                 n.getKey(), 
                                 n.getValue().getCount())
                                 );
+                metricLogEntry.setDateLogged(reportDate);
                 MetricLogClientFactory.getMetricLogClient().logMetricEvent(metricLogEntry);
             }
             
@@ -76,6 +80,7 @@ public class ReplicationTaskMonitor implements Runnable {
                         String.format("Replication Tasks: %d", 
                                 n.getValue().getCount())
                                 );
+                metricLogEntry.setDateLogged(reportDate);
                 MetricLogClientFactory.getMetricLogClient().logMetricEvent(metricLogEntry);
             }
             
