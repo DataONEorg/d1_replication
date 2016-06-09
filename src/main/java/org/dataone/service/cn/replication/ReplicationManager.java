@@ -126,6 +126,8 @@ public class ReplicationManager {
 
     private static final Integer DEFAULT_NUMBER_OF_REPLICAS = 3;
     private static final Integer REPLICATION_ATTEMPTS_PER_DAY = Integer.valueOf(10);
+    private long replicationTaskMonitorFreq;
+    private long replicationStatusMonitorFreq;
 
     /**
      * Constructor - singleton pattern, enforced by Spring application. Although
@@ -146,6 +148,12 @@ public class ReplicationManager {
         this.nodeReplicationStatusMapName = Settings.getConfiguration().getString(
                 "dataone.hazelcast.nodeReplicationStatusMap");
 
+        this.replicationTaskMonitorFreq = 
+                Settings.getConfiguration().getLong("replication.task.monitoring.freq.minutes",3L);
+        this.replicationStatusMonitorFreq = 
+                Settings.getConfiguration().getLong("replication.status.monitoring.freq.minutes",10L);
+        
+        
         // Connect to the Hazelcast storage cluster
         this.hzClient = HazelcastClientFactory.getStorageClient();
 
@@ -1027,7 +1035,7 @@ public class ReplicationManager {
                 || replicationTaskMonitoringScheduler.isShutdown()) {
             replicationTaskMonitoringScheduler = Executors.newSingleThreadScheduledExecutor();
             replicationTaskMonitoringScheduler.scheduleAtFixedRate(new ReplicationTaskMonitor(),
-                    0L, 3L, TimeUnit.MINUTES);
+                    0L, replicationTaskMonitorFreq, TimeUnit.MINUTES);
         }
     }
     
@@ -1036,7 +1044,7 @@ public class ReplicationManager {
                 || replicationStatusMonitoringScheduler.isShutdown()) {
             replicationStatusMonitoringScheduler = Executors.newSingleThreadScheduledExecutor();
             replicationStatusMonitoringScheduler.scheduleAtFixedRate(new ReplicationStatusMonitor(),
-                    1L, 10L, TimeUnit.MINUTES);
+                    1L, replicationStatusMonitorFreq, TimeUnit.MINUTES);
         }
     }
 
