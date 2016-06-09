@@ -175,6 +175,8 @@ public class ReplicationManager {
         startReplicationTaskProcessing();
         
         startReplicationMonitoring();
+        
+        startReplicationStatusMonitoring();
 
         // Report node status statistics on a scheduled basis
         // TODO: hold off on scheduling code for now
@@ -1026,6 +1028,15 @@ public class ReplicationManager {
             replicationTaskMonitoringScheduler = Executors.newSingleThreadScheduledExecutor();
             replicationTaskMonitoringScheduler.scheduleAtFixedRate(new ReplicationTaskMonitor(),
                     0L, 3L, TimeUnit.MINUTES);
+        }
+    }
+    
+    private void startReplicationStatusMonitoring() {
+        if (replicationStatusMonitoringScheduler == null
+                || replicationStatusMonitoringScheduler.isShutdown()) {
+            replicationStatusMonitoringScheduler = Executors.newSingleThreadScheduledExecutor();
+            replicationStatusMonitoringScheduler.scheduleAtFixedRate(new ReplicationStatusMonitor(),
+                    1L, 10L, TimeUnit.MINUTES);
         }
     }
 

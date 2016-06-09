@@ -108,7 +108,7 @@ public class ReplicationTaskQueue {
 
     /**
      * Indicates if a queued replica currently exists for the specified
-     * identifier and the memeber node specified by the nodeId parameter.
+     * identifier and the member node specified by the nodeId parameter.
      * 
      * @param nodeId
      * @param identifier
