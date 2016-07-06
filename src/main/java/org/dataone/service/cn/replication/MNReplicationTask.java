@@ -311,9 +311,10 @@ public class MNReplicationTask implements Serializable, Callable<String> {
             this.cn = D1Client.getCN();
 
         } catch (Exception e) {
-            log.warn("Caught a ServiceFailure while getting a reference to the CN "
+            log.warn("Caught an exception while getting a reference to the CN "
                     + "during replication task id " + getTaskid() + ", identifier "
-                    + getPid().getValue() + ", target node " + getTargetNode().getValue());
+                    + getPid().getValue() + ", target node " + getTargetNode().getValue()
+                    + ". Trying again...");
             // try again, then fail
             try {
                 Thread.sleep(5000L);
