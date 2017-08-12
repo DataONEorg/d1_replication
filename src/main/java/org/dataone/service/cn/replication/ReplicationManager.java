@@ -35,6 +35,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.log4j.Logger;
 import org.dataone.client.D1NodeFactory;
 import org.dataone.client.auth.CertificateManager;
@@ -50,6 +51,8 @@ import org.dataone.cn.data.repository.ReplicationTaskRepository;
 import org.dataone.cn.hazelcast.HazelcastClientFactory;
 import org.dataone.configuration.Settings;
 import org.dataone.service.cn.v2.CNReplication;
+import org.dataone.service.cn.v2.NodeRegistryService;
+import org.dataone.service.cn.v2.impl.NodeRegistryServiceImpl;
 import org.dataone.service.exceptions.BaseException;
 import org.dataone.service.exceptions.InvalidRequest;
 import org.dataone.service.exceptions.NotFound;
@@ -62,7 +65,6 @@ import org.dataone.service.types.v1.NodeReplicationPolicy;
 import org.dataone.service.types.v1.NodeType;
 import org.dataone.service.types.v1.ObjectFormatIdentifier;
 import org.dataone.service.types.v1.Replica;
-import org.dataone.service.types.v1.ReplicationPolicy;
 import org.dataone.service.types.v1.ReplicationStatus;
 import org.dataone.service.types.v1.Service;
 import org.dataone.service.types.v2.Node;
@@ -71,8 +73,6 @@ import org.dataone.service.types.v2.SystemMetadata;
 import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.core.ILock;
 import com.hazelcast.core.IMap;
-import org.dataone.service.cn.v2.NodeRegistryService;
-import org.dataone.service.cn.v2.impl.NodeRegistryServiceImpl;
 
 /**
  * A DataONE Coordinating Node implementation which manages replication queues
@@ -621,10 +621,11 @@ public class ReplicationManager {
      */
     protected boolean passesReplicationPolicies(Node node, SystemMetadata sysmeta) {
 
+        
         if (sysmeta.getReplicationPolicy() != null
-                && sysmeta.getReplicationPolicy().getBlockedMemberNodeList() != null
-                && sysmeta.getReplicationPolicy().getBlockedMemberNodeList()
-                .contains(node.getIdentifier()))
+                && CollectionUtils.isNotEmpty(sysmeta.getReplicationPolicy().getBlockedMemberNodeList()) 
+                && sysmeta.getReplicationPolicy().getBlockedMemberNodeList().contains(node.getIdentifier())
+                )
             return false;
 
         // if the target node doesn't have a policy, there are no more criteria to meet
@@ -632,15 +633,21 @@ public class ReplicationManager {
             return true;
         
         NodeReplicationPolicy nrp = node.getNodeReplicationPolicy();
-        if (nrp.getMaxObjectSize() != null && nrp.getMaxObjectSize().compareTo(sysmeta.getSize()) < 0)
+        if (nrp.getMaxObjectSize() != null 
+                && nrp.getMaxObjectSize().compareTo(sysmeta.getSize()) < 0
+                )
             return false;
 
         List<ObjectFormatIdentifier> allowedFormats = nrp.getAllowedObjectFormatList();
-        if (allowedFormats != null && !allowedFormats.contains(sysmeta.getFormatId()))
+        if ( CollectionUtils.isNotEmpty(allowedFormats)
+                && !allowedFormats.contains(sysmeta.getFormatId())
+                )
             return false;
 
         List<NodeReference> allowedNodes = nrp.getAllowedNodeList();
-        if (allowedNodes != null && !allowedNodes.contains(sysmeta.getAuthoritativeMemberNode()))
+        if ( CollectionUtils.isNotEmpty(allowedNodes)
+                && !allowedNodes.contains(sysmeta.getAuthoritativeMemberNode())
+                )
             return false;
 
         return true;
